@@ -1,9 +1,13 @@
 import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-// Resolve DB path relative to project root (one level up from server/)
-const DB_PATH = resolve(process.cwd(), 'data', 'beetree.db');
+// Resolve DB path relative to project root (one level up from server/).
+// Works regardless of the cwd the server is launched from.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const DB_PATH = resolve(__dirname, '..', 'data', 'beetree.db');
 
 mkdirSync(dirname(DB_PATH), { recursive: true });
 
