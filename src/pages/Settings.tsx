@@ -19,7 +19,7 @@ export function Settings() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `beelog-export-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `beetree-export-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
     flash('Exported data as JSON.');
@@ -27,7 +27,7 @@ export function Settings() {
 
   return (
     <div className="animate-fade-in">
-      <PageHeader title="Settings" subtitle="Manage your BeeLog data" />
+      <PageHeader title="Settings" subtitle="Manage your BeeTree data" />
 
       {/* App info */}
       <Card className="mb-4">
@@ -123,12 +123,12 @@ export function Settings() {
       {/* About */}
       <Card>
         <h3 className="text-sm font-semibold text-stone-700 mb-2 flex items-center gap-2">
-          <Info size={16} className="text-stone-400" /> About BeeLog
+          <Info size={16} className="text-stone-400" /> About BeeTree
         </h3>
         <p className="text-xs text-stone-500 leading-relaxed">
-          BeeLog is a mobile-first beekeeping management app inspired by APiLOG, enhanced with
-          BroodMinder sensor integration. All data is stored locally in your browser — nothing is sent
-          to a server. Sensor readings are currently mocked; connect InfluxDB for live data.
+          BeeTree is a mobile-first beekeeping management app inspired by APiLOG, enhanced with
+          BroodMinder sensor integration and a GBA Master Craftsman Beekeeper AI assistant.
+          Supported hive types: Langstroth 10/8-frame, Horizontal Long Hive, 5-frame Nuc, 7-frame Apimaye, Apimaye Queen Castle.
         </p>
         <p className="text-[11px] text-stone-400 mt-2">
           Supported hive types: Langstroth 10/8-frame, Horizontal Long Hive, 5-frame Nuc, 7-frame Apimaye, Apimaye Queen Castle.

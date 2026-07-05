@@ -83,6 +83,7 @@ function inspectionToForm(i: Inspection): InspectionFormData {
     colonyDead: i.colonyDead,
     notes: i.notes,
     photoUrls: i.photoUrls,
+    media: i.media ?? [],
   };
 }
 

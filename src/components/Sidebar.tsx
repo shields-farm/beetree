@@ -19,7 +19,7 @@ export function Sidebar() {
           <Hexagon size={20} className="text-white" fill="white" />
         </div>
         <div>
-          <div className="font-bold text-stone-800 leading-tight">BeeLog</div>
+          <div className="font-bold text-stone-800 leading-tight">BeeTree</div>
           <div className="text-[10px] text-stone-400 leading-tight">Beekeeping Manager</div>
         </div>
       </div>
@@ -46,7 +46,7 @@ export function Sidebar() {
         })}
       </nav>
       <div className="px-4 py-3 border-t border-stone-100">
-        <p className="text-[10px] text-stone-300">BeeLog v0.1 · local-only</p>
+        <p className="text-[10px] text-stone-300">BeeTree v0.1 · local-only</p>
       </div>
     </aside>
   );
