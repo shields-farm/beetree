@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Plus, Trash2, Mic, Camera, Check, AlertTriangle } from 'lucide-react';
-import type { Concern, Inspection, QueenLayingPattern, StoreLevel, Temperament, PopulationSize, HealthStatus } from '../types';
+import { Plus, Trash2, Check, AlertTriangle } from 'lucide-react';
+import type { Concern, Inspection, MediaItem, QueenLayingPattern, StoreLevel, Temperament, PopulationSize, HealthStatus } from '../types';
 import {
   LAYING_PATTERN_OPTIONS,
   POPULATION_OPTIONS,
@@ -10,6 +10,7 @@ import {
 } from '../lib/hiveTypes';
 import { calculateHealth, HEALTH_META } from '../lib/health';
 import { LabelSlider, Slider } from './Slider';
+import { MediaCapture } from './MediaCapture';
 import { uid } from '../store/useStore';
 
 export interface InspectionFormData {
@@ -32,6 +33,7 @@ export interface InspectionFormData {
   colonyDead: boolean;
   notes: string;
   photoUrls: string[];
+  media: MediaItem[];
 }
 
 function defaultForm(hiveId: string): InspectionFormData {
@@ -55,6 +57,7 @@ function defaultForm(hiveId: string): InspectionFormData {
     colonyDead: false,
     notes: '',
     photoUrls: [],
+    media: [],
   };
 }
 
@@ -330,26 +333,14 @@ export function InspectionForm({ hiveId, initial, onSubmit, onCancel, submitLabe
         />
       </div>
 
-      {/* Photos & Voice */}
+      {/* Photos, Video & Voice */}
       <div className="bg-white rounded-2xl shadow-card border border-stone-100 p-4">
-        <SectionTitle>Photos &amp; Voice</SectionTitle>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            className="flex-1 py-3 rounded-xl border border-dashed border-stone-300 text-stone-500 text-sm flex flex-col items-center gap-1 hover:border-honey-400 hover:text-honey-600"
-          >
-            <Camera size={20} />
-            <span>Attach Photo</span>
-          </button>
-          <button
-            type="button"
-            className="flex-1 py-3 rounded-xl border border-dashed border-stone-300 text-stone-500 text-sm flex flex-col items-center gap-1 hover:border-honey-400 hover:text-honey-600"
-          >
-            <Mic size={20} />
-            <span>Voice Note</span>
-            <span className="text-[9px] text-stone-400">coming soon</span>
-          </button>
-        </div>
+        <SectionTitle>Photos, Video &amp; Voice</SectionTitle>
+        <MediaCapture
+          media={form.media}
+          onAdd={(item) => set('media', [...form.media, item])}
+          onRemove={(id) => set('media', form.media.filter((m) => m.id !== id))}
+        />
       </div>
 
       {/* Actions */}

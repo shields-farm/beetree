@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Hexagon, Settings as SettingsIcon } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { BottomNav } from './BottomNav';
+import { FloatingChat } from './FloatingChat';
 
 export function Layout({ children }: { children: ReactNode }) {
   return (
@@ -18,7 +19,7 @@ export function Layout({ children }: { children: ReactNode }) {
             <div className="w-7 h-7 rounded-lg bg-honey-500 flex items-center justify-center">
               <Hexagon size={16} className="text-white" fill="white" />
             </div>
-            <span className="font-bold text-stone-800">BeeLog</span>
+            <span className="font-bold text-stone-800">BeeTree</span>
           </Link>
           <Link to="/settings" className="p-1.5 text-stone-400 hover:text-stone-600">
             <SettingsIcon size={20} />
@@ -32,6 +33,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </main>
       </div>
       <BottomNav />
+      <FloatingChat />
     </div>
   );
 }
