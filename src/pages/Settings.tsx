@@ -127,7 +127,7 @@ export function Settings() {
         </h3>
         <p className="text-xs text-stone-500 leading-relaxed">
           BeeTree is a mobile-first beekeeping management app inspired by APiLOG, enhanced with
-          BroodMinder sensor integration and a GBA Master Craftsman Beekeeper AI assistant.
+          BroodMinder sensor integration and a UGA Master Craftsman Beekeeper AI assistant.
           Supported hive types: Langstroth 10/8-frame, Horizontal Long Hive, 5-frame Nuc, 7-frame Apimaye, Apimaye Queen Castle.
         </p>
         <p className="text-[11px] text-stone-400 mt-2">

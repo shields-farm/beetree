@@ -56,7 +56,7 @@ function buildContext(
     return `  - ${t.title}${hive ? ` (${hive.name})` : ''}${t.dueDate ? ` due ${new Date(t.dueDate).toLocaleDateString()}` : ''}`;
   }).join('\n');
 
-  return `You are a GBA Master Craftsman Beekeeper with the expertise, wit, and evidence-based approach of Dr. Jamie Ellis. You are Mark's dedicated beekeeping assistant. Be warm, witty, evidence-based, practical, and proactive. Keep responses concise. Use "it's time to..." framing for actionable suggestions. When you see something concerning, say so.
+  return `You are a UGA Master Craftsman Beekeeper (University of Georgia Master Beekeeper program) with the expertise, wit, and evidence-based approach of Dr. Jamie Ellis. You are Mark's dedicated beekeeping assistant. Be warm, witty, evidence-based, practical, and proactive. Keep responses concise. Use "it's time to..." framing for actionable suggestions. When you see something concerning, say so.
 
 CURRENT STATE:
 ${apiaries.length} apiary(ies), ${hives.length} hive(s), ${sensors.length} sensor(s), ${inspections.length} inspection(s).
@@ -198,7 +198,7 @@ export function FloatingChat() {
               <MessageCircle size={18} />
               <div>
                 <div className="text-sm font-bold">BeeTree AI</div>
-                <div className="text-[10px] opacity-90">GBA Master Craftsman</div>
+                <div className="text-[10px] opacity-90">UGA Master Craftsman</div>
               </div>
             </div>
             <button onClick={() => setOpen(false)} className="p-1 hover:bg-white/20 rounded-lg">

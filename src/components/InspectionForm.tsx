@@ -152,9 +152,15 @@ export function InspectionForm({ hiveId, initial, onSubmit, onCancel, submitLabe
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Brood & Queen */}
+      {/* ─── PILLAR 1: QUEEN HEALTH ─── */}
       <div className="bg-white rounded-2xl shadow-card border border-stone-100 p-4">
-        <SectionTitle>Brood &amp; Queen</SectionTitle>
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-lg">👑</span>
+          <div>
+            <h3 className="text-sm font-semibold text-stone-700 uppercase tracking-wide">Queen Health</h3>
+            <p className="text-[10px] text-stone-400">Pillar 1 of 3 — Jamie Ellis</p>
+          </div>
+        </div>
         <div className="divide-y divide-stone-100">
           <CheckRow label="Queen present" checked={form.queenPresent} onChange={(v) => set('queenPresent', v)} />
           <CheckRow label="Queen cells" checked={form.queenCells} onChange={(v) => set('queenCells', v)} />
@@ -167,32 +173,30 @@ export function InspectionForm({ hiveId, initial, onSubmit, onCancel, submitLabe
             onChange={(v) => set('queenLayingPattern', v as QueenLayingPattern)}
           />
         </div>
-      </div>
-
-      {/* Brood Status */}
-      <div className="bg-white rounded-2xl shadow-card border border-stone-100 p-4">
-        <SectionTitle>Brood Status</SectionTitle>
-        <div className="divide-y divide-stone-100">
+        <div className="pt-2 divide-y divide-stone-100">
           <CheckRow label="Eggs present" checked={form.eggsPresent} onChange={(v) => set('eggsPresent', v)} />
           <CheckRow label="Larvae present" checked={form.larvaePresent} onChange={(v) => set('larvaePresent', v)} />
           <CheckRow label="Capped brood" checked={form.cappedBrood} onChange={(v) => set('cappedBrood', v)} />
         </div>
+        <div className="pt-2">
+          <SelectRow
+            label="Bee temperament"
+            value={form.temperament}
+            options={TEMPERAMENT_OPTIONS}
+            onChange={(v) => set('temperament', v as Temperament)}
+          />
+        </div>
       </div>
 
-      {/* Temperament */}
-      <div className="bg-white rounded-2xl shadow-card border border-stone-100 p-4">
-        <SectionTitle>Temperament</SectionTitle>
-        <SelectRow
-          label="Bee temperament"
-          value={form.temperament}
-          options={TEMPERAMENT_OPTIONS}
-          onChange={(v) => set('temperament', v as Temperament)}
-        />
-      </div>
-
-      {/* Resources */}
+      {/* ─── PILLAR 2: NUTRITION ─── */}
       <div className="bg-white rounded-2xl shadow-card border border-stone-100 p-4 space-y-5">
-        <SectionTitle>Resources</SectionTitle>
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-lg">🍯</span>
+          <div>
+            <h3 className="text-sm font-semibold text-stone-700 uppercase tracking-wide">Nutrition</h3>
+            <p className="text-[10px] text-stone-400">Pillar 2 of 3 — honey &amp; pollen stores, population</p>
+          </div>
+        </div>
         <LabelSlider<StoreLevel>
           label="Honey stores"
           value={form.honeyStores}
@@ -205,24 +209,14 @@ export function InspectionForm({ hiveId, initial, onSubmit, onCancel, submitLabe
           options={STORE_LEVEL_OPTIONS}
           onChange={(v) => set('pollenStores', v)}
         />
-      </div>
-
-      {/* Population */}
-      <div className="bg-white rounded-2xl shadow-card border border-stone-100 p-4">
-        <SectionTitle>Colony Population</SectionTitle>
         <LabelSlider<PopulationSize>
           label="Population size"
           value={form.populationSize}
           options={POPULATION_OPTIONS}
           onChange={(v) => set('populationSize', v)}
         />
-      </div>
-
-      {/* Weight */}
-      <div className="bg-white rounded-2xl shadow-card border border-stone-100 p-4">
-        <SectionTitle>Hive Weight</SectionTitle>
         <Slider
-          label="Weight"
+          label="Hive weight"
           value={form.hiveWeight}
           min={0}
           max={250}
@@ -232,9 +226,67 @@ export function InspectionForm({ hiveId, initial, onSubmit, onCancel, submitLabe
         />
       </div>
 
-      {/* Health */}
+      {/* ─── PILLAR 3: PESTS & DISEASES ─── */}
       <div className="bg-white rounded-2xl shadow-card border border-stone-100 p-4">
-        <SectionTitle>Overall Health</SectionTitle>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">🐝</span>
+            <div>
+              <h3 className="text-sm font-semibold text-stone-700 uppercase tracking-wide">Pests &amp; Diseases</h3>
+              <p className="text-[10px] text-stone-400">Pillar 3 of 3 — varroa, SHB, concerns</p>
+            </div>
+          </div>
+          <button type="button" onClick={addConcern} className="text-xs text-honey-600 font-medium flex items-center gap-1 hover:text-honey-700">
+            <Plus size={14} /> Add
+          </button>
+        </div>
+
+        <div className="space-y-2">
+          {form.concerns.map((c) => (
+            <div key={c.id} className="flex items-start gap-2 bg-stone-50 rounded-lg p-2">
+              <input
+                value={c.type}
+                onChange={(e) => updateConcern(c.id, { type: e.target.value })}
+                placeholder="e.g., Varroa mites, Small hive beetles, Wax moths"
+                className="flex-1 min-w-0 bg-transparent text-sm border-b border-stone-200 pb-1 focus:border-honey-400 outline-none"
+              />
+              <input
+                type="number"
+                value={c.count ?? ''}
+                onChange={(e) => updateConcern(c.id, { count: e.target.value ? Number(e.target.value) : undefined })}
+                placeholder="count"
+                className="w-16 bg-transparent text-sm border-b border-stone-200 pb-1 text-right focus:border-honey-400 outline-none"
+              />
+              <button type="button" onClick={() => removeConcern(c.id)} className="text-stone-400 hover:text-red-500 p-1">
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+          {form.concerns.length === 0 && (
+            <p className="text-xs text-stone-400 italic">No concerns recorded. Tap "Add" to log varroa counts, beetles, moths, etc.</p>
+          )}
+        </div>
+
+        <div className="mt-3 pt-3 border-t border-stone-100">
+          <CheckRow
+            label="Colony found dead"
+            checked={form.colonyDead}
+            onChange={(v) => set('colonyDead', v)}
+          />
+          {form.colonyDead && (
+            <div className="mt-1 flex items-center gap-1.5 text-xs text-red-600">
+              <AlertTriangle size={13} /> Marked as dead — health will be set to Critical.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Overall Health Summary */}
+      <div className="bg-white rounded-2xl shadow-card border border-stone-100 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-lg">📋</span>
+          <h3 className="text-sm font-semibold text-stone-700 uppercase tracking-wide">Overall Health</h3>
+        </div>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <span className={`inline-block w-2.5 h-2.5 rounded-full ${hm.dot}`} />
@@ -268,57 +320,8 @@ export function InspectionForm({ hiveId, initial, onSubmit, onCancel, submitLabe
             ))}
           </div>
         ) : (
-          <p className="text-xs text-stone-400">Auto-calculated from inspection fields.</p>
+          <p className="text-xs text-stone-400">Auto-calculated from the three pillars above.</p>
         )}
-      </div>
-
-      {/* Concerns */}
-      <div className="bg-white rounded-2xl shadow-card border border-stone-100 p-4">
-        <div className="flex items-center justify-between mb-3">
-          <SectionTitle>Counts &amp; Concerns</SectionTitle>
-          <button type="button" onClick={addConcern} className="text-xs text-honey-600 font-medium flex items-center gap-1 hover:text-honey-700">
-            <Plus size={14} /> Add
-          </button>
-        </div>
-
-        <div className="space-y-2">
-          {form.concerns.map((c) => (
-            <div key={c.id} className="flex items-start gap-2 bg-stone-50 rounded-lg p-2">
-              <input
-                value={c.type}
-                onChange={(e) => updateConcern(c.id, { type: e.target.value })}
-                placeholder="Concern type (e.g., Varroa count)"
-                className="flex-1 min-w-0 bg-transparent text-sm border-b border-stone-200 pb-1 focus:border-honey-400 outline-none"
-              />
-              <input
-                type="number"
-                value={c.count ?? ''}
-                onChange={(e) => updateConcern(c.id, { count: e.target.value ? Number(e.target.value) : undefined })}
-                placeholder="count"
-                className="w-16 bg-transparent text-sm border-b border-stone-200 pb-1 text-right focus:border-honey-400 outline-none"
-              />
-              <button type="button" onClick={() => removeConcern(c.id)} className="text-stone-400 hover:text-red-500 p-1">
-                <Trash2 size={14} />
-              </button>
-            </div>
-          ))}
-          {form.concerns.length === 0 && (
-            <p className="text-xs text-stone-400 italic">No concerns recorded. Tap "Add" to log varroa counts, beetles, etc.</p>
-          )}
-        </div>
-
-        <div className="mt-3 pt-3 border-t border-stone-100">
-          <CheckRow
-            label="Colony found dead"
-            checked={form.colonyDead}
-            onChange={(v) => set('colonyDead', v)}
-          />
-          {form.colonyDead && (
-            <div className="mt-1 flex items-center gap-1.5 text-xs text-red-600">
-              <AlertTriangle size={13} /> Marked as dead — health will be set to Critical.
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Notes */}
