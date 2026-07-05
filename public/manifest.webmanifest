@@ -1,0 +1,18 @@
+{
+  "name": "BeeLog",
+  "short_name": "BeeLog",
+  "description": "Modern beekeeping management with BroodMinder sensor integration",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#faf7f2",
+  "theme_color": "#f59e0b",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
