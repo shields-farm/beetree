@@ -164,6 +164,7 @@ export const SEED_INSPECTIONS: Inspection[] = [
     colonyDead: false,
     notes: 'Colony booming. Saw marked queen on frame 4. Capped honey in top box.',
     photoUrls: [],
+    media: [],
   },
   {
     id: 'insp-2',
@@ -186,6 +187,7 @@ export const SEED_INSPECTIONS: Inspection[] = [
     colonyDead: false,
     notes: 'Long hive looking healthy. Bees covering 14 of 25 frames.',
     photoUrls: [],
+    media: [],
   },
   {
     id: 'insp-3',
@@ -210,6 +212,7 @@ export const SEED_INSPECTIONS: Inspection[] = [
     colonyDead: false,
     notes: 'Queen cells present — possible supersedure. Treating for varroa.',
     photoUrls: [],
+    media: [],
   },
 ];
 

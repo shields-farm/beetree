@@ -94,6 +94,15 @@ export interface Concern {
   note?: string;
 }
 
+export interface MediaItem {
+  id: string;
+  type: 'photo' | 'video' | 'audio';
+  dataUrl: string;
+  timestamp: string;
+  label?: string;
+  duration?: number;
+}
+
 export interface Inspection {
   id: string;
   hiveId: string;
@@ -115,6 +124,7 @@ export interface Inspection {
   colonyDead: boolean;
   notes: string;
   photoUrls: string[];
+  media: MediaItem[];
 }
 
 export interface Task {

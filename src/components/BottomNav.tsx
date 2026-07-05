@@ -1,26 +1,22 @@
-import { LayoutDashboard, MapPin, Boxes, ClipboardList, Thermometer, CheckSquare, Settings as SettingsIcon } from 'lucide-react';
+import { LayoutDashboard, Boxes, ClipboardList, Thermometer, CheckSquare } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 const NAV_ITEMS = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/apiaries', label: 'Apiaries', icon: MapPin },
+  { to: '/', label: 'Home', icon: LayoutDashboard, end: true },
   { to: '/hives', label: 'Hives', icon: Boxes },
-  { to: '/inspections', label: 'Inspections', icon: ClipboardList },
+  { to: '/inspections', label: 'Inspect', icon: ClipboardList },
   { to: '/sensors', label: 'Sensors', icon: Thermometer },
   { to: '/tasks', label: 'Tasks', icon: CheckSquare },
-  { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ];
 
 export function BottomNav() {
-  // Show 5 main tabs; Settings accessed via a "more" or just include 6. We'll show 5 + settings squeezed.
-  const items = NAV_ITEMS.slice(0, 5);
   return (
     <nav
       className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-stone-200"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
     >
       <div className="flex items-stretch justify-around max-w-lg mx-auto">
-        {items.map((item) => {
+        {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           return (
             <NavLink

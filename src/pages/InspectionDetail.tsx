@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Pencil, Trash2, Check, AlertTriangle, Mic, Camera } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2, Check, AlertTriangle, Mic } from 'lucide-react';
 import { format } from 'date-fns';
 import { useStore } from '../store/useStore';
 import { SectionCard } from '../components/Card';
@@ -138,19 +138,37 @@ export function InspectionDetail({ id }: { id: string }) {
         </SectionCard>
       )}
 
-      <SectionCard title="Photos & Voice" className="mt-4">
-        <div className="flex gap-3">
-          <div className="flex-1 py-3 rounded-xl border border-dashed border-stone-200 text-stone-400 text-xs flex flex-col items-center gap-1">
-            <Camera size={20} />
-            <span>{insp.photoUrls.length} photo{insp.photoUrls.length !== 1 ? 's' : ''}</span>
+      {/* Media */}
+      {insp.media && insp.media.length > 0 ? (
+        <SectionCard title="Photos, Video & Voice" className="mt-4">
+          <div className="space-y-3">
+            {insp.media.filter((m) => m.type === 'photo').length > 0 && (
+              <div className="grid grid-cols-3 gap-2">
+                {insp.media.filter((m) => m.type === 'photo').map((p) => (
+                  <div key={p.id} className="rounded-lg overflow-hidden aspect-square">
+                    <img src={p.dataUrl} alt="" className="w-full h-full object-cover" />
+                  </div>
+                ))}
+              </div>
+            )}
+            {insp.media.filter((m) => m.type === 'video').map((v) => (
+              <div key={v.id} className="rounded-lg overflow-hidden bg-stone-900">
+                <video src={v.dataUrl} controls className="w-full max-h-48" />
+              </div>
+            ))}
+            {insp.media.filter((m) => m.type === 'audio').map((a) => (
+              <div key={a.id} className="flex items-center gap-2 rounded-lg bg-purple-50 border border-purple-100 p-2.5">
+                <Mic size={16} className="text-purple-600 shrink-0" />
+                <audio src={a.dataUrl} controls className="flex-1 h-8" />
+              </div>
+            ))}
           </div>
-          <div className="flex-1 py-3 rounded-xl border border-dashed border-stone-200 text-stone-400 text-xs flex flex-col items-center gap-1">
-            <Mic size={20} />
-            <span>Voice notes</span>
-            <span className="text-[9px]">coming soon</span>
-          </div>
-        </div>
-      </SectionCard>
+        </SectionCard>
+      ) : (
+        <SectionCard title="Photos, Video & Voice" className="mt-4">
+          <p className="text-xs text-stone-400 text-center py-2">No media attached.</p>
+        </SectionCard>
+      )}
 
       {hive && (
         <Link

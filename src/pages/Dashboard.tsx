@@ -1,170 +1,58 @@
 import { Link } from 'react-router-dom';
-import { MapPin, Boxes, Thermometer, ClipboardList, CheckSquare, TrendingUp, AlertCircle } from 'lucide-react';
-import { formatDistanceToNow, isToday, isPast } from 'date-fns';
+import { Clock, ChevronRight, AlertCircle } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { PageHeader } from '../components/Layout';
-import { Card } from '../components/Card';
-import { HEALTH_META } from '../lib/health';
-import { HIVE_TYPES } from '../lib/hiveTypes';
+import { generateAlerts, ALERT_META, type Alert } from '../lib/alerts';
 
 export function Dashboard() {
   const { apiaries, hives, inspections, sensors, tasks } = useStore();
+  const alerts = generateAlerts(hives, inspections, sensors, tasks);
 
-  const recentInspections = [...inspections].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4);
-  const dueTasks = tasks.filter((t) => !t.completed && (!t.dueDate || isPast(new Date(t.dueDate))));
-  const hivesWithSensors = hives.filter((h) => h.sensorIds && h.sensorIds.length > 0);
-  const healthCounts = hives.reduce<Record<string, number>>((acc, h) => {
-    acc[h.healthStatus] = (acc[h.healthStatus] ?? 0) + 1;
-    return acc;
-  }, {});
+  const urgentCount = alerts.filter((a) => a.severity === 'urgent').length;
+  const warningCount = alerts.filter((a) => a.severity === 'warning').length;
 
   return (
     <div className="animate-fade-in">
-      <PageHeader title="Dashboard" subtitle={`${apiaries.length} apiaries · ${hives.length} hives`} />
+      {/* "It's Time To..." — front and center */}
+      <div className="mb-6">
+        <div className="flex items-center gap-2 mb-3">
+          <Clock size={20} className="text-honey-600" />
+          <h1 className="text-xl font-bold text-stone-800">It's Time To...</h1>
+          {(urgentCount > 0 || warningCount > 0) && (
+            <span className="text-xs text-stone-400 ml-auto">
+              {urgentCount > 0 && <span className="text-red-500 font-medium">{urgentCount} urgent</span>}
+              {urgentCount > 0 && warningCount > 0 && <span className="text-stone-300 mx-1">·</span>}
+              {warningCount > 0 && <span className="text-amber-600 font-medium">{warningCount} warnings</span>}
+            </span>
+          )}
+        </div>
 
-      {/* Stat tiles */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-        <StatTile icon={<MapPin size={20} />} value={apiaries.length} label="Apiaries" to="/apiaries" color="bg-emerald-50 text-emerald-600" />
-        <StatTile icon={<Boxes size={20} />} value={hives.length} label="Hives" to="/hives" color="bg-honey-50 text-honey-600" />
-        <StatTile icon={<Thermometer size={20} />} value={sensors.length} label="Sensors" to="/sensors" color="bg-sky-50 text-sky-600" />
-        <StatTile icon={<ClipboardList size={20} />} value={inspections.length} label="Inspections" to="/inspections" color="bg-purple-50 text-purple-600" />
-      </div>
-
-      <div className="grid lg:grid-cols-2 gap-4">
-        {/* Health overview */}
-        <Card>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-stone-800 flex items-center gap-2">
-              <TrendingUp size={16} className="text-honey-600" /> Health Overview
-            </h3>
-            <Link to="/hives" className="text-xs text-honey-600 font-medium">View all →</Link>
+        {alerts.length === 0 ? (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 text-center">
+            <p className="text-sm text-emerald-700 font-medium">All caught up 🎉</p>
+            <p className="text-xs text-emerald-600 mt-1">No urgent tasks right now. Check back after your next inspection.</p>
           </div>
+        ) : (
           <div className="space-y-2">
-            {HEALTH_META_ORDER.map((key) => {
-              const count = healthCounts[key] ?? 0;
-              if (count === 0 && key !== 'good') return null;
-              const meta = HEALTH_META[key];
-              const pct = hives.length > 0 ? (count / hives.length) * 100 : 0;
-              return (
-                <div key={key} className="flex items-center gap-2">
-                  <span className={`text-xs font-medium w-16 ${meta.text}`}>{meta.label}</span>
-                  <div className="flex-1 h-2.5 rounded-full bg-stone-100 overflow-hidden">
-                    <div className={`h-full ${meta.dot} rounded-full transition-all`} style={{ width: `${pct}%` }} />
-                  </div>
-                  <span className="text-xs text-stone-400 w-6 text-right">{count}</span>
-                </div>
-              );
-            })}
-            {hives.length === 0 && <p className="text-xs text-stone-400">No hives yet.</p>}
+            {alerts.map((alert) => (
+              <AlertCard key={alert.id} alert={alert} />
+            ))}
           </div>
-        </Card>
-
-        {/* Tasks due */}
-        <Card>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-stone-800 flex items-center gap-2">
-              <CheckSquare size={16} className="text-honey-600" /> Tasks Due
-            </h3>
-            <Link to="/tasks" className="text-xs text-honey-600 font-medium">All tasks →</Link>
-          </div>
-          {dueTasks.length === 0 ? (
-            <p className="text-xs text-stone-400">No overdue tasks. 🎉</p>
-          ) : (
-            <div className="space-y-2">
-              {dueTasks.slice(0, 4).map((t) => {
-                return (
-                  <Link
-                    key={t.id}
-                    to="/tasks"
-                    className="flex items-center gap-2 py-1.5 group"
-                  >
-                    <span className={`w-1.5 h-1.5 rounded-full ${t.priority === 'high' ? 'bg-red-500' : t.priority === 'medium' ? 'bg-amber-500' : 'bg-stone-400'}`} />
-                    <span className="text-sm text-stone-700 truncate flex-1 group-hover:text-honey-700">{t.title}</span>
-                    {t.dueDate && (
-                      <span className="text-[10px] text-red-500">
-                        {isToday(new Date(t.dueDate)) ? 'Today' : formatDistanceToNow(new Date(t.dueDate), { addSuffix: true })}
-                      </span>
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </Card>
-
-        {/* Recent inspections */}
-        <Card>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-stone-800 flex items-center gap-2">
-              <ClipboardList size={16} className="text-honey-600" /> Recent Inspections
-            </h3>
-            <Link to="/inspections" className="text-xs text-honey-600 font-medium">All →</Link>
-          </div>
-          {recentInspections.length === 0 ? (
-            <p className="text-xs text-stone-400">No inspections recorded yet.</p>
-          ) : (
-            <div className="space-y-2.5">
-              {recentInspections.map((i) => {
-                const hiveName = hives.find((h) => h.id === i.hiveId)?.name ?? 'Unknown hive';
-                const meta = HEALTH_META[i.healthStatus];
-                return (
-                  <Link key={i.id} to={`/inspections/${i.id}`} className="flex items-center gap-2.5 py-1 group">
-                    <span className={`w-2 h-2 rounded-full ${meta.dot}`} />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm text-stone-700 truncate group-hover:text-honey-700">{hiveName}</div>
-                      <div className="text-[10px] text-stone-400">
-                        {formatDistanceToNow(new Date(i.date), { addSuffix: true })}
-                      </div>
-                    </div>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${meta.bg} ${meta.text}`}>{meta.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </Card>
-
-        {/* Sensor overview */}
-        <Card>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-stone-800 flex items-center gap-2">
-              <Thermometer size={16} className="text-sky-600" /> Sensor Overview
-            </h3>
-            <Link to="/sensors" className="text-xs text-sky-600 font-medium">All →</Link>
-          </div>
-          {hivesWithSensors.length === 0 ? (
-            <p className="text-xs text-stone-400">No hives with sensors assigned.</p>
-          ) : (
-            <div className="space-y-2.5">
-              {hivesWithSensors.map((h) => {
-                const hiveSensors = sensors.filter((s) => s.hiveId === h.id);
-                const r = hiveSensors.find((s) => s.latestReading)?.latestReading;
-                return (
-                  <Link key={h.id} to={`/hives/${h.id}`} className="flex items-center gap-2.5 py-1 group">
-                    <Thermometer size={14} className="text-sky-500 shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm text-stone-700 truncate group-hover:text-sky-700">{h.name}</div>
-                      <div className="text-[10px] text-stone-400">{HIVE_TYPES[h.type].label}</div>
-                    </div>
-                    {r && (
-                      <div className="text-right">
-                        <div className="text-sm font-semibold text-orange-600">{r.temperature.toFixed(1)}°F</div>
-                        <div className="text-[10px] text-sky-600">{r.humidity.toFixed(0)}%</div>
-                      </div>
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </Card>
+        )}
       </div>
 
+      {/* Minimal quick stats — just the essentials */}
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        <QuickStat value={hives.length} label="Hives" to="/hives" />
+        <QuickStat value={sensors.length} label="Sensors" to="/sensors" />
+        <QuickStat value={inspections.length} label="Inspections" to="/inspections" />
+      </div>
+
+      {/* Welcome banner for empty state */}
       {hives.length === 0 && apiaries.length === 0 && (
-        <div className="mt-6 bg-honey-50 border border-honey-200 rounded-xl p-4 flex items-center gap-3">
+        <div className="mt-4 bg-honey-50 border border-honey-200 rounded-xl p-4 flex items-center gap-3">
           <AlertCircle size={20} className="text-honey-600 shrink-0" />
           <p className="text-sm text-honey-800">
-            Welcome to BeeLog! Sample data has been seeded. Go to <Link to="/settings" className="underline font-medium">Settings</Link> to reset or clear data.
+            Welcome to BeeTree! Sample data has been seeded. Go to <Link to="/settings" className="underline font-medium">Settings</Link> to reset or clear data.
           </p>
         </div>
       )}
@@ -172,16 +60,33 @@ export function Dashboard() {
   );
 }
 
-const HEALTH_META_ORDER = ['excellent', 'good', 'fair', 'poor', 'critical'] as const;
-
-function StatTile({ icon, value, label, to, color }: { icon: React.ReactNode; value: number; label: string; to: string; color: string }) {
+function AlertCard({ alert }: { alert: Alert }) {
+  const meta = ALERT_META[alert.severity];
   return (
-    <Link to={to} className="bg-white rounded-2xl shadow-card border border-stone-100 p-3.5 flex flex-col gap-2 active:scale-[0.98] transition-transform">
-      <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${color}`}>{icon}</div>
-      <div>
-        <div className="text-2xl font-bold text-stone-800 leading-none">{value}</div>
-        <div className="text-[11px] text-stone-400 mt-0.5">{label}</div>
+    <div className={`rounded-2xl border ${meta.border} ${meta.bg} p-3.5 flex items-start gap-3`}>
+      <span className={`w-2.5 h-2.5 rounded-full ${meta.dot} mt-1.5 shrink-0`} />
+      <div className="min-w-0 flex-1">
+        <div className={`text-sm font-semibold ${meta.text}`}>{alert.title}</div>
+        <div className="text-xs text-stone-600 mt-0.5 leading-relaxed">{alert.message}</div>
       </div>
+      {alert.actionRoute && (
+        <Link
+          to={alert.actionRoute}
+          className="text-xs font-medium text-honey-700 bg-white/70 px-3 py-1.5 rounded-lg shrink-0 hover:bg-white flex items-center gap-1"
+        >
+          {alert.actionLabel ?? 'Go'}
+          <ChevronRight size={12} />
+        </Link>
+      )}
+    </div>
+  );
+}
+
+function QuickStat({ value, label, to }: { value: number; label: string; to: string }) {
+  return (
+    <Link to={to} className="bg-white rounded-2xl shadow-card border border-stone-100 p-3 text-center active:scale-[0.97] transition-transform">
+      <div className="text-2xl font-bold text-stone-800">{value}</div>
+      <div className="text-[10px] text-stone-400 mt-0.5">{label}</div>
     </Link>
   );
 }
