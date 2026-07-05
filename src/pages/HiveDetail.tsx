@@ -4,6 +4,7 @@ import { ArrowLeft, Plus, Trash2, Pencil, Thermometer, ClipboardList, ChevronRig
 import { format } from 'date-fns';
 import { useStore } from '../store/useStore';
 import { Card } from '../components/Card';
+import { GpsPin } from '../components/GpsPin';
 import { HiveVisual } from '../components/HiveVisual';
 import { SensorCard } from '../components/SensorCard';
 import { HEALTH_META } from '../lib/health';
@@ -85,6 +86,15 @@ export function HiveDetail({ id }: { id: string }) {
             <Thermometer size={11} /> {hiveSensors.length} sensor{hiveSensors.length !== 1 ? 's' : ''}
           </span>
         )}
+      </div>
+
+      {/* GPS Location Pin */}
+      <div className="mb-4">
+        <GpsPin
+          hive={hive}
+          onPin={(location) => updateHive(hive.id, { location })}
+          onClear={() => updateHive(hive.id, { location: undefined })}
+        />
       </div>
 
       {editing && (
