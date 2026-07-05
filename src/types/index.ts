@@ -78,6 +78,13 @@ export interface Hive {
   sensorIds?: string[];
   notes?: string;
   createdAt: string;
+  location?: {
+    lat: number;
+    lng: number;
+    accuracy?: number; // meters
+    pinnedAt?: string; // ISO timestamp of when location was set
+    label?: string; // optional label like "near the oak tree"
+  };
 }
 
 export interface Concern {

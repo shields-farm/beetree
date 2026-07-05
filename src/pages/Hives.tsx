@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Boxes, Thermometer, ChevronRight } from 'lucide-react';
+import { Plus, Boxes, Thermometer, ChevronRight, MapPin } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { PageHeader } from '../components/Layout';
 import { Card } from '../components/Card';
@@ -110,6 +110,7 @@ export function Hives() {
                     <span className="text-stone-300">·</span>
                     {HIVE_TYPES[h.type].label}
                     {hasSensor && <Thermometer size={11} className="text-sky-500" />}
+                    {h.location && <MapPin size={11} className="text-honey-500" />}
                   </div>
                 </div>
                 <span className={`text-[10px] px-2 py-0.5 rounded-full ${meta.bg} ${meta.text}`}>{meta.label}</span>
