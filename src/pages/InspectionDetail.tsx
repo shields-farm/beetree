@@ -1,13 +1,16 @@
+import { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Pencil, Trash2, Check, AlertTriangle, Mic } from 'lucide-react';
 import { format } from 'date-fns';
 import { useStore } from '../store/useStore';
+import { useChat, AskAIButton } from '../components/ChatContext';
 import { SectionCard } from '../components/Card';
 import { HEALTH_META } from '../lib/health';
 import { HIVE_TYPES } from '../lib/hiveTypes';
 
 export function InspectionDetail({ id }: { id: string }) {
   const { inspections, hives, deleteInspection } = useStore();
+  const { setQuickQuestions } = useChat();
   const navigate = useNavigate();
   const insp = inspections.find((i) => i.id === id);
 
@@ -22,6 +25,21 @@ export function InspectionDetail({ id }: { id: string }) {
 
   const hive = hives.find((h) => h.id === insp.hiveId);
   const meta = HEALTH_META[insp.healthStatus];
+
+  // Page-specific quick questions about this inspection
+  useEffect(() => {
+    const hiveName = hive?.name ?? 'this hive';
+    const qs: string[] = [];
+    // Three-pillar focused questions
+    if (!insp.queenPresent) qs.push(`${hiveName} has no queen — what are my options?`);
+    if (insp.queenCells) qs.push(`${hiveName} has queen cells — is it swarming or supersedure?`);
+    if (insp.honeyStores === 'none' || insp.honeyStores === 'low') qs.push(`${hiveName} has low honey stores — should I feed?`);
+    if (insp.concerns.length > 0) qs.push(`Analyze the pest/disease concerns from this inspection`);
+    if (qs.length === 0) qs.push(`What does this inspection tell me about ${hiveName}?`);
+    qs.push(`What should I do next for ${hiveName}?`);
+    setQuickQuestions(qs);
+    return () => setQuickQuestions([]);
+  }, [insp, hive, setQuickQuestions]);
 
   const Field = ({ label, value }: { label: string; value: string | boolean }) => (
     <div className="flex items-center justify-between py-1.5">
@@ -72,6 +90,11 @@ export function InspectionDetail({ id }: { id: string }) {
         <span className={`text-sm font-bold ${meta.text}`}>{meta.label}{insp.healthAutoCalculated ? ' (auto)' : ''}</span>
       </div>
 
+      {/* Ask AI about this inspection */}
+      <div className="mb-4">
+        <AskAIButton prompt={`Analyze this inspection of ${hive?.name ?? 'the hive'}: health is ${meta.label}, queen ${insp.queenPresent ? 'present' : 'absent'}, honey stores ${insp.honeyStores}, ${insp.concerns.length} concern(s). What are the three-pillar takeaways (queen health, nutrition, pests/diseases)?`} label="Analyze this inspection" />
+      </div>
+
       {insp.colonyDead && (
         <div className="rounded-xl bg-red-100 px-4 py-3 mb-4 flex items-center gap-2">
           <AlertTriangle size={18} className="text-red-600" />
@@ -80,44 +103,32 @@ export function InspectionDetail({ id }: { id: string }) {
       )}
 
       <div className="grid sm:grid-cols-2 gap-4">
-        <SectionCard title="Brood & Queen">
+        {/* Pillar 1: Queen Health */}
+        <SectionCard title="👑 Queen Health">
           <div className="divide-y divide-stone-50">
             <Field label="Queen present" value={insp.queenPresent} />
             <Field label="Queen cells" value={insp.queenCells} />
             <Field label="Laying pattern" value={insp.queenLayingPattern} />
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Brood Status">
-          <div className="divide-y divide-stone-50">
             <Field label="Eggs present" value={insp.eggsPresent} />
             <Field label="Larvae present" value={insp.larvaePresent} />
             <Field label="Capped brood" value={insp.cappedBrood} />
+            <Field label="Temperament" value={insp.temperament.replace('-', ' ')} />
           </div>
         </SectionCard>
 
-        <SectionCard title="Temperament">
-          <Field label="Bee temperament" value={insp.temperament.replace('-', ' ')} />
-        </SectionCard>
-
-        <SectionCard title="Resources">
+        {/* Pillar 2: Nutrition */}
+        <SectionCard title="🍯 Nutrition">
           <div className="divide-y divide-stone-50">
             <Field label="Honey stores" value={insp.honeyStores} />
             <Field label="Pollen stores" value={insp.pollenStores} />
+            <Field label="Population size" value={insp.populationSize} />
+            <Field label="Hive weight" value={`${insp.hiveWeight} lbs`} />
           </div>
-        </SectionCard>
-
-        <SectionCard title="Colony Population">
-          <Field label="Population size" value={insp.populationSize} />
-        </SectionCard>
-
-        <SectionCard title="Hive Weight">
-          <Field label="Weight" value={`${insp.hiveWeight} lbs`} />
         </SectionCard>
       </div>
 
       {insp.concerns.length > 0 && (
-        <SectionCard title="Counts & Concerns" className="mt-4">
+        <SectionCard title="🐝 Pests & Diseases" className="mt-4">
           <div className="space-y-1.5">
             {insp.concerns.map((c) => (
               <div key={c.id} className="flex items-center justify-between text-sm py-1">
