@@ -1,10 +1,31 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { MessageCircle, Send, X, Sparkles, AlertCircle } from 'lucide-react';
+import { marked } from 'marked';
 import { useStore } from '../store/useStore';
 import { useChat } from './ChatContext';
 import { generateAlerts } from '../lib/alerts';
 import { HEALTH_META } from '../lib/health';
 import { HIVE_TYPES } from '../lib/hiveTypes';
+
+// Configure marked for compact output
+marked.setOptions({ breaks: true, gfm: true });
+
+/** Extract the last italic line as a follow-up question, remove it from content */
+function extractFollowUp(content: string): { body: string; followUp: string | null } {
+  const match = content.match(/\*(.+?)\*\s*$/);
+  if (match) {
+    return {
+      body: content.slice(0, match.index).trim(),
+      followUp: match[1].trim(),
+    };
+  }
+  return { body: content, followUp: null };
+}
+
+/** Render markdown as HTML (sanitized — we control the input) */
+function renderMarkdown(text: string): string {
+  return marked.parse(text) as string;
+}
 
 interface ChatMessage {
   id: string;
@@ -57,7 +78,18 @@ function buildContext(
     return `  - ${t.title}${hive ? ` (${hive.name})` : ''}${t.dueDate ? ` due ${new Date(t.dueDate).toLocaleDateString()}` : ''}`;
   }).join('\n');
 
-  return `You are Buzz, a UGA Master Craftsman Beekeeper (University of Georgia Master Beekeeper program) with the expertise, wit, and evidence-based approach of Dr. Jamie Ellis. You are Mark's dedicated beekeeping assistant. Be warm, witty, evidence-based, practical, and proactive. Keep responses concise. Use "it's time to..." framing for actionable suggestions. When you see something concerning, say so.
+  return `You are Buzz, a UGA Master Craftsman Beekeeper (University of Georgia Master Beekeeper program) with the expertise and wit of Dr. Jamie Ellis. You are Mark's beekeeping assistant.
+
+RULES:
+- Keep it SHORT. 2-4 sentences max unless asked for detail.
+- Use PLAIN English. No jargon. Beekeepers may be new or not technical.
+- Use **bold** for key things (hive names, actions, warnings).
+- Use bullet points for lists.
+- Start with the answer. Don't pad.
+- Use "It's time to..." for actions.
+- If something is wrong, say so plainly.
+- Always END with one short follow-up question in italics, like: *Want me to walk through what to check?*
+- Be warm. Like a neighbor leaning over the fence.
 
 CURRENT STATE:
 ${apiaries.length} apiary(ies), ${hives.length} hive(s), ${sensors.length} sensor(s), ${inspections.length} inspection(s).
@@ -284,17 +316,48 @@ export function FloatingChat() {
                 </div>
               </div>
             )}
-            {messages.map((m) => (
-              <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap ${
-                  m.role === 'user'
-                    ? 'bg-honey-500 text-white rounded-br-md'
-                    : 'bg-stone-100 text-stone-700 rounded-bl-md'
-                }`}>
-                  {m.content}
+            {messages.map((m) => {
+              if (m.role === 'user') {
+                return (
+                  <div key={m.id} className="flex justify-end">
+                    <div className="max-w-[85%] rounded-2xl rounded-br-md px-3 py-2 text-sm bg-honey-500 text-white whitespace-pre-wrap">
+                      {m.content}
+                    </div>
+                  </div>
+                );
+              }
+              // Assistant: render markdown, extract follow-up
+              const { body, followUp } = extractFollowUp(m.content);
+              const html = renderMarkdown(body);
+              return (
+                <div key={m.id} className="flex justify-start">
+                  <div className="max-w-[90%] rounded-2xl rounded-bl-md px-3 py-2.5 text-sm bg-stone-100 text-stone-700">
+                    <div
+                      className="buzz-markdown"
+                      dangerouslySetInnerHTML={{ __html: html }}
+                    />
+                    {followUp && (
+                      <button
+                        onClick={() => {
+                          setInput(followUp);
+                          // Auto-send the follow-up
+                          setTimeout(() => {
+                            const textarea = inputRef.current;
+                            if (textarea) {
+                              const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+                              textarea.dispatchEvent(event);
+                            }
+                          }, 50);
+                        }}
+                        className="mt-2 block text-xs italic text-honey-700 bg-honey-50 border border-honey-200 rounded-full px-3 py-1.5 hover:bg-honey-100 transition-colors"
+                      >
+                        {followUp} →
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             {loading && (
               <div className="flex justify-start">
                 <div className="bg-stone-100 rounded-2xl rounded-bl-md px-4 py-3">
