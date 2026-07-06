@@ -50,7 +50,7 @@ export function Sidebar() {
         </div>
         <div>
           <div className="font-bold text-stone-800 dark:text-stone-100 leading-tight">BeeTree</div>
-          <div className="text-[10px] text-stone-400 dark:text-stone-500 leading-tight">Beekeeping Manager</div>
+          <div className="text-[10px] text-stone-400 dark:text-stone-500 leading-tight">Integrated Beekeeping Management</div>
         </div>
       </div>
       <nav className="flex-1 px-3 py-4 space-y-1">
