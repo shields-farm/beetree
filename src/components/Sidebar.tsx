@@ -1,4 +1,4 @@
-import { LayoutDashboard, MapPin, Boxes, ClipboardList, Thermometer, CheckSquare, Settings as SettingsIcon, Hexagon, Mic } from 'lucide-react';
+import { LayoutDashboard, MapPin, Boxes, ClipboardList, Thermometer, CheckSquare, Settings as SettingsIcon, Hexagon, Camera, Bug, Wind, CalendarClock, PenLine, TrendingUp, Pill, Flower2, AudioLines, Crown, GitCompare, Layers } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 const NAV_ITEMS = [
@@ -6,7 +6,18 @@ const NAV_ITEMS = [
   { to: '/apiaries', label: 'Apiaries', icon: MapPin },
   { to: '/hives', label: 'Hives', icon: Boxes },
   { to: '/inspections', label: 'Inspections', icon: ClipboardList },
-  { to: '/omi', label: 'Voice (Omi)', icon: Mic },
+  { to: '/schedule', label: 'Schedule', icon: CalendarClock },
+  { to: '/quick-inspect', label: 'Quick Inspect', icon: PenLine },
+  { to: '/frame-analysis', label: 'AI Frame Analysis', icon: Camera },
+  { to: '/varroa', label: 'Varroa Counter', icon: Bug },
+  { to: '/swarm', label: 'Swarm Risk', icon: Wind },
+  { to: '/trends', label: 'Health Trends', icon: TrendingUp },
+  { to: '/treatments', label: 'Treatments', icon: Pill },
+  { to: '/forage', label: 'Forage', icon: Flower2 },
+  { to: '/acoustics', label: 'Acoustics', icon: AudioLines },
+  { to: '/queen', label: 'Queen Track', icon: Crown },
+  { to: '/outliers', label: 'Outliers', icon: GitCompare },
+  { to: '/colony-map', label: 'Colony Map', icon: Layers },
   { to: '/sensors', label: 'Sensors', icon: Thermometer },
   { to: '/tasks', label: 'Tasks', icon: CheckSquare },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
