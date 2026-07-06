@@ -66,7 +66,7 @@ function buildContext(
     return `  - ${t.title}${hive ? ` (${hive.name})` : ''}${t.dueDate ? ` due ${new Date(t.dueDate).toLocaleDateString()}` : ''} [${t.priority}]`;
   }).join('\n');
 
-  return `You are BeeTree AI, Mark's beekeeping assistant. You have full context about his apiary operation below. Be helpful, specific, and proactive — suggest actions when you see something that needs attention. Keep responses concise and practical.
+  return `You are Buzz, Mark's beekeeping assistant. You have full context about his apiary operation below. Be helpful, specific, and proactive — suggest actions when you see something that needs attention. Keep responses concise and practical.
 
 CURRENT APIARY STATE:
 ${apiaries.length} apiary(ies), ${hives.length} hive(s), ${sensors.length} sensor(s), ${inspections.length} inspection(s) recorded.
@@ -115,7 +115,7 @@ export function ChatPage() {
       setMessages([{
         id: uid(),
         role: 'assistant',
-        content: `🐝 Hi Mark! I'm BeeTree AI, your beekeeping assistant. I can see your ${apiaries.length} apiaries, ${hives.length} hives, and ${sensors.length} sensors.
+        content: `🐝 Hi Mark! I'm Buzz, your beekeeping assistant. I can see your ${apiaries.length} apiaries, ${hives.length} hives, and ${sensors.length} sensors.
 
 ${urgentCount > 0 ? `⚠️ You have ${urgentCount} urgent alert${urgentCount !== 1 ? 's' : ''} that need attention.` : ''}
 ${warningCount > 0 ? `🟡 ${warningCount} warning${warningCount !== 1 ? 's' : ''} to review.` : ''}
@@ -208,7 +208,7 @@ Ask me about any hive, sensor trends, what needs attention, or what to do next. 
       <div className="flex items-center gap-2 mb-3">
         <MessageCircle size={20} className="text-honey-600" />
         <div>
-          <h1 className="text-lg font-bold text-stone-800">BeeTree AI</h1>
+          <h1 className="text-lg font-bold text-stone-800">Buzz</h1>
           <p className="text-[11px] text-stone-400">Your beekeeping assistant — knows your hives</p>
         </div>
       </div>
