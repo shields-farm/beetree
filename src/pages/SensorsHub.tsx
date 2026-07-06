@@ -81,7 +81,7 @@ function AnomalySummary() {
             <CheckCircle2 size={20} className="text-green-500" />
           )}
           <span className={'font-semibold text-sm ' + (totalAnomalies > 0 ? 'text-amber-800 dark:text-amber-200' : 'text-green-800 dark:text-green-200')}>
-            {totalAnomalies > 0 ? `${totalAnomalies} anomaly${totalAnomalies !== 1 ? 'ies' : 'y'} detected` : 'All sensors normal'}
+            {totalAnomalies > 0 ? `${totalAnomalies} ${totalAnomalies === 1 ? 'anomaly' : 'anomalies'}` : 'All sensors normal'}
           </span>
         </div>
         {summaryItems.length > 0 && (
