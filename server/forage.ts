@@ -7,6 +7,7 @@ export interface ForageFlow {
   endMonth: string;
   notes: string;
   significant?: boolean;
+  commonness?: number; // bloom duration in months — proxy for forage availability
   latinName?: string;
   plantType?: string;
 }
@@ -262,6 +263,7 @@ export function getAllForageSpecies(): ForageFlow[] {
   const now = new Date().getMonth();
   return BLOOM_CALENDAR.map((plant) => {
     const status = plantStatus(plant, now);
+    const duration = plant.end >= plant.start ? plant.end - plant.start + 1 : (12 - plant.start) + plant.end + 1;
     return {
       plant: plant.plant,
       status,
@@ -269,13 +271,16 @@ export function getAllForageSpecies(): ForageFlow[] {
       endMonth: monthName(plant.end),
       notes: plant.notes,
       significant: plant.significant,
+      commonness: duration, // months of bloom — higher = more commonly available
       latinName: plant.latinName,
       plantType: plant.plantType,
     } as ForageFlow;
   }).sort((a, b) => {
-    // Sort: significant first, then by start month
+    // Sort: significant first, then by commonness (longer bloom = more common), then by start month
     if (a.significant && !b.significant) return -1;
     if (!a.significant && b.significant) return 1;
+    const diff = (b.commonness || 0) - (a.commonness || 0);
+    if (diff !== 0) return diff;
     return 0;
   });
 }
