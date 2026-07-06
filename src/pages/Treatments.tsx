@@ -13,7 +13,7 @@ import {
 import { PageHeader } from '../components/Layout';
 import { Card } from '../components/Card';
 
-import { API_BASE, apiFetch } from '../lib/apiBase';
+import { API_BASE, apiFetch, statusToMessage } from '../lib/apiBase';
 
 interface Treatment {
   type: string;
@@ -65,7 +65,7 @@ export function Treatments() {
       setError(null);
       try {
         const resp = await apiFetch(API_BASE + '/api/treatment');
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        if (!resp.ok) throw new Error(statusToMessage(resp.status));
         const data = (await resp.json()) as TreatmentRecommendation[];
         if (!cancelled) setRecs(data);
       } catch (e) {

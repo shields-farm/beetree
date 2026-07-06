@@ -15,7 +15,7 @@ import { PageHeader } from '../components/Layout';
 import { Card } from '../components/Card';
 import { useStore } from '../store/useStore';
 
-import { API_BASE, apiFetch } from '../lib/apiBase';
+import { API_BASE, apiFetch, statusToMessage } from '../lib/apiBase';
 
 interface VarroaCount {
   miteCount: number;
@@ -82,7 +82,7 @@ export function VarroaCounter() {
       setHistoryLoading(true);
       try {
         const resp = await apiFetch(API_BASE + '/api/varroa/history/' + hiveId);
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        if (!resp.ok) throw new Error(statusToMessage(resp.status));
         const data = (await resp.json()) as VarroaHistoryEntry[];
         if (!cancelled) setHistory(data);
       } catch {
@@ -122,7 +122,7 @@ export function VarroaCounter() {
       });
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ error: 'HTTP ' + resp.status }));
-        throw new Error(err.error || 'HTTP ' + resp.status);
+        throw new Error(err.error || statusToMessage(resp.status));
       }
       const data = (await resp.json()) as { count: VarroaCount };
       setResult(data.count);
@@ -150,7 +150,7 @@ export function VarroaCounter() {
       });
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ error: 'HTTP ' + resp.status }));
-        throw new Error(err.error || 'HTTP ' + resp.status);
+        throw new Error(err.error || statusToMessage(resp.status));
       }
       setSaved(true);
       // Refresh history

@@ -12,7 +12,7 @@ import { PageHeader } from '../components/Layout';
 import { Card } from '../components/Card';
 import { useStore } from '../store/useStore';
 
-import { API_BASE, apiFetch } from '../lib/apiBase';
+import { API_BASE, apiFetch, statusToMessage } from '../lib/apiBase';
 
 interface SwarmFactor {
   factor: string;
@@ -52,7 +52,7 @@ export function SwarmRisk() {
       setError(null);
       try {
         const resp = await apiFetch(API_BASE + '/api/swarm/risk');
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        if (!resp.ok) throw new Error(statusToMessage(resp.status));
         const data = (await resp.json()) as SwarmRiskAssessment[];
         if (!cancelled) setAssessments(data);
       } catch (e) {
