@@ -8,12 +8,17 @@ import { HIVE_TYPES, makeEmptyFrames } from '../lib/hiveTypes';
 import { HEALTH_META } from '../lib/health';
 import type { HiveType } from '../types';
 
-export function Hives() {
+export function Hives({ apiaryFilter }: { apiaryFilter?: string }) {
   const { hives, apiaries, addHive } = useStore();
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState('');
-  const [apiaryId, setApiaryId] = useState(apiaries[0]?.id ?? '');
+  const [apiaryId, setApiaryId] = useState(apiaryFilter ?? apiaries[0]?.id ?? '');
   const [type, setType] = useState<HiveType>('langstroth-10');
+
+  // Filter hives by selected apiary when apiaryFilter is provided
+  const visibleHives = apiaryFilter
+    ? hives.filter((h) => h.apiaryId === apiaryFilter)
+    : hives;
 
   const handleAdd = () => {
     if (!name.trim() || !apiaryId) return;
@@ -41,7 +46,7 @@ export function Hives() {
     <div className="animate-fade-in">
       <PageHeader
         title="Hives"
-        subtitle={`${hives.length} hive${hives.length !== 1 ? 's' : ''}`}
+        subtitle={`${visibleHives.length} hive${visibleHives.length !== 1 ? 's' : ''}`}
         action={
           <button
             onClick={() => setShowAdd(!showAdd)}
@@ -93,7 +98,7 @@ export function Hives() {
       )}
 
       <div className="space-y-3">
-        {hives.map((h) => {
+        {visibleHives.map((h) => {
           const apiary = apiaries.find((a) => a.id === h.apiaryId);
           const meta = HEALTH_META[h.healthStatus];
           const hasSensor = h.sensorIds && h.sensorIds.length > 0;
@@ -119,7 +124,7 @@ export function Hives() {
             </Card>
           );
         })}
-        {hives.length === 0 && !showAdd && (
+        {visibleHives.length === 0 && !showAdd && (
           <p className="text-center text-sm text-stone-400 dark:text-stone-500 py-12">No hives yet. Tap + to add one.</p>
         )}
       </div>
