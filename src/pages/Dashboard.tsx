@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Clock, ChevronRight, Thermometer, TrendingUp, TrendingDown, Minus,
-  Flower2, Crown, Bug, AlertTriangle, CheckCircle2,
+  Flower2, Crown, Bug, AlertTriangle, CheckCircle2, Activity, Battery,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useChat, AskAIButton } from '../components/ChatContext';
@@ -10,6 +10,7 @@ import { generateAlerts, ALERT_META, type Alert } from '../lib/alerts';
 import { HEALTH_META } from '../lib/health';
 import { API_BASE, apiFetch } from '../lib/apiBase';
 import { getPestPrefs, filterTreatments } from '../lib/pestPrefs';
+import { useAnomalies } from '../lib/useAnomalies';
 
 // ─── Types (mirror server modules) ───────────────────────────────────────────
 interface ForageFlow {
@@ -95,6 +96,7 @@ export function Dashboard() {
   const { hives, inspections, sensors, tasks } = useStore();
   const { setQuickQuestions } = useChat();
   const alerts = generateAlerts(hives, inspections, sensors, tasks);
+  const anomalies = useAnomalies();
 
   const [forage, setForage] = useState<ForageForecast | null>(null);
   const [queenStatuses, setQueenStatuses] = useState<QueenStatus[]>([]);
@@ -329,6 +331,33 @@ export function Dashboard() {
           </PillarCard>
         </div>
       </div>
+
+      {/* ─── ANOMALIES BANNER (only if there are anomalies) ─────────────────── */}
+      {!anomalies.allClear && (
+        <Link
+          to="/sensors"
+          className="block bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 hover:border-amber-400 transition-colors"
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle size={18} className="text-amber-500 shrink-0" />
+            <span className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+              {anomalies.total} {anomalies.total === 1 ? 'sensor anomaly' : 'sensor anomalies'}
+            </span>
+            <ChevronRight size={14} className="text-amber-400 ml-auto" />
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            {anomalies.items.slice(0, 4).map((item, i) => (
+              <span key={i} className="text-xs text-amber-700 dark:text-amber-300">
+                <span className="font-medium">{item.count}</span> {item.label}
+                {item.detail && <span className="text-amber-500/70"> — {item.detail}</span>}
+              </span>
+            ))}
+            {anomalies.items.length > 4 && (
+              <span className="text-xs text-amber-500">+{anomalies.items.length - 4} more</span>
+            )}
+          </div>
+        </Link>
+      )}
 
       {/* ─── SECOND ROW: Sensors + Health (desktop grid) ─────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
