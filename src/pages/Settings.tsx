@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Database, RotateCcw, Trash2, Download, Upload, Hexagon, Info, Sun, Moon, Monitor, Key, Check, ShieldCheck } from 'lucide-react';
+import { Database, RotateCcw, Trash2, Download, Upload, Hexagon, Info, Sun, Moon, Monitor, Key, Check, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useTheme, type Theme } from '../contexts/ThemeContext';
 import { PageHeader } from '../components/Layout';
 import { Card } from '../components/Card';
-import { setApiKey as saveApiKey, hasApiKey } from '../lib/apiBase';
+import { setApiKey as saveApiKey, hasApiKey, API_BASE } from '../lib/apiBase';
 
 export function Settings() {
   const { apiaries, hives, inspections, sensors, tasks, resetToSeed, clearAll } = useStore();
@@ -197,19 +197,73 @@ function ApiKeyCard() {
   const [keyInput, setKeyInput] = useState('');
   const [saved, setSaved] = useState(hasApiKey());
   const [showKey, setShowKey] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<'ok' | 'fail' | null>(null);
 
-  const handleSave = () => {
-    if (keyInput.trim()) {
-      saveApiKey(keyInput.trim());
-      setSaved(true);
-      setKeyInput('');
-      setShowKey(false);
+  const handleSave = async () => {
+    const trimmed = keyInput.trim();
+    if (!trimmed) return;
+
+    // Test the key against the server before saving
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const resp = await fetch(API_BASE + '/api/apiaries', {
+        headers: { Authorization: 'Bearer ' + trimmed },
+      });
+      if (resp.ok) {
+        saveApiKey(trimmed);
+        setSaved(true);
+        setKeyInput('');
+        setShowKey(false);
+        setTestResult('ok');
+      } else {
+        setTestResult('fail');
+      }
+    } catch {
+      setTestResult('fail');
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  // Auto-detect key from server (only works when accessing from same machine)
+  const handleAutoDetect = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const resp = await fetch(API_BASE + '/api/key');
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.key) {
+          // Test the detected key
+          const testResp = await fetch(API_BASE + '/api/apiaries', {
+            headers: { Authorization: 'Bearer ' + data.key },
+          });
+          if (testResp.ok) {
+            saveApiKey(data.key);
+            setSaved(true);
+            setTestResult('ok');
+          } else {
+            setTestResult('fail');
+          }
+        } else {
+          setTestResult('fail');
+        }
+      } else {
+        setTestResult('fail');
+      }
+    } catch {
+      setTestResult('fail');
+    } finally {
+      setTesting(false);
     }
   };
 
   const handleClear = () => {
     saveApiKey('');
     setSaved(false);
+    setTestResult(null);
   };
 
   return (
@@ -241,7 +295,7 @@ function ApiKeyCard() {
             <input
               type={showKey ? 'text' : 'password'}
               value={keyInput}
-              onChange={(e) => setKeyInput(e.target.value)}
+              onChange={(e) => { setKeyInput(e.target.value); setTestResult(null); }}
               placeholder="Paste API key here"
               className="flex-1 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-3.5 py-2.5 text-sm font-mono"
             />
@@ -252,12 +306,35 @@ function ApiKeyCard() {
               {showKey ? 'Hide' : 'Show'}
             </button>
           </div>
+          {testResult === 'fail' && (
+            <div className="flex items-center gap-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 rounded-lg p-2.5">
+              <AlertCircle size={14} className="shrink-0" />
+              <span>Key rejected by server. Make sure you copied the full key from the server console.</span>
+            </div>
+          )}
+          {testResult === 'ok' && (
+            <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/30 rounded-lg p-2.5">
+              <Check size={14} className="shrink-0" />
+              <span>Key verified — API calls are now authenticated.</span>
+            </div>
+          )}
           <button
             onClick={handleSave}
-            disabled={!keyInput.trim()}
-            className="w-full py-2.5 rounded-xl bg-honey-500 text-white text-sm font-semibold disabled:opacity-50"
+            disabled={!keyInput.trim() || testing}
+            className="w-full py-2.5 rounded-xl bg-honey-500 text-white text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            Save API Key
+            {testing ? (
+              <><Loader2 size={16} className="animate-spin" /> Testing…</>
+            ) : (
+              'Save API Key'
+            )}
+          </button>
+          <button
+            onClick={handleAutoDetect}
+            disabled={testing}
+            className="w-full py-2 rounded-xl border border-stone-200 dark:border-stone-800 text-xs text-stone-500 dark:text-stone-400 hover:bg-stone-50 dark:hover:bg-stone-900 disabled:opacity-50"
+          >
+            {testing ? 'Testing…' : 'Auto-detect key (same machine only)'}
           </button>
         </div>
       )}

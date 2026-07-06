@@ -134,9 +134,17 @@ app.use((req, _res, next) => {
   next();
 });
 
-// Apply auth to all /api routes except health
+// Apply auth to all /api routes except health and key (local-only)
 app.use('/api', (req, res, next) => {
   if (req.path === '/health') return next();
+  if (req.path === '/key') {
+    // Only allow from localhost
+    const ip = req.ip || req.socket.remoteAddress || '';
+    if (ip.includes('127.0.0.1') || ip.includes('::1') || ip.includes('::ffff:127.0.0.1')) {
+      return next();
+    }
+    return res.status(403).json({ error: 'Key retrieval only available from localhost' });
+  }
   return authMiddleware(req, res, next);
 });
 
@@ -1597,6 +1605,12 @@ app.post('/api/chat', async (req, res) => {
 // /api/health check & 404
 // ============================================================================
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
+
+// Local-only endpoint to retrieve the API key (for easy device pairing).
+// The auth middleware above already restricts this to localhost.
+app.get('/api/key', (_req, res) => {
+  res.json({ key: API_KEY });
+});
 
 app.use((_req, res) => res.status(404).json({ error: 'not found' }));
 
