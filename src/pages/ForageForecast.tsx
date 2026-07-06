@@ -21,6 +21,9 @@ interface ForageFlow {
   startMonth: string;
   endMonth: string;
   notes: string;
+  significant?: boolean;
+  latinName?: string;
+  plantType?: string;
 }
 
 interface ForageForecast {
@@ -238,6 +241,150 @@ export function ForageForecast() {
           </Card>
         </div>
       )}
+
+      {/* Full species calendar with bloom timeline */}
+      <ForageSpeciesCalendar />
+
+    </div>
+  );
+}
+
+// ─── Forage Species Calendar with bloom timeline ──────────────────────────────
+const MONTHS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function monthToIndex(monthName: string): number {
+  return MONTH_LABELS.findIndex(m => monthName.startsWith(m));
+}
+
+function ForageSpeciesCalendar() {
+  const [species, setSpecies] = useState<ForageFlow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAll, setShowAll] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const resp = await apiFetch(API_BASE + '/api/forage/species/all');
+        if (!resp.ok) return;
+        const data = (await resp.json()) as ForageFlow[];
+        if (!cancelled) setSpecies(data);
+      } catch { /* ignore */ }
+      finally { if (!cancelled) setLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  if (loading || species.length === 0) return null;
+
+  const currentMonth = new Date().getMonth();
+  const significant = species.filter(s => s.significant);
+  const others = species.filter(s => !s.significant);
+  const display = showAll ? species : significant;
+
+  return (
+    <div>
+      <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100 mb-2 flex items-center gap-2">
+        <Flower2 size={16} className="text-honey-500" /> Forage species calendar
+        <span className="text-xs font-normal text-stone-400 dark:text-stone-500">
+          ({species.length} species, NASA HoneyBeeNet GA data)
+        </span>
+      </h3>
+
+      {/* Month header bar */}
+      <Card className="overflow-x-auto">
+        <div className="min-w-[500px]">
+          {/* Month labels */}
+          <div className="flex items-center border-b border-stone-100 dark:border-stone-800 pb-1 mb-1">
+            <div className="w-32 sm:w-40 shrink-0 text-xs font-medium text-stone-400 dark:text-stone-500">Plant</div>
+            <div className="flex-1 flex">
+              {MONTHS.map((m, i) => (
+                <div
+                  key={i}
+                  className={'flex-1 text-center text-[10px] font-medium ' +
+                    (i === currentMonth
+                      ? 'text-honey-600 dark:text-honey-400 font-bold'
+                      : 'text-stone-400 dark:text-stone-500')}
+                >
+                  {m}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Species rows */}
+          {display.map((s, i) => {
+            const start = monthToIndex(s.startMonth);
+            const end = monthToIndex(s.endMonth);
+            if (start < 0 || end < 0) return null;
+            const isActive = s.status === 'active' || s.status === 'ending';
+            return (
+              <div key={i} className="flex items-center py-1.5 border-b border-stone-50 dark:border-stone-900 last:border-0 group hover:bg-stone-50 dark:hover:bg-stone-900/50 rounded-lg px-1">
+                <div className="w-32 sm:w-40 shrink-0">
+                  <div className="flex items-center gap-1.5">
+                    {s.significant && <span className="text-amber-500 text-xs" title="Significant nectar source">★</span>}
+                    <span className={'text-xs font-medium truncate ' + (s.significant ? 'text-stone-800 dark:text-stone-100' : 'text-stone-600 dark:text-stone-300')}>
+                      {s.plant}
+                    </span>
+                  </div>
+                  {s.latinName && (
+                    <div className="text-[10px] text-stone-400 dark:text-stone-500 italic truncate">{s.latinName}</div>
+                  )}
+                </div>
+                <div className="flex-1 flex relative h-5">
+                  {MONTHS.map((_, m) => {
+                    const inBloom = m >= start && m <= end;
+                    const isCurrent = m === currentMonth;
+                    return (
+                      <div key={m} className="flex-1 relative">
+                        {inBloom && (
+                          <div
+                            className={
+                              'absolute inset-y-0 left-0.5 right-0.5 rounded ' +
+                              (isActive && isCurrent
+                                ? 'bg-honey-400 dark:bg-honey-500'
+                                : s.significant
+                                  ? 'bg-honey-200 dark:bg-honey-800'
+                                  : 'bg-stone-200 dark:bg-stone-700')
+                            }
+                          />
+                        )}
+                        {isCurrent && (
+                          <div className="absolute inset-y-[-2px] left-1/2 -translate-x-1/2 w-0.5 bg-honey-500" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Toggle button */}
+        {others.length > 0 && (
+          <button
+            onClick={() => setShowAll(!showAll)}
+            className="mt-3 text-xs text-honey-600 dark:text-honey-400 font-medium hover:underline"
+          >
+            {showAll ? 'Show significant sources only' : `Show all ${species.length} species`}
+          </button>
+        )}
+
+        {/* Legend */}
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-[10px] text-stone-400 dark:text-stone-500">
+          <span className="flex items-center gap-1"><span className="text-amber-500">★</span> Significant nectar source</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-honey-400" /> Active now</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-honey-200 dark:bg-honey-800" /> Significant bloom</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-stone-200 dark:bg-stone-700" /> Other bloom</span>
+        </div>
+
+        {/* Source attribution */}
+        <div className="mt-2 text-[10px] text-stone-400 dark:text-stone-500">
+          Data: NASA HoneyBeeNet Ayers &amp; Harman forage map (GA regions 11 &amp; 12) + Beepods + ApiaryBook
+        </div>
+      </Card>
     </div>
   );
 }
