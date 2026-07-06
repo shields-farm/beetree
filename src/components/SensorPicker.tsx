@@ -33,20 +33,20 @@ export function SensorPicker({ hiveId, boxId, boxSensorIds }: SensorPickerProps)
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold text-stone-700 flex items-center gap-1.5">
+        <span className="text-xs font-semibold text-stone-700 dark:text-stone-200 flex items-center gap-1.5">
           <Thermometer size={13} className="text-sky-600" /> Sensors on this box
         </span>
         <button
           type="button"
           onClick={() => setShowAdd(!showAdd)}
-          className="text-xs text-honey-600 font-medium flex items-center gap-1 hover:text-honey-700"
+          className="text-xs text-honey-600 dark:text-honey-400 font-medium flex items-center gap-1 hover:text-honey-700"
         >
           {showAdd ? <X size={13} /> : <Plus size={13} />} {showAdd ? 'Cancel' : 'Assign'}
         </button>
       </div>
 
       {assigned.length === 0 && !showAdd && (
-        <p className="text-xs text-stone-400 italic">No sensors assigned to this box.</p>
+        <p className="text-xs text-stone-400 dark:text-stone-500 italic">No sensors assigned to this box.</p>
       )}
 
       {assigned.map((s) => (
@@ -74,14 +74,14 @@ export function SensorPicker({ hiveId, boxId, boxSensorIds }: SensorPickerProps)
       ))}
 
       {showAdd && (
-        <div className="p-2.5 rounded-lg bg-stone-50 border border-stone-200 space-y-2 animate-fade-in">
+        <div className="p-2.5 rounded-lg bg-stone-50 dark:bg-stone-950 dark:bg-stone-800 border border-stone-200 dark:border-stone-800 dark:border-stone-700 space-y-2 animate-fade-in">
           <div>
-            <label className="text-[11px] text-stone-500 font-medium block mb-1">Select sensor</label>
+            <label className="text-[11px] text-stone-500 dark:text-stone-400 font-medium block mb-1">Select sensor</label>
             <div className="relative">
               <select
                 value={selectedSensor}
                 onChange={(e) => setSelectedSensor(e.target.value)}
-                className="w-full appearance-none rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm pr-8"
+                className="w-full appearance-none rounded-lg border border-stone-200 dark:border-stone-800 dark:border-stone-700 bg-white dark:bg-stone-900 px-3 py-2 text-sm dark:text-stone-100 pr-8"
               >
                 <option value="">Choose a sensor…</option>
                 {available.map((s) => (
@@ -91,11 +91,11 @@ export function SensorPicker({ hiveId, boxId, boxSensorIds }: SensorPickerProps)
                   </option>
                 ))}
               </select>
-              <ChevronDown size={16} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
+              <ChevronDown size={16} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 dark:text-stone-500 pointer-events-none" />
             </div>
           </div>
           <div>
-            <label className="text-[11px] text-stone-500 font-medium block mb-1">Position in box</label>
+            <label className="text-[11px] text-stone-500 dark:text-stone-400 font-medium block mb-1">Position in box</label>
             <div className="flex gap-1.5 flex-wrap">
               {POSITIONS.map((p) => (
                 <button
@@ -105,7 +105,7 @@ export function SensorPicker({ hiveId, boxId, boxSensorIds }: SensorPickerProps)
                   className={`text-xs px-2.5 py-1 rounded-full transition-colors ${
                     position === p
                       ? 'bg-honey-500 text-white'
-                      : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                      : 'bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700'
                   }`}
                 >
                   {p}
@@ -122,7 +122,7 @@ export function SensorPicker({ hiveId, boxId, boxSensorIds }: SensorPickerProps)
             Assign sensor
           </button>
           {available.length === 0 && (
-            <p className="text-[11px] text-stone-400 text-center">All sensors already assigned to this hive.</p>
+            <p className="text-[11px] text-stone-400 dark:text-stone-500 text-center">All sensors already assigned to this hive.</p>
           )}
         </div>
       )}

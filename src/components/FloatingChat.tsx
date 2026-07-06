@@ -6,6 +6,7 @@ import { useChat } from './ChatContext';
 import { generateAlerts } from '../lib/alerts';
 import { HEALTH_META } from '../lib/health';
 import { HIVE_TYPES } from '../lib/hiveTypes';
+import { API_BASE, apiFetch } from '../lib/apiBase';
 
 // Configure marked for compact output
 marked.setOptions({ breaks: true, gfm: true });
@@ -193,34 +194,26 @@ export function FloatingChat() {
     const context = buildContext(apiaries, hives, inspections, sensors, tasks);
 
     try {
-      const beetreeUrl = 'http://192.168.1.40:8643/v1/chat/completions';
-      const beetreeKey = 'dev-beetree-api-key-replace-me';
-
+      // Build context and send to our Express server, which proxies to Ollama.
       const messages_payload = [
-        { role: 'system', content: context },
-        ...messages.map((m) => ({ role: m.role, content: m.content })),
-        { role: 'user', content: userMsg.content },
+        { role: 'system' as const, content: context },
+        ...messages.map((m) => ({ role: m.role as string, content: m.content })),
+        { role: 'user' as const, content: userMsg.content },
       ];
 
-      const response = await fetch(beetreeUrl, {
+      const response = await apiFetch(API_BASE + '/api/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${beetreeKey}`,
-        },
-        body: JSON.stringify({
-          model: 'beetree',
-          messages: messages_payload,
-          stream: false,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: messages_payload }),
       });
 
       if (!response.ok) {
-        throw new Error(`BeeTree API ${response.status}`);
+        const errText = await response.text().catch(() => '');
+        throw new Error(`Buzz API ${response.status}: ${errText.slice(0, 200)}`);
       }
 
       const data = await response.json();
-      const assistantContent = data.choices?.[0]?.message?.content ?? 'No response.';
+      const assistantContent = data.content ?? 'No response.';
 
       setMessages((m) => [...m, {
         id: uid(),
@@ -233,7 +226,7 @@ export function FloatingChat() {
       setMessages((m) => [...m, {
         id: uid(),
         role: 'assistant',
-        content: "I can't reach Buzz right now. Make sure the beetree gateway is running on the Mac Mini.",
+        content: "I can't reach Buzz right now. Make sure the Express server is running on http://localhost:3001.",
         timestamp: new Date().toISOString(),
       }]);
     } finally {
@@ -267,7 +260,7 @@ export function FloatingChat() {
 
       {/* Chat panel */}
       {open && (
-        <div className="fixed bottom-20 lg:bottom-6 right-4 z-50 w-[calc(100vw-2rem)] sm:w-96 max-h-[70vh] flex flex-col bg-white rounded-2xl shadow-2xl border border-stone-200 overflow-hidden animate-fade-in">
+        <div className="fixed bottom-20 lg:bottom-6 right-4 z-50 w-[calc(100vw-2rem)] sm:w-96 max-h-[70vh] flex flex-col bg-white dark:bg-stone-900 rounded-2xl shadow-2xl border border-stone-200 dark:border-stone-800 overflow-hidden animate-fade-in">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 bg-honey-500 text-white">
             <div className="flex items-center gap-2">
@@ -281,13 +274,13 @@ export function FloatingChat() {
               {messages.length > 0 && (
                 <button
                   onClick={clearChat}
-                  className="p-1.5 hover:bg-white/20 rounded-lg text-[10px] font-medium"
+                  className="p-1.5 hover:bg-white/20 dark:hover:bg-white/10 rounded-lg text-[10px] font-medium"
                   title="Clear conversation"
                 >
                   Clear
                 </button>
               )}
-              <button onClick={() => toggleOpen(false)} className="p-1 hover:bg-white/20 rounded-lg">
+              <button onClick={() => toggleOpen(false)} className="p-1 hover:bg-white/20 dark:hover:bg-white/10 rounded-lg">
                 <X size={18} />
               </button>
             </div>
@@ -298,8 +291,8 @@ export function FloatingChat() {
             {messages.length === 0 && (
               <div className="text-center py-4">
                 <Sparkles size={24} className="text-honey-400 mx-auto mb-2" />
-                <p className="text-sm text-stone-600 font-medium">Ask Buzz about your hives</p>
-                <p className="text-xs text-stone-400 mt-1">I know your apiaries, sensors, and inspection history</p>
+                <p className="text-sm text-stone-600 dark:text-stone-300 font-medium">Ask Buzz about your hives</p>
+                <p className="text-xs text-stone-400 dark:text-stone-500 mt-1">I know your apiaries, sensors, and inspection history</p>
                 <div className="flex flex-wrap gap-1.5 mt-3 justify-center">
                   {pageQuestions.map((q) => (
                     <button
@@ -308,7 +301,7 @@ export function FloatingChat() {
                         setInput(q);
                         inputRef.current?.focus();
                       }}
-                      className="text-xs bg-honey-50 border border-honey-200 text-honey-700 px-2.5 py-1.5 rounded-full hover:bg-honey-100"
+                      className="text-xs bg-honey-50 dark:bg-honey-950 border border-honey-200 dark:border-honey-800 text-honey-700 dark:text-honey-300 px-2.5 py-1.5 rounded-full hover:bg-honey-100 dark:hover:bg-honey-900"
                     >
                       {q}
                     </button>
@@ -331,7 +324,7 @@ export function FloatingChat() {
               const html = renderMarkdown(body);
               return (
                 <div key={m.id} className="flex justify-start">
-                  <div className="max-w-[90%] rounded-2xl rounded-bl-md px-3 py-2.5 text-sm bg-stone-100 text-stone-700">
+                  <div className="max-w-[90%] rounded-2xl rounded-bl-md px-3 py-2.5 text-sm bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-200">
                     <div
                       className="buzz-markdown"
                       dangerouslySetInnerHTML={{ __html: html }}
@@ -349,7 +342,7 @@ export function FloatingChat() {
                             }
                           }, 50);
                         }}
-                        className="mt-2 block text-xs italic text-honey-700 bg-honey-50 border border-honey-200 rounded-full px-3 py-1.5 hover:bg-honey-100 transition-colors"
+                        className="mt-2 block text-xs italic text-honey-700 dark:text-honey-300 bg-honey-50 dark:bg-honey-950 border border-honey-200 dark:border-honey-800 rounded-full px-3 py-1.5 hover:bg-honey-100 dark:hover:bg-honey-900 transition-colors"
                       >
                         {followUp} →
                       </button>
@@ -360,7 +353,7 @@ export function FloatingChat() {
             })}
             {loading && (
               <div className="flex justify-start">
-                <div className="bg-stone-100 rounded-2xl rounded-bl-md px-4 py-3">
+                <div className="bg-stone-100 dark:bg-stone-800 rounded-2xl rounded-bl-md px-4 py-3">
                   <div className="flex gap-1">
                     <span className="w-2 h-2 rounded-full bg-honey-400 animate-bounce" style={{ animationDelay: '0ms' }} />
                     <span className="w-2 h-2 rounded-full bg-honey-400 animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -379,7 +372,7 @@ export function FloatingChat() {
           )}
 
           {/* Input */}
-          <div className="flex gap-2 items-end p-3 border-t border-stone-100">
+          <div className="flex gap-2 items-end p-3 border-t border-stone-100 dark:border-stone-800">
             <textarea
               ref={inputRef}
               value={input}
@@ -392,7 +385,7 @@ export function FloatingChat() {
               }}
               placeholder="Ask about your hives…"
               rows={1}
-              className="flex-1 rounded-xl border border-stone-200 px-3 py-2 text-sm resize-none max-h-20"
+              className="flex-1 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 px-3 py-2 text-sm dark:text-stone-100 resize-none max-h-20"
               style={{ minHeight: '40px' }}
             />
             <button

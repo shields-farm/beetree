@@ -8,6 +8,10 @@
   --safe-top: env(safe-area-inset-top, 0px);
 }
 
+.dark {
+  color-scheme: dark;
+}
+
 html, body, #root {
   height: 100%;
 }
@@ -21,6 +25,11 @@ body {
   color: #1c1917;
   overscroll-behavior-y: none;
   -webkit-tap-highlight-color: transparent;
+}
+
+.dark body {
+  background: #0c0a09;
+  color: #e7e5e4;
 }
 
 * {
@@ -60,6 +69,9 @@ input[type='range'] {
   background: #fef3c7;
   outline: none;
 }
+.dark input[type='range'] {
+  background: #451a03;
+}
 input[type='range']::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
@@ -94,6 +106,10 @@ input[type='range']::-moz-range-thumb {
   flex-shrink: 0;
   background: white;
 }
+.dark .fancy-check {
+  border-color: #44403c;
+  background: #1c1917;
+}
 .fancy-check.checked {
   background: #f59e0b;
   border-color: #f59e0b;
@@ -119,6 +135,8 @@ input[type='range']::-moz-range-thumb {
 .buzz-markdown p { margin: 0 0 0.25rem 0; line-height: 1.5; }
 .buzz-markdown p:last-child { margin-bottom: 0; }
 .buzz-markdown strong { font-weight: 700; color: #44403c; }
+.dark .buzz-markdown strong { color: #f5f5f4; }
 .buzz-markdown ul { margin: 0.25rem 0; padding-left: 1.1rem; list-style: disc; }
 .buzz-markdown li { margin: 0.1rem 0; }
 .buzz-markdown em { font-style: italic; color: #78716c; }
+.dark .buzz-markdown em { color: #a8a29e; }

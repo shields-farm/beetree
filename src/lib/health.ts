@@ -84,9 +84,9 @@ export function calculateHealth(i: Pick<
 }
 
 export const HEALTH_META: Record<HealthStatus, { label: string; bg: string; text: string; dot: string }> = {
-  excellent: { label: 'Excellent', bg: 'bg-green-100', text: 'text-green-800', dot: 'bg-green-500' },
-  good: { label: 'Good', bg: 'bg-lime-100', text: 'text-lime-800', dot: 'bg-lime-500' },
-  fair: { label: 'Fair', bg: 'bg-amber-100', text: 'text-amber-800', dot: 'bg-amber-500' },
-  poor: { label: 'Poor', bg: 'bg-orange-100', text: 'text-orange-800', dot: 'bg-orange-500' },
-  critical: { label: 'Critical', bg: 'bg-red-100', text: 'text-red-800', dot: 'bg-red-500' },
+  excellent: { label: 'Excellent', bg: 'bg-green-100 dark:bg-green-950', text: 'text-green-800 dark:text-green-300', dot: 'bg-green-500' },
+  good: { label: 'Good', bg: 'bg-lime-100 dark:bg-lime-950', text: 'text-lime-800 dark:text-lime-300', dot: 'bg-lime-500' },
+  fair: { label: 'Fair', bg: 'bg-amber-100 dark:bg-amber-950', text: 'text-amber-800 dark:text-amber-300', dot: 'bg-amber-500' },
+  poor: { label: 'Poor', bg: 'bg-orange-100 dark:bg-orange-950', text: 'text-orange-800 dark:text-orange-300', dot: 'bg-orange-500' },
+  critical: { label: 'Critical', bg: 'bg-red-100 dark:bg-red-950', text: 'text-red-800 dark:text-red-300', dot: 'bg-red-500' },
 };

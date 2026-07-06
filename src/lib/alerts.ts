@@ -248,7 +248,7 @@ export function generateAlerts(
 }
 
 export const ALERT_META = {
-  urgent: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', dot: 'bg-red-500', icon: '🔴' },
-  warning: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', dot: 'bg-amber-500', icon: '🟡' },
-  info: { bg: 'bg-sky-50', border: 'border-sky-200', text: 'text-sky-700', dot: 'bg-sky-500', icon: '🔵' },
+  urgent: { bg: 'bg-red-50 dark:bg-red-950', border: 'border-red-200 dark:border-red-900', text: 'text-red-700 dark:text-red-300', dot: 'bg-red-500', icon: '🔴' },
+  warning: { bg: 'bg-amber-50 dark:bg-amber-950', border: 'border-amber-200 dark:border-amber-900', text: 'text-amber-700 dark:text-amber-300', dot: 'bg-amber-500', icon: '🟡' },
+  info: { bg: 'bg-sky-50 dark:bg-sky-950', border: 'border-sky-200 dark:border-sky-900', text: 'text-sky-700 dark:text-sky-300', dot: 'bg-sky-500', icon: '🔵' },
 };

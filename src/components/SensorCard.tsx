@@ -15,24 +15,24 @@ export function SensorCard({ sensor, onClick, compact }: SensorCardProps) {
   return (
     <div
       onClick={onClick}
-      className={`bg-white rounded-xl border border-stone-100 shadow-card ${onClick ? 'cursor-pointer active:scale-[0.99] hover:shadow-card-hover' : ''} transition-all`}
+      className={`bg-white dark:bg-stone-900 rounded-xl border border-stone-100 dark:border-stone-800 shadow-card ${onClick ? 'cursor-pointer active:scale-[0.99] hover:shadow-card-hover' : ''} transition-all`}
     >
       <div className="px-3.5 py-3">
         <div className="flex items-start justify-between mb-2">
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <Thermometer size={15} className="text-sky-600 shrink-0" />
-              <span className="text-sm font-semibold text-stone-800 truncate">{sensor.name}</span>
+              <span className="text-sm font-semibold text-stone-800 dark:text-stone-100 truncate">{sensor.name}</span>
             </div>
-            <div className="text-[11px] text-stone-400 mt-0.5">
+            <div className="text-[11px] text-stone-400 dark:text-stone-500 mt-0.5">
               {sensor.deviceId} · {sensor.model}
               {sensor.position ? ` · ${sensor.position}` : ''}
             </div>
           </div>
           {r && (
             <div className="flex items-center gap-1.5 text-[10px]">
-              <BatteryFull size={14} className={batteryPct > 50 ? 'text-green-500' : batteryPct > 20 ? 'text-amber-500' : 'text-red-500'} />
-              <span className="text-stone-500">{r.batteryVoltage}V</span>
+              <BatteryFull size={14} className={batteryPct > 50 ? 'text-green-500' : batteryPct > 20 ? 'text-amber-500' : 'text-red-500 dark:text-red-400'} />
+              <span className="text-stone-500 dark:text-stone-400">{r.batteryVoltage}V</span>
             </div>
           )}
         </div>
@@ -40,7 +40,7 @@ export function SensorCard({ sensor, onClick, compact }: SensorCardProps) {
         {r ? (
           <>
             <div className={`grid grid-cols-2 gap-2 ${compact ? '' : 'mt-1'}`}>
-              <div className="rounded-lg bg-orange-50 px-2.5 py-2">
+              <div className="rounded-lg bg-orange-50 dark:bg-orange-950 px-2.5 py-2">
                 <div className="flex items-center gap-1 text-[10px] text-orange-600 font-medium uppercase tracking-wide">
                   <Thermometer size={11} /> Temp
                 </div>
@@ -56,7 +56,7 @@ export function SensorCard({ sensor, onClick, compact }: SensorCardProps) {
               </div>
             </div>
             {!compact && (
-              <div className="flex items-center justify-between mt-2 text-[10px] text-stone-400">
+              <div className="flex items-center justify-between mt-2 text-[10px] text-stone-400 dark:text-stone-500">
                 <span className="flex items-center gap-1">
                   <Signal size={11} /> {r.signal} dBm
                 </span>
@@ -67,7 +67,7 @@ export function SensorCard({ sensor, onClick, compact }: SensorCardProps) {
             )}
           </>
         ) : (
-          <p className="text-xs text-stone-400 italic py-2">No reading available</p>
+          <p className="text-xs text-stone-400 dark:text-stone-500 italic py-2">No reading available</p>
         )}
       </div>
     </div>
