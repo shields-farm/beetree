@@ -3,13 +3,15 @@ import { InspectionList } from './InspectionList';
 import { QuickInspect } from './QuickInspect';
 import { FrameAnalysisPage } from './FrameAnalysis';
 import { SmartSchedule } from './SmartSchedule';
+import { QueenTracking } from './QueenTracking';
 
-type TabKey = 'history' | 'quick' | 'ai' | 'schedule';
+type TabKey = 'history' | 'quick' | 'ai' | 'schedule' | 'queen';
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'history', label: 'History' },
   { key: 'quick', label: 'Quick Inspect' },
   { key: 'ai', label: 'AI Photo' },
+  { key: 'queen', label: 'Queen Track' },
   { key: 'schedule', label: 'Schedule' },
 ];
 
@@ -45,6 +47,7 @@ export function InspectionsHub() {
         {tab === 'history' && <InspectionList />}
         {tab === 'quick' && <QuickInspect />}
         {tab === 'ai' && <FrameAnalysisPage />}
+        {tab === 'queen' && <QueenTracking />}
         {tab === 'schedule' && <SmartSchedule />}
       </div>
     </div>
