@@ -246,7 +246,12 @@ export function mapInspection(r: InspectionRow, concerns: any[]) {
     colonyDead: bool(r.colonyDead),
     notes: r.notes,
     photoUrls: JSON.parse(r.photoUrls || '[]'),
-    concerns,
+    concerns: concerns.map((c: any) => ({
+      id: c.id,
+      type: c.type,
+      count: c.count != null ? c.count : undefined,
+      note: c.note ?? undefined,
+    })),
     media: [] as any[],
   };
 }

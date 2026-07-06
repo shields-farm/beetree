@@ -3,8 +3,22 @@
 import { startTelemetry, stopTelemetry, apiRequestDurationHistogram, hiveCountGauge, inspectionCountGauge, sensorTemperatureGauge, sensorHumidityGauge, sensorBatteryGauge } from './telemetry.js';
 startTelemetry();
 
+// Load .env file (simple parser, no dotenv dependency)
+import fs from 'fs';
+import path from 'path';
+try {
+  const envPath = path.join(import.meta.dirname, '.env');
+  if (fs.existsSync(envPath)) {
+    for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
+      const m = line.match(/^\s*([A-Z_]+)\s*=\s*(.+)\s*$/);
+      if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim();
+    }
+  }
+} catch { /* ignore */ }
+
 import express from 'express';
 import cors from 'cors';
+import crypto from 'crypto';
 import {
   db,
   initSchema,
@@ -34,10 +48,105 @@ initSchema();
   }
 }
 
+// ============================================================================
+// Security: Bearer token authentication
+// ============================================================================
+// Set BEETREE_API_KEY in environment or .env file. If not set, one is generated
+// and printed to the console on boot (so local dev still works, but production
+// behind Tailscale Funnel requires the token).
+const API_KEY = process.env.BEETREE_API_KEY || crypto.randomBytes(24).toString('hex');
+const AUTH_DISABLED = process.env.BEETREE_DISABLE_AUTH === '1';
+
+// Timing-safe token comparison
+function safeCompare(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+// Bearer token middleware — applied to all /api routes except /api/health
+function authMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (AUTH_DISABLED) return next();
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required. Send Authorization: Bearer <token> header.' });
+  }
+  const token = auth.slice(7).trim();
+  if (!token || !safeCompare(token, API_KEY)) {
+    return res.status(403).json({ error: 'Invalid API key.' });
+  }
+  next();
+}
+
+// ============================================================================
+// CORS: restrict to known origins (Tailscale + localhost)
+// ============================================================================
+const ALLOWED_ORIGINS = [
+  'https://beetree-host.tailnet-id.ts.net',
+  'https://localhost:5173',
+  'https://127.0.0.1:5173',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:4173',
+  'http://127.0.0.1:4173',
+  'http://localhost:3001',
+  'http://127.0.0.1:3001',
+];
+
 const app = express();
-app.use(cors({ origin: '*' }));
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (curl, server-to-server, same-origin via proxy)
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, false);
+    }
+  },
+  credentials: true,
+}));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Simple rate limiting (in-memory, per-IP, 100 requests per minute)
+const rateMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT = 100;
+const RATE_WINDOW = 60_000; // 1 minute
+
+app.use((req, _res, next) => {
+  // Skip rate limit for health check
+  if (req.path === '/api/health') return next();
+
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+  const entry = rateMap.get(ip);
+
+  if (!entry || now > entry.resetAt) {
+    rateMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW });
+  } else {
+    entry.count++;
+    if (entry.count > RATE_LIMIT) {
+      _res.status(429).json({ error: 'Rate limit exceeded. Please slow down.' });
+      return;
+    }
+  }
+  next();
+});
+
+// Apply auth to all /api routes except health
+app.use('/api', (req, res, next) => {
+  if (req.path === '/health') return next();
+  return authMiddleware(req, res, next);
+});
+
+// Security headers
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
 
 // Request logger
 app.use((req, _res, next) => {
@@ -336,13 +445,21 @@ function getConcernsFor(inspectionId: string) {
 
 app.get('/api/inspections', (_req, res) => {
   const rows = db.prepare('SELECT * FROM inspections').all() as InspectionRow[];
-  res.json(rows.map((r) => mapInspection(r, getConcernsFor(r.id))));
+  res.json(rows.map((r) => {
+    const insp = mapInspection(r, getConcernsFor(r.id));
+    const media = db.prepare('SELECT * FROM media_items WHERE inspectionId = ? ORDER BY timestamp DESC').all(r.id) as any[];
+    insp.media = media.map(mapMedia);
+    return insp;
+  }));
 });
 
 app.get('/api/inspections/:id', (req, res) => {
   const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(req.params.id) as InspectionRow | undefined;
   if (!row) return res.status(404).json({ error: 'not found' });
-  res.json(mapInspection(row, getConcernsFor(row.id)));
+  const insp = mapInspection(row, getConcernsFor(row.id));
+  const media = db.prepare('SELECT * FROM media_items WHERE inspectionId = ? ORDER BY timestamp DESC').all(row.id) as any[];
+  insp.media = media.map(mapMedia);
+  res.json(insp);
 });
 
 app.get('/api/hives/:hiveId/inspections', (req, res) => {
@@ -668,7 +785,7 @@ app.get('/api/omi/transcripts/:date', (req, res) => {
 });
 
 // ============================================================================
-// /api/vision — Frame photo analysis via synthetic.new vision API
+// /api/vision — Frame photo analysis via Ollama vision API
 // ============================================================================
 import { analyzeFramePhoto, type FrameAnalysis } from './vision.js';
 
@@ -816,7 +933,7 @@ app.post('/api/vision/analyze-and-create', async (req, res) => {
       hiveId,
       new Date().toISOString(),
       analysis.queenSpotted ? 1 : 0,
-      0, // queenCells not determinable from photo
+      analysis.queenCellsVisible ? 1 : 0, // queen cells detected by vision model
       queenLayingPattern,
       analysis.eggsVisible ? 1 : 0,
       analysis.larvaeVisible ? 1 : 0,
@@ -844,11 +961,29 @@ app.post('/api/vision/analyze-and-create', async (req, res) => {
       }
     }
 
+    // Save the original frame photo to media_items so it's viewable from the inspection
+    try {
+      const photoId = genId('media');
+      db.prepare(
+        'INSERT INTO media_items (id, inspectionId, hiveId, type, dataUrl, timestamp, label, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      ).run(photoId, id, hiveId, 'photo', normalizeImage(image), new Date().toISOString(), 'AI Frame Analysis Photo', null);
+      // Also link it via photoUrls on the inspection for quick access
+      db.prepare('UPDATE inspections SET photoUrls = ? WHERE id = ?').run(
+        JSON.stringify([photoId]),
+        id,
+      );
+    } catch (mediaErr) {
+      console.error('[vision/analyze-and-create] media save error:', mediaErr);
+    }
+
     // Update hive health status
     db.prepare('UPDATE hives SET healthStatus = ? WHERE id = ?').run(health, hiveId);
 
     const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(id) as InspectionRow;
     const inspection = mapInspection(row, getConcernsFor(id));
+    // Attach media
+    const mediaRows = db.prepare('SELECT * FROM media_items WHERE inspectionId = ? ORDER BY timestamp DESC').all(id) as any[];
+    inspection.media = mediaRows.map(mapMedia);
 
     // Store in recent analyses
     const record: VisionAnalysisRecord = {
@@ -1406,6 +1541,59 @@ app.post('/api/vision/reconstruct', async (req, res) => {
 });
 
 // ============================================================================
+// /api/chat — Buzz the beekeeper AI (Ollama glm-5.2:cloud)
+// ============================================================================
+const CHAT_URL = 'http://localhost:11434/v1/chat/completions';
+const CHAT_MODEL = 'glm-5.2:cloud';
+const CHAT_SYSTEM_PROMPT =
+  'You are Buzz, a UGA Master Craftsman Beekeeper with decades of experience. ' +
+  'You are helpful, concise, and practical. You know Georgia beekeeping, seasonal management, ' +
+  'and Integrated Pest Management. Answer in a friendly, expert tone. Keep responses under 200 words unless asked for detail.';
+
+app.post('/api/chat', async (req, res) => {
+  try {
+    const { messages } = req.body || {};
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: 'messages array is required' });
+    }
+
+    const payload = {
+      model: CHAT_MODEL,
+      messages: [
+        { role: 'system', content: CHAT_SYSTEM_PROMPT },
+        ...messages.filter((m: any) => m.role === 'user' || m.role === 'assistant')
+          .map((m: any) => ({ role: m.role, content: m.content })),
+      ],
+      stream: false,
+      temperature: 0.7,
+    };
+
+    const ollamaResp = await fetch(CHAT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!ollamaResp.ok) {
+      const txt = await ollamaResp.text().catch(() => '');
+      console.error('[chat] Ollama error:', ollamaResp.status, txt.slice(0, 200));
+      return res.status(ollamaResp.status).json({ error: `Ollama ${ollamaResp.status}: ${txt.slice(0, 200)}` });
+    }
+
+    const data = await ollamaResp.json() as any;
+    const content = data.choices?.[0]?.message?.content ?? '';
+    if (!content) {
+      return res.status(500).json({ error: 'Ollama returned empty response' });
+    }
+
+    res.json({ content, model: CHAT_MODEL });
+  } catch (e) {
+    console.error('[chat] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'chat failed' });
+  }
+});
+
+// ============================================================================
 // /api/health check & 404
 // ============================================================================
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
@@ -1416,9 +1604,19 @@ app.use((_req, res) => res.status(404).json({ error: 'not found' }));
 // Start
 // ============================================================================
 const PORT = Number(process.env.PORT || 3001);
-const HOST = '0.0.0.0';
+const HOST = '127.0.0.1'; // localhost only — Tailscale Funnel proxy reaches it locally
 app.listen(PORT, HOST, () => {
   console.log(`🐝 BeeTree API listening on http://${HOST}:${PORT}`);
+  if (AUTH_DISABLED) {
+    console.log('⚠️  AUTH DISABLED (BEETREE_DISABLE_AUTH=1) — NOT secure for internet exposure!');
+  } else if (!process.env.BEETREE_API_KEY) {
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🔑 API KEY (auto-generated, set BEETREE_API_KEY to override):');
+    console.log(`   ${API_KEY}`);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  } else {
+    console.log('🔑 API key loaded from BEETREE_API_KEY env var.');
+  }
 });
 
 // Graceful shutdown for OpenTelemetry SDK

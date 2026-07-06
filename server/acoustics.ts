@@ -1,8 +1,7 @@
-// server/acoustics.ts — Hive acoustics analysis via Buzz text API + heuristics
+// server/acoustics.ts — Hive acoustics analysis via Ollama (glm-5.2:cloud) + heuristics
 
-const BUZZ_URL = 'http://192.0.2.10:8643/v1/chat/completions';
-const BUZZ_KEY = 'dev-beetree-api-key-replace-me';
-const BUZZ_MODEL = 'beetree';
+const BUZZ_URL = 'http://localhost:11434/v1/chat/completions';
+const BUZZ_MODEL = 'glm-5.2:cloud';
 
 export interface AcousticAnalysis {
   hiveId: string;
@@ -111,14 +110,12 @@ async function buzzInterpret(
     temperature: 0.2,
   };
 
-  const authHeader = 'Bearer ' + BUZZ_KEY;
   let resp: Response;
   try {
     resp = await fetch(BUZZ_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': authHeader,
       },
       body: JSON.stringify(body),
     });
