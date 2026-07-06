@@ -30,4 +30,22 @@ export default defineConfig({
     port: 4173,
     allowedHosts: true,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Split vendor libraries into separate chunks for better caching
+        manualChunks(id) {
+          if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/') || id.includes('node_modules/react-router')) {
+            return 'react-vendor';
+          }
+          if (id.includes('node_modules/lucide-react')) {
+            return 'icons';
+          }
+          if (id.includes('node_modules/date-fns') || id.includes('node_modules/marked')) {
+            return 'utils';
+          }
+        },
+      },
+    },
+  },
 })
