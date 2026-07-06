@@ -11,7 +11,7 @@
 export interface PestProduct {
   id: string;
   name: string;
-  category: 'varroa' | 'shb' | 'wax-moth' | 'nosema' | 'management';
+  category: 'varroa' | 'shb' | 'wax-moth' | 'nosema' | 'management' | 'feeding' | 'robbing';
   description: string;
   /** Server treatment.type strings that this product matches */
   matches: string[];
@@ -77,6 +77,13 @@ export const PEST_PRODUCTS: PestProduct[] = [
     description: 'Simple oil trap near entrance',
     matches: ["AJ's Beetle Eater", 'Beetle Eater'],
   },
+  {
+    id: 'nematodes',
+    name: 'Beneficial Nematodes',
+    category: 'shb',
+    description: 'Ground treatment — prevents SHB pupation in soil',
+    matches: ['Nematode', 'nematode', 'Beneficial nematode'],
+  },
 
   // ─── Wax Moth ────────────────────────────────────────────────────────────
   {
@@ -116,7 +123,60 @@ export const PEST_PRODUCTS: PestProduct[] = [
     name: 'Reduce Hive Volume',
     category: 'management',
     description: 'Remove unused supers to help bees defend comb',
-    matches: ['Reduce hive volume', 'Reduce hive volume'],
+    matches: ['Reduce hive volume'],
+  },
+
+  // ─── Feeding Methods ──────────────────────────────────────────────────────
+  {
+    id: 'apimaye-feeder',
+    name: 'Apimaye Inner Cover Feeder',
+    category: 'feeding',
+    description: 'Integrated feeder in Apimaye hives — syrup or solid food',
+    matches: ['Apimaye feeder', 'inner cover feeder', 'Apimaye'],
+  },
+  {
+    id: 'mountain-camp',
+    name: 'Mountain Camp Method',
+    category: 'feeding',
+    description: 'Empty super + newspaper + granulated sugar moistened with water',
+    matches: ['Mountain Camp', 'camp feed', 'Camp method'],
+  },
+  {
+    id: 'entrance-feeder',
+    name: 'Entrance Feeder (water only)',
+    category: 'feeding',
+    description: 'Only for water — syrup attracts robbing',
+    matches: ['Entrance feeder', 'entrance feed'],
+  },
+  {
+    id: 'frame-feeder',
+    name: 'Frame Feeder',
+    category: 'feeding',
+    description: 'In-hive division board feeder for syrup',
+    matches: ['Frame feeder', 'division board', 'Boardman'],
+  },
+  {
+    id: 'pollen-patties',
+    name: 'Pollen Patties',
+    category: 'feeding',
+    description: 'Supplemental pollen substitute for brood build-up',
+    matches: ['Pollen patty', 'pollen patties', 'Pollen substitute'],
+  },
+
+  // ─── Robbing Prevention ───────────────────────────────────────────────────
+  {
+    id: 'robbing-screen',
+    name: 'Robbing Screen',
+    category: 'robbing',
+    description: 'Restricts entrance access — stops robbers, lets residents navigate',
+    matches: ['Robbing screen', 'robbing screen'],
+  },
+  {
+    id: 'entrance-reducer',
+    name: 'Entrance Reducer',
+    category: 'robbing',
+    description: 'Narrow entrance for weak hives or robbing season',
+    matches: ['Entrance reduc', 'Reduce entrance', 'entrance reduc'],
   },
 ];
 
@@ -128,6 +188,8 @@ export const CATEGORY_META: Record<PestProduct['category'], { label: string; ico
   'wax-moth': { label: 'Wax Moth', icon: '🦋' },
   nosema: { label: 'Nosema', icon: '🔬' },
   management: { label: 'Hive Management', icon: '🔧' },
+  feeding: { label: 'Feeding Methods', icon: '🫗' },
+  robbing: { label: 'Robbing Prevention', icon: '🛡️' },
 };
 
 // ─── Default preferences ───────────────────────────────────────────────────────
@@ -141,11 +203,19 @@ const DEFAULT_PREFS: Record<string, boolean> = {
   'hopguard': false,
   'beetle-blaster': true,
   'beetle-eater': false,
+  'nematodes': true,
   'certan': true,
   'fumagilin': false,
   'requeen': true,
   'ventilation': true,
   'reduce-volume': true,
+  'apimaye-feeder': true,
+  'mountain-camp': true,
+  'entrance-feeder': true,
+  'frame-feeder': false,
+  'pollen-patties': true,
+  'robbing-screen': true,
+  'entrance-reducer': true,
 };
 
 const STORAGE_KEY = 'beetree-pest-prefs';
