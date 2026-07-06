@@ -1319,7 +1319,7 @@ app.get('/api/treatment', (_req, res) => {
 // ============================================================================
 // /api/forage — Forage & nectar flow forecast
 // ============================================================================
-import { getForageForecast, getForageForecastWithPreview } from './forage.js';
+import { getForageForecast, getForageForecastWithPreview, getAllForageSpecies } from './forage.js';
 
 app.get('/api/forage', (_req, res) => {
   try {
@@ -1342,6 +1342,15 @@ app.get('/api/forage/:month', (req, res) => {
   } catch (e) {
     console.error('[forage/:month] error:', e);
     res.status(500).json({ error: e instanceof Error ? e.message : 'forage failed' });
+  }
+});
+
+// /api/forage/species — All forage species with bloom windows (for map overlay)
+app.get('/api/forage/species/all', (_req, res) => {
+  try {
+    res.json(getAllForageSpecies());
+  } catch (e) {
+    res.status(500).json({ error: 'failed to get forage species' });
   }
 });
 
