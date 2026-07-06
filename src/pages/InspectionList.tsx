@@ -26,7 +26,7 @@ import {
 } from '../lib/hiveTypes';
 import type { Concern, Inspection, PopulationSize, QueenLayingPattern, StoreLevel, Temperament } from '../types';
 
-const API_BASE = 'http://localhost:3001';
+import { API_BASE } from '../lib/apiBase';
 
 // ─── Voice transcript types ──────────────────────────────────────────────────
 
@@ -239,7 +239,7 @@ export function InspectionList() {
               className={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm transition-colors ${
                 mode === 'voice' || mode === 'review'
                   ? 'bg-honey-500 text-white'
-                  : 'bg-white border border-stone-200 text-stone-500 hover:text-honey-600'
+                  : 'bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 text-stone-500 dark:text-stone-400 hover:text-honey-600'
               }`}
               title="Voice inspections (Omi)"
             >
@@ -258,16 +258,16 @@ export function InspectionList() {
 
       {/* Created success banner */}
       {createdId && (
-        <Card className="mb-4 bg-green-50 border-green-200">
+        <Card className="mb-4 bg-green-50 dark:bg-green-950 border-green-200">
           <div className="flex items-center gap-3">
-            <Check size={22} className="text-green-600" />
+            <Check size={22} className="text-green-600 dark:text-green-400" />
             <div className="flex-1">
               <p className="text-sm font-semibold text-green-800">Inspection created from voice!</p>
-              <p className="text-xs text-green-600">Buzz parsed your voice notes into a saved inspection.</p>
+              <p className="text-xs text-green-600 dark:text-green-400">Buzz parsed your voice notes into a saved inspection.</p>
             </div>
             <Link
               to={`/inspections/${createdId}`}
-              className="text-xs font-medium text-green-700 underline"
+              className="text-xs font-medium text-green-700 dark:text-green-300 underline"
             >
               View
             </Link>
@@ -280,14 +280,14 @@ export function InspectionList() {
         <>
           {sorted.length === 0 ? (
             <div className="text-center py-12">
-              <ClipboardList size={40} className="mx-auto text-stone-300 mb-3" />
-              <p className="text-sm text-stone-400 mb-3">No inspections yet.</p>
+              <ClipboardList size={40} className="mx-auto text-stone-300 dark:text-stone-600 mb-3" />
+              <p className="text-sm text-stone-400 dark:text-stone-500 mb-3">No inspections yet.</p>
               <div className="flex items-center justify-center gap-3">
-                <Link to="/inspections/new" className="inline-flex items-center gap-1.5 text-honey-600 text-sm font-medium">
+                <Link to="/inspections/new" className="inline-flex items-center gap-1.5 text-honey-600 dark:text-honey-400 text-sm font-medium">
                   <Plus size={16} /> Manual
                 </Link>
-                <span className="text-stone-300">·</span>
-                <button onClick={() => setMode('voice')} className="inline-flex items-center gap-1.5 text-honey-600 text-sm font-medium">
+                <span className="text-stone-300 dark:text-stone-600">·</span>
+                <button onClick={() => setMode('voice')} className="inline-flex items-center gap-1.5 text-honey-600 dark:text-honey-400 text-sm font-medium">
                   <Mic size={16} /> Voice
                 </button>
               </div>
@@ -300,12 +300,12 @@ export function InspectionList() {
                 return (
                   <Card key={i.id} onClick={() => {}} pad={false}>
                     <Link to={`/inspections/${i.id}`} className="flex items-center gap-3 p-4">
-                      <div className="w-11 h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                      <div className="w-11 h-11 rounded-xl bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
                         <ClipboardList size={22} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="font-semibold text-stone-800 truncate">{hive?.name ?? 'Unknown hive'}</div>
-                        <div className="text-xs text-stone-400">{format(new Date(i.date), 'MMM d, yyyy · h:mm a')}</div>
+                        <div className="font-semibold text-stone-800 dark:text-stone-100 truncate">{hive?.name ?? 'Unknown hive'}</div>
+                        <div className="text-xs text-stone-400 dark:text-stone-500">{format(new Date(i.date), 'MMM d, yyyy · h:mm a')}</div>
                       </div>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full ${meta.bg} ${meta.text}`}>{meta.label}</span>
                     </Link>
@@ -322,18 +322,18 @@ export function InspectionList() {
         <>
           {loadingList && (
             <div className="flex items-center justify-center py-12">
-              <Loader2 size={24} className="animate-spin text-stone-400" />
-              <span className="ml-2 text-sm text-stone-400">Loading transcripts…</span>
+              <Loader2 size={24} className="animate-spin text-stone-400 dark:text-stone-500" />
+              <span className="ml-2 text-sm text-stone-400 dark:text-stone-500">Loading transcripts…</span>
             </div>
           )}
 
           {listError && (
-            <Card className="bg-red-50 border-red-200">
-              <div className="flex items-center gap-2 text-sm text-red-700">
+            <Card className="bg-red-50 dark:bg-red-950 border-red-200">
+              <div className="flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
                 <AlertTriangle size={18} />
                 {listError}
               </div>
-              <p className="text-xs text-red-500 mt-2">
+              <p className="text-xs text-red-500 dark:text-red-400 mt-2">
                 Make sure the Express server is running on {API_BASE}.
               </p>
             </Card>
@@ -341,9 +341,9 @@ export function InspectionList() {
 
           {!loadingList && !listError && sortedTranscripts.length === 0 && (
             <div className="text-center py-12">
-              <Mic size={40} className="mx-auto text-stone-300 mb-3" />
-              <p className="text-sm text-stone-400">No Omi transcripts found.</p>
-              <p className="text-xs text-stone-400 mt-1">
+              <Mic size={40} className="mx-auto text-stone-300 dark:text-stone-600 mb-3" />
+              <p className="text-sm text-stone-400 dark:text-stone-500">No Omi transcripts found.</p>
+              <p className="text-xs text-stone-400 dark:text-stone-500 mt-1">
                 Transcripts appear here when the Omi webhook writes to ~/.hermes/memories/omi-transcripts/
               </p>
             </div>
@@ -353,19 +353,19 @@ export function InspectionList() {
             {sortedTranscripts.map((t) => (
               <Card key={t.date} pad={false} onClick={() => selectTranscript(t)}>
                 <div className="flex items-start gap-3 p-4">
-                  <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
                     <FileText size={20} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-stone-800 text-sm">{t.date}</span>
+                      <span className="font-semibold text-stone-800 dark:text-stone-100 text-sm">{t.date}</span>
                       {t.hasBeeContent && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-honey-100 text-honey-700 font-medium">
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-honey-100 text-honey-700 dark:text-honey-300 font-medium">
                           🐝 Bee-related
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-stone-500 mt-1 line-clamp-2">{t.preview || '(empty)'}</p>
+                    <p className="text-xs text-stone-500 dark:text-stone-400 mt-1 line-clamp-2">{t.preview || '(empty)'}</p>
                   </div>
                 </div>
               </Card>
@@ -379,23 +379,23 @@ export function InspectionList() {
         <>
           <button
             onClick={() => { setMode('voice'); setParsed(defaultParsed()); setRawTranscript(''); setCreatedId(null); }}
-            className="text-xs text-stone-400 hover:text-stone-600 mb-3 inline-flex items-center gap-1"
+            className="text-xs text-stone-400 dark:text-stone-500 hover:text-stone-600 mb-3 inline-flex items-center gap-1"
           >
             ← All transcripts
           </button>
 
           {parsing && (
-            <Card className="mb-4 bg-honey-50 border-honey-200">
+            <Card className="mb-4 bg-honey-50 dark:bg-honey-950 border-honey-200">
               <div className="flex items-center gap-3">
-                <Loader2 size={20} className="animate-spin text-honey-600" />
+                <Loader2 size={20} className="animate-spin text-honey-600 dark:text-honey-400" />
                 <span className="text-sm text-honey-800">Buzz is listening to your transcript…</span>
               </div>
             </Card>
           )}
 
           {parseError && (
-            <Card className="mb-4 bg-red-50 border-red-200">
-              <div className="flex items-center gap-2 text-sm text-red-700">
+            <Card className="mb-4 bg-red-50 dark:bg-red-950 border-red-200">
+              <div className="flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
                 <AlertTriangle size={18} />
                 {parseError}
               </div>
@@ -406,19 +406,19 @@ export function InspectionList() {
             <Card className="mb-4">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-lg">🐝</span>
-                <h3 className="text-sm font-semibold text-stone-700">Buzz heard:</h3>
+                <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200">Buzz heard:</h3>
               </div>
-              <p className="text-xs text-stone-400 mb-3">
+              <p className="text-xs text-stone-400 dark:text-stone-500 mb-3">
                 Review what Buzz parsed from your voice notes. Edit anything that's wrong, then confirm.
               </p>
 
               {/* Hive selector */}
               <label className="block py-2">
-                <span className="text-sm font-medium text-stone-700 block mb-1.5">Hive</span>
+                <span className="text-sm font-medium text-stone-700 dark:text-stone-200 block mb-1.5">Hive</span>
                 <select
                   value={hiveId}
                   onChange={(e) => setHiveId(e.target.value)}
-                  className="w-full rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-sm"
+                  className="w-full rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-3.5 py-2.5 text-sm"
                 >
                   <option value="">— Select hive —</option>
                   {hives.map((h) => (
@@ -426,7 +426,7 @@ export function InspectionList() {
                   ))}
                 </select>
                 {parsed.hiveName && !parsed.hiveId && (
-                  <p className="text-[11px] text-amber-600 mt-1">
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">
                     Buzz heard "{parsed.hiveName}" but couldn't match it — pick the right hive above.
                   </p>
                 )}
@@ -457,55 +457,55 @@ export function InspectionList() {
               </div>
 
               {/* Concerns */}
-              <div className="pt-3 mt-3 border-t border-stone-100">
+              <div className="pt-3 mt-3 border-t border-stone-100 dark:border-stone-800">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-semibold text-stone-700">Concerns</span>
-                  <button type="button" onClick={addConcern} className="text-xs text-honey-600 font-medium flex items-center gap-1 hover:text-honey-700">
+                  <span className="text-sm font-semibold text-stone-700 dark:text-stone-200">Concerns</span>
+                  <button type="button" onClick={addConcern} className="text-xs text-honey-600 dark:text-honey-400 font-medium flex items-center gap-1 hover:text-honey-700">
                     <Plus size={14} /> Add
                   </button>
                 </div>
                 <div className="space-y-2">
                   {(parsed.concerns ?? []).map((c, idx) => (
-                    <div key={idx} className="flex items-start gap-2 bg-stone-50 rounded-lg p-2">
+                    <div key={idx} className="flex items-start gap-2 bg-stone-50 dark:bg-stone-950 rounded-lg p-2">
                       <input
                         value={c.type}
                         onChange={(e) => updateConcern(idx, { type: e.target.value })}
                         placeholder="e.g., Varroa, SHB, Wax moth"
-                        className="flex-1 min-w-0 bg-transparent text-sm border-b border-stone-200 pb-1 focus:border-honey-400 outline-none"
+                        className="flex-1 min-w-0 bg-transparent text-sm border-b border-stone-200 dark:border-stone-800 pb-1 focus:border-honey-400 outline-none"
                       />
                       <input
                         type="number"
                         value={c.count ?? ''}
                         onChange={(e) => updateConcern(idx, { count: e.target.value ? Number(e.target.value) : undefined })}
                         placeholder="count"
-                        className="w-16 bg-transparent text-sm border-b border-stone-200 pb-1 text-right focus:border-honey-400 outline-none"
+                        className="w-16 bg-transparent text-sm border-b border-stone-200 dark:border-stone-800 pb-1 text-right focus:border-honey-400 outline-none"
                       />
-                      <button type="button" onClick={() => removeConcern(idx)} className="text-stone-400 hover:text-red-500 p-1">
+                      <button type="button" onClick={() => removeConcern(idx)} className="text-stone-400 dark:text-stone-500 hover:text-red-500 p-1">
                         <Trash2 size={14} />
                       </button>
                     </div>
                   ))}
                   {(!parsed.concerns || parsed.concerns.length === 0) && (
-                    <p className="text-xs text-stone-400 italic">No concerns recorded.</p>
+                    <p className="text-xs text-stone-400 dark:text-stone-500 italic">No concerns recorded.</p>
                   )}
                 </div>
               </div>
 
               {/* Notes */}
-              <div className="pt-3 mt-3 border-t border-stone-100">
-                <span className="text-sm font-semibold text-stone-700 block mb-1.5">Notes</span>
+              <div className="pt-3 mt-3 border-t border-stone-100 dark:border-stone-800">
+                <span className="text-sm font-semibold text-stone-700 dark:text-stone-200 block mb-1.5">Notes</span>
                 <textarea
                   value={parsed.notes ?? ''}
                   onChange={(e) => set('notes', e.target.value)}
                   placeholder="Additional observations…"
                   rows={3}
-                  className="w-full rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-sm resize-y"
+                  className="w-full rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-3.5 py-2.5 text-sm resize-y"
                 />
               </div>
 
               {/* Health preview */}
-              <div className="pt-3 mt-3 border-t border-stone-100 flex items-center justify-between">
-                <span className="text-sm font-semibold text-stone-700">Predicted health</span>
+              <div className="pt-3 mt-3 border-t border-stone-100 dark:border-stone-800 flex items-center justify-between">
+                <span className="text-sm font-semibold text-stone-700 dark:text-stone-200">Predicted health</span>
                 <div className="flex items-center gap-2">
                   <span className={`inline-block w-2.5 h-2.5 rounded-full ${hm.dot}`} />
                   <span className={`text-sm font-semibold ${hm.text}`}>{hm.label}</span>
@@ -522,11 +522,11 @@ export function InspectionList() {
                 onClick={() => setShowRaw((v) => !v)}
                 className="flex items-center justify-between w-full text-left"
               >
-                <span className="text-sm font-semibold text-stone-700">Raw transcript</span>
-                {showRaw ? <ChevronUp size={18} className="text-stone-400" /> : <ChevronDown size={18} className="text-stone-400" />}
+                <span className="text-sm font-semibold text-stone-700 dark:text-stone-200">Raw transcript</span>
+                {showRaw ? <ChevronUp size={18} className="text-stone-400 dark:text-stone-500" /> : <ChevronDown size={18} className="text-stone-400 dark:text-stone-500" />}
               </button>
               {showRaw && (
-                <pre className="mt-3 text-xs text-stone-500 whitespace-pre-wrap font-mono bg-stone-50 rounded-lg p-3 max-h-72 overflow-y-auto">
+                <pre className="mt-3 text-xs text-stone-500 dark:text-stone-400 whitespace-pre-wrap font-mono bg-stone-50 dark:bg-stone-950 rounded-lg p-3 max-h-72 overflow-y-auto">
                   {rawTranscript}
                 </pre>
               )}
@@ -537,8 +537,8 @@ export function InspectionList() {
           {!parsing && !parseError && (
             <>
               {confirmError && (
-                <Card className="mb-3 bg-red-50 border-red-200">
-                  <div className="flex items-center gap-2 text-sm text-red-700">
+                <Card className="mb-3 bg-red-50 dark:bg-red-950 border-red-200">
+                  <div className="flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
                     <AlertTriangle size={18} />
                     {confirmError}
                   </div>
@@ -548,7 +548,7 @@ export function InspectionList() {
                 <button
                   type="button"
                   onClick={() => { setMode('voice'); setParsed(defaultParsed()); setCreatedId(null); }}
-                  className="flex-1 py-3 rounded-xl border border-stone-200 text-stone-600 font-medium text-sm hover:bg-stone-50"
+                  className="flex-1 py-3 rounded-xl border border-stone-200 dark:border-stone-800 text-stone-600 dark:text-stone-300 font-medium text-sm hover:bg-stone-50 dark:hover:bg-stone-800"
                 >
                   Cancel
                 </button>
@@ -580,12 +580,12 @@ function CheckRow({ label, checked, onChange }: { label: string; checked: boolea
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className="flex items-center gap-3 py-2.5 w-full text-left active:bg-stone-50 rounded-lg px-1 -mx-1"
+      className="flex items-center gap-3 py-2.5 w-full text-left active:bg-stone-50 dark:active:bg-stone-800 rounded-lg px-1 -mx-1"
     >
       <span className={`fancy-check ${checked ? 'checked' : ''}`}>
         {checked && <Check size={16} className="text-white" strokeWidth={3} />}
       </span>
-      <span className="text-sm text-stone-700">{label}</span>
+      <span className="text-sm text-stone-700 dark:text-stone-200">{label}</span>
     </button>
   );
 }
@@ -593,11 +593,11 @@ function CheckRow({ label, checked, onChange }: { label: string; checked: boolea
 function SelectRow({ label, value, options, onChange }: { label: string; value: string; options: { value: string; label: string }[]; onChange: (v: string) => void }) {
   return (
     <label className="block py-2">
-      <span className="text-sm font-medium text-stone-700 block mb-1.5">{label}</span>
+      <span className="text-sm font-medium text-stone-700 dark:text-stone-200 block mb-1.5">{label}</span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-sm appearance-none"
+        className="w-full rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-3.5 py-2.5 text-sm appearance-none"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>{o.label}</option>
@@ -646,8 +646,8 @@ export function InspectionFormPage() {
   if (!hive && !existing) {
     return (
       <div className="animate-fade-in">
-        <p className="text-sm text-stone-400">Select a hive first. No hives available — create one in the Hives tab.</p>
-        <Link to="/hives" className="text-honey-600 text-sm underline mt-2 inline-block">Go to Hives</Link>
+        <p className="text-sm text-stone-400 dark:text-stone-500">Select a hive first. No hives available — create one in the Hives tab.</p>
+        <Link to="/hives" className="text-honey-600 dark:text-honey-400 text-sm underline mt-2 inline-block">Go to Hives</Link>
       </div>
     );
   }
@@ -656,11 +656,11 @@ export function InspectionFormPage() {
 
   return (
     <div className="animate-fade-in">
-      <Link to="/inspections" className="text-xs text-stone-400 hover:text-stone-600 mb-2 inline-block">← Inspections</Link>
-      <h1 className="text-xl font-bold text-stone-800 mb-1">
+      <Link to="/inspections" className="text-xs text-stone-400 dark:text-stone-500 hover:text-stone-600 mb-2 inline-block">← Inspections</Link>
+      <h1 className="text-xl font-bold text-stone-800 dark:text-stone-100 mb-1">
         {existing ? 'Edit Inspection' : 'New Inspection'}
       </h1>
-      {hive && <p className="text-sm text-stone-500 mb-4">{hive.name}</p>}
+      {hive && <p className="text-sm text-stone-500 dark:text-stone-400 mb-4">{hive.name}</p>}
 
       <InspectionForm
         hiveId={existing?.hiveId ?? hiveId}

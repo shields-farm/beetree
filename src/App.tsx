@@ -2,6 +2,7 @@ import { HashRouter, Routes, Route } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { StoreProvider } from './store/useStore';
 import { ChatProvider } from './components/ChatContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { Dashboard } from './pages/Dashboard';
 import { Apiaries, ApiaryDetail } from './pages/Apiaries';
 import { Hives } from './pages/Hives';
@@ -27,8 +28,9 @@ import { ColonyMap } from './pages/ColonyMap';
 export default function App() {
   return (
     <StoreProvider>
-      <ChatProvider>
-        <HashRouter>
+      <ThemeProvider>
+        <ChatProvider>
+          <HashRouter>
           <Layout>
           <Routes>
             <Route path="/" element={<Dashboard />} />
@@ -58,7 +60,8 @@ export default function App() {
           </Routes>
           </Layout>
         </HashRouter>
-      </ChatProvider>
+        </ChatProvider>
+      </ThemeProvider>
     </StoreProvider>
   );
 }

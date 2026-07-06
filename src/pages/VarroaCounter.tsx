@@ -15,7 +15,7 @@ import { PageHeader } from '../components/Layout';
 import { Card } from '../components/Card';
 import { useStore } from '../store/useStore';
 
-const API_BASE = 'http://localhost:3001';
+import { API_BASE, apiFetch } from '../lib/apiBase';
 
 interface VarroaCount {
   miteCount: number;
@@ -37,16 +37,16 @@ interface VarroaHistoryEntry {
 }
 
 const INFESTATION_META: Record<VarroaCount['infestationLevel'], { label: string; bg: string; text: string; ring: string }> = {
-  low: { label: 'Low', bg: 'bg-green-100', text: 'text-green-800', ring: 'ring-green-300' },
-  moderate: { label: 'Moderate', bg: 'bg-amber-100', text: 'text-amber-800', ring: 'ring-amber-300' },
-  high: { label: 'High', bg: 'bg-orange-100', text: 'text-orange-800', ring: 'ring-orange-300' },
-  severe: { label: 'Severe', bg: 'bg-red-100', text: 'text-red-800', ring: 'ring-red-300' },
+  low: { label: 'Low', bg: 'bg-green-100 dark:bg-green-900', text: 'text-green-800', ring: 'ring-green-300' },
+  moderate: { label: 'Moderate', bg: 'bg-amber-100 dark:bg-amber-900', text: 'text-amber-800', ring: 'ring-amber-300' },
+  high: { label: 'High', bg: 'bg-orange-100 dark:bg-orange-900', text: 'text-orange-800', ring: 'ring-orange-300' },
+  severe: { label: 'Severe', bg: 'bg-red-100 dark:bg-red-900', text: 'text-red-800', ring: 'ring-red-300' },
 };
 
 const CONFIDENCE_META: Record<VarroaCount['confidence'], { label: string; color: string }> = {
-  high: { label: 'High confidence', color: 'text-green-600' },
-  medium: { label: 'Medium confidence', color: 'text-amber-600' },
-  low: { label: 'Low confidence', color: 'text-red-600' },
+  high: { label: 'High confidence', color: 'text-green-600 dark:text-green-400' },
+  medium: { label: 'Medium confidence', color: 'text-amber-600 dark:text-amber-400' },
+  low: { label: 'Low confidence', color: 'text-red-600 dark:text-red-400' },
 };
 
 export function VarroaCounter() {
@@ -81,7 +81,7 @@ export function VarroaCounter() {
     (async () => {
       setHistoryLoading(true);
       try {
-        const resp = await fetch(API_BASE + '/api/varroa/history/' + hiveId);
+        const resp = await apiFetch(API_BASE + '/api/varroa/history/' + hiveId);
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const data = (await resp.json()) as VarroaHistoryEntry[];
         if (!cancelled) setHistory(data);
@@ -115,7 +115,7 @@ export function VarroaCounter() {
     setResult(null);
     setSaved(false);
     try {
-      const resp = await fetch(API_BASE + '/api/vision/varroa', {
+      const resp = await apiFetch(API_BASE + '/api/vision/varroa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image, hiveId }),
@@ -138,7 +138,7 @@ export function VarroaCounter() {
     setSaving(true);
     setError(null);
     try {
-      const resp = await fetch(API_BASE + '/api/vision/varroa/save', {
+      const resp = await apiFetch(API_BASE + '/api/vision/varroa/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -154,7 +154,7 @@ export function VarroaCounter() {
       }
       setSaved(true);
       // Refresh history
-      const histResp = await fetch(API_BASE + '/api/varroa/history/' + hiveId);
+      const histResp = await apiFetch(API_BASE + '/api/varroa/history/' + hiveId);
       if (histResp.ok) {
         const data = (await histResp.json()) as VarroaHistoryEntry[];
         setHistory(data);
@@ -176,7 +176,7 @@ export function VarroaCounter() {
         action={
           <button
             onClick={() => navigate(-1)}
-            className="lg:hidden flex items-center gap-1 text-sm text-stone-500"
+            className="lg:hidden flex items-center gap-1 text-sm text-stone-500 dark:text-stone-400"
           >
             <ChevronLeft size={18} /> Back
           </button>
@@ -185,11 +185,11 @@ export function VarroaCounter() {
 
       {/* Hive selector */}
       <Card>
-        <label className="block text-sm font-medium text-stone-700 mb-2">Hive</label>
+        <label className="block text-sm font-medium text-stone-700 dark:text-stone-200 mb-2">Hive</label>
         <select
           value={hiveId}
           onChange={(e) => setHiveId(e.target.value)}
-          className="w-full px-3 py-2.5 rounded-xl border border-stone-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-honey-300"
+          className="w-full px-3 py-2.5 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-honey-300"
         >
           {hives.length === 0 && <option value="">No hives available</option>}
           {hives.map((h) => (
@@ -202,8 +202,8 @@ export function VarroaCounter() {
       {!image && (
         <Card>
           <div className="text-center py-6">
-            <Bug size={48} className="mx-auto text-stone-300 mb-3" />
-            <p className="text-sm text-stone-500 mb-4">
+            <Bug size={48} className="mx-auto text-stone-300 dark:text-stone-600 mb-3" />
+            <p className="text-sm text-stone-500 dark:text-stone-400 mb-4">
               Take a photo of your varroa sticky board and the AI will count the mites for you.
             </p>
             <div className="flex flex-col gap-2 max-w-xs mx-auto">
@@ -215,7 +215,7 @@ export function VarroaCounter() {
               </button>
               <button
                 onClick={() => photoInputRef.current?.click()}
-                className="w-full py-2.5 rounded-xl bg-stone-50 border border-stone-200 text-stone-600 text-sm flex items-center justify-center gap-2 hover:bg-stone-100"
+                className="w-full py-2.5 rounded-xl bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 text-stone-600 dark:text-stone-300 text-sm flex items-center justify-center gap-2 hover:bg-stone-100 dark:hover:bg-stone-700"
               >
                 <ImageIcon size={16} /> Choose from Gallery
               </button>
@@ -249,7 +249,7 @@ export function VarroaCounter() {
               </button>
             )}
             {analyzing && (
-              <div className="flex items-center justify-center gap-2 py-3 text-honey-600 text-sm">
+              <div className="flex items-center justify-center gap-2 py-3 text-honey-600 dark:text-honey-400 text-sm">
                 <Loader2 size={20} className="animate-spin" /> Analyzing sticky board…
               </div>
             )}
@@ -260,11 +260,11 @@ export function VarroaCounter() {
       {/* Error */}
       {error && (
         <Card>
-          <div className="flex items-start gap-2 text-red-600">
+          <div className="flex items-start gap-2 text-red-600 dark:text-red-400">
             <AlertTriangle size={20} className="shrink-0 mt-0.5" />
             <div>
               <p className="font-medium text-sm">Analysis Error</p>
-              <p className="text-xs text-red-500 mt-0.5">{error}</p>
+              <p className="text-xs text-red-500 dark:text-red-400 mt-0.5">{error}</p>
             </div>
           </div>
         </Card>
@@ -276,8 +276,8 @@ export function VarroaCounter() {
           <div className="space-y-4">
             {/* Mite count hero */}
             <div className="text-center py-4">
-              <div className="text-6xl font-bold text-stone-800">{result.miteCount}</div>
-              <div className="text-sm text-stone-500 mt-1">Varroa mites detected</div>
+              <div className="text-6xl font-bold text-stone-800 dark:text-stone-100">{result.miteCount}</div>
+              <div className="text-sm text-stone-500 dark:text-stone-400 mt-1">Varroa mites detected</div>
               <div className={'inline-flex items-center gap-1.5 mt-3 px-4 py-1.5 rounded-full text-sm font-semibold ' + INFESTATION_META[result.infestationLevel].bg + ' ' + INFESTATION_META[result.infestationLevel].text}>
                 <span className={'w-2 h-2 rounded-full ' + INFESTATION_META[result.infestationLevel].bg.replace('100', '500')} />
                 {INFESTATION_META[result.infestationLevel].label} infestation
@@ -289,25 +289,25 @@ export function VarroaCounter() {
               <span className={'font-medium ' + CONFIDENCE_META[result.confidence].color}>
                 {CONFIDENCE_META[result.confidence].label}
               </span>
-              <span className="text-stone-300">·</span>
-              <span className="text-stone-500">~{result.naturalDropPerDay} mites/day</span>
+              <span className="text-stone-300 dark:text-stone-600">·</span>
+              <span className="text-stone-500 dark:text-stone-400">~{result.naturalDropPerDay} mites/day</span>
             </div>
 
             {/* Recommendation */}
-            <div className="rounded-xl bg-stone-50 border border-stone-100 p-3">
-              <p className="text-xs font-medium text-stone-500 mb-1">Recommendation</p>
-              <p className="text-sm text-stone-700">{result.recommendation}</p>
+            <div className="rounded-xl bg-stone-50 dark:bg-stone-950 border border-stone-100 dark:border-stone-800 p-3">
+              <p className="text-xs font-medium text-stone-500 dark:text-stone-400 mb-1">Recommendation</p>
+              <p className="text-sm text-stone-700 dark:text-stone-200">{result.recommendation}</p>
             </div>
 
             {/* Details */}
             <div className="space-y-2 text-xs">
               <div>
-                <span className="font-medium text-stone-500">Board area: </span>
-                <span className="text-stone-700">{result.boardArea}</span>
+                <span className="font-medium text-stone-500 dark:text-stone-400">Board area: </span>
+                <span className="text-stone-700 dark:text-stone-200">{result.boardArea}</span>
               </div>
               <div>
-                <span className="font-medium text-stone-500">Other debris: </span>
-                <span className="text-stone-700">{result.otherDebris}</span>
+                <span className="font-medium text-stone-500 dark:text-stone-400">Other debris: </span>
+                <span className="text-stone-700 dark:text-stone-200">{result.otherDebris}</span>
               </div>
             </div>
 
@@ -326,15 +326,15 @@ export function VarroaCounter() {
       {/* History chart */}
       <Card>
         <div className="flex items-center gap-2 mb-3">
-          <History size={18} className="text-stone-400" />
-          <h3 className="text-sm font-semibold text-stone-800">Mite Count History</h3>
+          <History size={18} className="text-stone-400 dark:text-stone-500" />
+          <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100">Mite Count History</h3>
         </div>
         {historyLoading ? (
-          <div className="flex items-center justify-center py-6 text-stone-400 text-sm">
+          <div className="flex items-center justify-center py-6 text-stone-400 dark:text-stone-500 text-sm">
             <Loader2 size={18} className="animate-spin mr-2" /> Loading…
           </div>
         ) : history.length === 0 ? (
-          <p className="text-xs text-stone-400 text-center py-6">No varroa readings recorded for this hive yet.</p>
+          <p className="text-xs text-stone-400 dark:text-stone-500 text-center py-6">No varroa readings recorded for this hive yet.</p>
         ) : (
           <div className="space-y-2">
             {/* Simple bar chart */}
@@ -344,9 +344,9 @@ export function VarroaCounter() {
                 const level = h.miteCount < 3 ? 'bg-green-400' : h.miteCount <= 10 ? 'bg-amber-400' : h.miteCount <= 30 ? 'bg-orange-400' : 'bg-red-400';
                 return (
                   <div key={h.inspectionId} className="flex-1 flex flex-col items-center gap-1 group relative">
-                    <div className="text-[9px] text-stone-400">{h.miteCount}</div>
+                    <div className="text-[9px] text-stone-400 dark:text-stone-500">{h.miteCount}</div>
                     <div className={'w-full rounded-t ' + level} style={{ height: heightPct + '%' }} />
-                    <div className="text-[8px] text-stone-400 whitespace-nowrap">
+                    <div className="text-[8px] text-stone-400 dark:text-stone-500 whitespace-nowrap">
                       {new Date(h.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                     </div>
                   </div>
@@ -354,7 +354,7 @@ export function VarroaCounter() {
               })}
             </div>
             {/* Threshold legend */}
-            <div className="flex items-center gap-3 text-[10px] text-stone-400 pt-2 border-t border-stone-100">
+            <div className="flex items-center gap-3 text-[10px] text-stone-400 dark:text-stone-500 pt-2 border-t border-stone-100 dark:border-stone-800">
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-green-400" /> &lt;3</span>
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-amber-400" /> 3-10</span>
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-orange-400" /> 10-30</span>

@@ -13,7 +13,7 @@ import {
 import { PageHeader } from '../components/Layout';
 import { Card } from '../components/Card';
 
-const API_BASE = 'http://localhost:3001';
+import { API_BASE, apiFetch } from '../lib/apiBase';
 
 interface AcousticAnalysis {
   hiveId: string;
@@ -40,18 +40,18 @@ interface AcousticHistoryEntry {
 }
 
 const INTERP_META: Record<AcousticAnalysis['interpretation'], { label: string; bg: string; text: string }> = {
-  queenright: { label: 'Queenright', bg: 'bg-green-100', text: 'text-green-800' },
-  queenless: { label: 'Queenless', bg: 'bg-red-100', text: 'text-red-800' },
-  'swarm-preparation': { label: 'Swarm Preparation', bg: 'bg-amber-100', text: 'text-amber-800' },
-  stressed: { label: 'Stressed', bg: 'bg-orange-100', text: 'text-orange-800' },
-  normal: { label: 'Normal', bg: 'bg-blue-100', text: 'text-blue-800' },
-  unknown: { label: 'Unknown', bg: 'bg-stone-100', text: 'text-stone-600' },
+  queenright: { label: 'Queenright', bg: 'bg-green-100 dark:bg-green-900', text: 'text-green-800' },
+  queenless: { label: 'Queenless', bg: 'bg-red-100 dark:bg-red-900', text: 'text-red-800' },
+  'swarm-preparation': { label: 'Swarm Preparation', bg: 'bg-amber-100 dark:bg-amber-900', text: 'text-amber-800' },
+  stressed: { label: 'Stressed', bg: 'bg-orange-100 dark:bg-orange-900', text: 'text-orange-800' },
+  normal: { label: 'Normal', bg: 'bg-blue-100 dark:bg-blue-900', text: 'text-blue-800' },
+  unknown: { label: 'Unknown', bg: 'bg-stone-100 dark:bg-stone-800', text: 'text-stone-600 dark:text-stone-300' },
 };
 
 const CONF_META: Record<AcousticAnalysis['confidence'], { label: string; color: string }> = {
-  high: { label: 'High confidence', color: 'text-green-600' },
-  medium: { label: 'Medium confidence', color: 'text-amber-600' },
-  low: { label: 'Low confidence', color: 'text-stone-500' },
+  high: { label: 'High confidence', color: 'text-green-600 dark:text-green-400' },
+  medium: { label: 'Medium confidence', color: 'text-amber-600 dark:text-amber-400' },
+  low: { label: 'Low confidence', color: 'text-stone-500 dark:text-stone-400' },
 };
 
 export function AcousticAnalysis() {
@@ -74,7 +74,7 @@ export function AcousticAnalysis() {
   const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
-    fetch(API_BASE + '/api/hives')
+    apiFetch(API_BASE + '/api/hives')
       .then((r) => r.json())
       .then((data: Hive[]) => {
         setHives(data);
@@ -85,7 +85,7 @@ export function AcousticAnalysis() {
 
   useEffect(() => {
     if (!selectedHiveId) return;
-    fetch(API_BASE + '/api/acoustics/history/' + selectedHiveId)
+    apiFetch(API_BASE + '/api/acoustics/history/' + selectedHiveId)
       .then((r) => r.json())
       .then((data: AcousticHistoryEntry[]) => setHistory(data))
       .catch(() => setHistory([]));
@@ -169,7 +169,7 @@ export function AcousticAnalysis() {
         body.audio = audioBase64;
         body.duration = recordSeconds;
       }
-      const resp = await fetch(API_BASE + '/api/acoustics/analyze', {
+      const resp = await apiFetch(API_BASE + '/api/acoustics/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -192,7 +192,7 @@ export function AcousticAnalysis() {
     setSaving(true);
     setSavedMsg(null);
     try {
-      const resp = await fetch(API_BASE + '/api/acoustics/save', {
+      const resp = await apiFetch(API_BASE + '/api/acoustics/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ hiveId: selectedHiveId, analysis }),
@@ -203,7 +203,7 @@ export function AcousticAnalysis() {
       }
       setSavedMsg('Saved to inspection successfully.');
       // Refresh history
-      const histResp = await fetch(API_BASE + '/api/acoustics/history/' + selectedHiveId);
+      const histResp = await apiFetch(API_BASE + '/api/acoustics/history/' + selectedHiveId);
       if (histResp.ok) {
         const histData = (await histResp.json()) as AcousticHistoryEntry[];
         setHistory(histData);
@@ -221,9 +221,9 @@ export function AcousticAnalysis() {
 
       {/* Hive selector */}
       <Card>
-        <label className="block text-sm font-medium text-stone-700 mb-1">Hive</label>
+        <label className="block text-sm font-medium text-stone-700 dark:text-stone-200 mb-1">Hive</label>
         <select
-          className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm"
+          className="w-full rounded-xl border border-stone-200 dark:border-stone-800 px-3 py-2 text-sm"
           value={selectedHiveId}
           onChange={(e) => { setSelectedHiveId(e.target.value); setAnalysis(null); setSavedMsg(null); }}
         >
@@ -236,7 +236,7 @@ export function AcousticAnalysis() {
 
       {/* Recording */}
       <Card>
-        <h3 className="text-sm font-semibold text-stone-800 mb-3 flex items-center gap-2">
+        <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100 mb-3 flex items-center gap-2">
           <AudioLines size={16} className="text-honey-500" /> Record Audio
         </h3>
         <div className="flex items-center gap-3">
@@ -256,45 +256,45 @@ export function AcousticAnalysis() {
             </button>
           )}
           {recording && (
-            <div className="flex items-center gap-2 text-sm text-red-600">
+            <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
               <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
               <Clock size={16} />
               <span>{recordSeconds}s</span>
             </div>
           )}
           {!recording && recordSeconds > 0 && audioBase64 && (
-            <span className="text-xs text-green-600">Recorded {recordSeconds}s ✓</span>
+            <span className="text-xs text-green-600 dark:text-green-400">Recorded {recordSeconds}s ✓</span>
           )}
         </div>
         {audioBase64 && !recording && (
           <audio controls src={audioBase64} className="mt-3 w-full" style={{ height: 36 }} />
         )}
-        <p className="text-xs text-stone-400 mt-2">
+        <p className="text-xs text-stone-400 dark:text-stone-500 mt-2">
           Place your phone microphone near the hive entrance. Record 5-15 seconds for best results.
         </p>
       </Card>
 
       {/* Text description */}
       <Card>
-        <h3 className="text-sm font-semibold text-stone-800 mb-2">Or describe what you hear</h3>
+        <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100 mb-2">Or describe what you hear</h3>
         <textarea
-          className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm min-h-[80px]"
+          className="w-full rounded-xl border border-stone-200 dark:border-stone-800 px-3 py-2 text-sm min-h-[80px]"
           placeholder="e.g. The hive sounds like a steady low hum, calm and continuous."
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
-        <p className="text-xs text-stone-400 mt-1">
+        <p className="text-xs text-stone-400 dark:text-stone-500 mt-1">
           Tip: describe the pitch, volume, and pattern. "Queenless roar", "agitated buzz", "calm hum".
         </p>
       </Card>
 
       {error && (
         <Card>
-          <div className="flex items-start gap-2 text-red-600">
+          <div className="flex items-start gap-2 text-red-600 dark:text-red-400">
             <AlertTriangle size={20} className="shrink-0 mt-0.5" />
             <div>
               <p className="font-medium text-sm">Error</p>
-              <p className="text-xs text-red-500 mt-0.5">{error}</p>
+              <p className="text-xs text-red-500 dark:text-red-400 mt-0.5">{error}</p>
             </div>
           </div>
         </Card>
@@ -314,39 +314,39 @@ export function AcousticAnalysis() {
       {analysis && (
         <Card>
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-stone-800">Analysis Results</h3>
+            <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100">Analysis Results</h3>
             <span className={'px-2 py-0.5 rounded-full text-xs font-medium ' + INTERP_META[analysis.interpretation].bg + ' ' + INTERP_META[analysis.interpretation].text}>
               {INTERP_META[analysis.interpretation].label}
             </span>
           </div>
           <div className="space-y-2 text-sm">
             <div className="flex items-center gap-2">
-              <span className="text-stone-400 w-24">Confidence:</span>
+              <span className="text-stone-400 dark:text-stone-500 w-24">Confidence:</span>
               <span className={CONF_META[analysis.confidence].color}>{CONF_META[analysis.confidence].label}</span>
             </div>
             <div className="flex items-start gap-2">
-              <span className="text-stone-400 w-24 shrink-0">Frequency:</span>
-              <span className="text-stone-700">{analysis.frequency}</span>
+              <span className="text-stone-400 dark:text-stone-500 w-24 shrink-0">Frequency:</span>
+              <span className="text-stone-700 dark:text-stone-200">{analysis.frequency}</span>
             </div>
             <div className="flex items-start gap-2">
-              <span className="text-stone-400 w-24 shrink-0">Pattern:</span>
-              <span className="text-stone-700">{analysis.pattern}</span>
+              <span className="text-stone-400 dark:text-stone-500 w-24 shrink-0">Pattern:</span>
+              <span className="text-stone-700 dark:text-stone-200">{analysis.pattern}</span>
             </div>
             <div className="flex items-start gap-2">
-              <span className="text-stone-400 w-24 shrink-0">Notes:</span>
-              <span className="text-stone-700">{analysis.notes}</span>
+              <span className="text-stone-400 dark:text-stone-500 w-24 shrink-0">Notes:</span>
+              <span className="text-stone-700 dark:text-stone-200">{analysis.notes}</span>
             </div>
           </div>
           {analysis.recommendations.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-stone-100">
-              <h4 className="text-xs font-semibold text-stone-600 mb-2 flex items-center gap-1.5">
+            <div className="mt-3 pt-3 border-t border-stone-100 dark:border-stone-800">
+              <h4 className="text-xs font-semibold text-stone-600 dark:text-stone-300 mb-2 flex items-center gap-1.5">
                 <Lightbulb size={14} className="text-amber-500" /> Recommendations
               </h4>
               <div className="space-y-1.5">
                 {analysis.recommendations.map((r, i) => (
                   <div key={i} className="flex items-start gap-2">
                     <span className="shrink-0 mt-1 w-1.5 h-1.5 rounded-full bg-honey-400" />
-                    <span className="text-sm text-stone-700">{r}</span>
+                    <span className="text-sm text-stone-700 dark:text-stone-200">{r}</span>
                   </div>
                 ))}
               </div>
@@ -361,7 +361,7 @@ export function AcousticAnalysis() {
             {saving ? 'Saving…' : 'Save to Inspection'}
           </button>
           {savedMsg && (
-            <p className="mt-2 text-xs text-green-600 text-center">{savedMsg}</p>
+            <p className="mt-2 text-xs text-green-600 dark:text-green-400 text-center">{savedMsg}</p>
           )}
         </Card>
       )}
@@ -369,19 +369,19 @@ export function AcousticAnalysis() {
       {/* History */}
       {history.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-stone-800 mb-2 flex items-center gap-2">
-            <History size={16} className="text-stone-400" /> Past Acoustic Checks
+          <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100 mb-2 flex items-center gap-2">
+            <History size={16} className="text-stone-400 dark:text-stone-500" /> Past Acoustic Checks
           </h3>
           <div className="space-y-2">
             {history.map((h, i) => (
               <Card key={i}>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-stone-400">
+                  <span className="text-xs text-stone-400 dark:text-stone-500">
                     {new Date(h.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                   </span>
-                  <span className="text-xs text-stone-500">Health: {h.healthStatus}</span>
+                  <span className="text-xs text-stone-500 dark:text-stone-400">Health: {h.healthStatus}</span>
                 </div>
-                <p className="text-sm text-stone-700">{h.note}</p>
+                <p className="text-sm text-stone-700 dark:text-stone-200">{h.note}</p>
               </Card>
             ))}
           </div>

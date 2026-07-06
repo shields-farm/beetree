@@ -11,7 +11,7 @@ import {
 import { PageHeader } from '../components/Layout';
 import { Card } from '../components/Card';
 
-const API_BASE = 'http://localhost:3001';
+import { API_BASE, apiFetch } from '../lib/apiBase';
 
 interface HiveStat {
   hiveId: string;
@@ -41,8 +41,8 @@ interface OutlierReport {
 }
 
 const SEVERITY_META: Record<OutlierEntry['severity'], { label: string; bg: string; text: string }> = {
-  significant: { label: 'Significant', bg: 'bg-red-100', text: 'text-red-800' },
-  moderate: { label: 'Moderate', bg: 'bg-amber-100', text: 'text-amber-800' },
+  significant: { label: 'Significant', bg: 'bg-red-100 dark:bg-red-900', text: 'text-red-800' },
+  moderate: { label: 'Moderate', bg: 'bg-amber-100 dark:bg-amber-900', text: 'text-amber-800' },
   minor: { label: 'Minor', bg: 'bg-yellow-50', text: 'text-yellow-700' },
 };
 
@@ -67,7 +67,7 @@ export function OutlierDetection() {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetch(API_BASE + '/api/outlier')
+    apiFetch(API_BASE + '/api/outlier')
       .then((r) => r.json())
       .then((data: OutlierReport[]) => {
         setReports(data);
@@ -93,7 +93,7 @@ export function OutlierDetection() {
       <div className="animate-fade-in space-y-5">
         <PageHeader title="Outlier Detection" subtitle="Find hives falling behind the apiary" />
         <Card>
-          <div className="flex items-center justify-center py-8 text-stone-400 text-sm">
+          <div className="flex items-center justify-center py-8 text-stone-400 dark:text-stone-500 text-sm">
             <Loader2 size={20} className="animate-spin mr-2" /> Analyzing apiaries…
           </div>
         </Card>
@@ -106,11 +106,11 @@ export function OutlierDetection() {
       <div className="animate-fade-in space-y-5">
         <PageHeader title="Outlier Detection" subtitle="Find hives falling behind the apiary" />
         <Card>
-          <div className="flex items-start gap-2 text-red-600">
+          <div className="flex items-start gap-2 text-red-600 dark:text-red-400">
             <AlertTriangle size={20} className="shrink-0 mt-0.5" />
             <div>
               <p className="font-medium text-sm">Error</p>
-              <p className="text-xs text-red-500 mt-0.5">{error}</p>
+              <p className="text-xs text-red-500 dark:text-red-400 mt-0.5">{error}</p>
             </div>
           </div>
         </Card>
@@ -128,9 +128,9 @@ export function OutlierDetection() {
 
       {/* Apiary selector */}
       <Card>
-        <label className="block text-sm font-medium text-stone-700 mb-1">Apiary</label>
+        <label className="block text-sm font-medium text-stone-700 dark:text-stone-200 mb-1">Apiary</label>
         <select
-          className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm"
+          className="w-full rounded-xl border border-stone-200 dark:border-stone-800 px-3 py-2 text-sm"
           value={selectedApiaryId}
           onChange={(e) => setSelectedApiaryId(e.target.value)}
         >
@@ -143,7 +143,7 @@ export function OutlierDetection() {
 
       {visibleReports.length === 0 && (
         <Card>
-          <p className="text-sm text-stone-400 text-center py-4">No apiaries found.</p>
+          <p className="text-sm text-stone-400 dark:text-stone-500 text-center py-4">No apiaries found.</p>
         </Card>
       )}
 
@@ -152,9 +152,9 @@ export function OutlierDetection() {
           {/* Apiary header */}
           <div className="flex items-center gap-2">
             <GitCompare size={18} className="text-honey-500" />
-            <h2 className="text-lg font-bold text-stone-800">{report.apiaryName}</h2>
+            <h2 className="text-lg font-bold text-stone-800 dark:text-stone-100">{report.apiaryName}</h2>
             {report.outliers.length > 0 && (
-              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600">
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400">
                 {report.outliers.length} outlier{report.outliers.length === 1 ? '' : 's'}
               </span>
             )}
@@ -162,20 +162,20 @@ export function OutlierDetection() {
 
           {/* Bar chart of hive scores */}
           <Card>
-            <h3 className="text-sm font-semibold text-stone-800 mb-3">Hive Scores</h3>
+            <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100 mb-3">Hive Scores</h3>
             <div className="space-y-2.5">
               {report.hiveStats.map((h) => {
                 const outlier = isOutlier(report, h.hiveId);
                 return (
                   <div key={h.hiveId}>
                     <div className="flex items-center justify-between text-xs mb-1">
-                      <span className={'font-medium ' + (outlier ? 'text-red-700' : 'text-stone-700')}>
+                      <span className={'font-medium ' + (outlier ? 'text-red-700 dark:text-red-300' : 'text-stone-700 dark:text-stone-200')}>
                         {h.hiveName}
                         {outlier && <span className="ml-1">⚠</span>}
                       </span>
-                      <span className="text-stone-500">{h.score}/100</span>
+                      <span className="text-stone-500 dark:text-stone-400">{h.score}/100</span>
                     </div>
-                    <div className="h-5 rounded-full bg-stone-100 overflow-hidden">
+                    <div className="h-5 rounded-full bg-stone-100 dark:bg-stone-800 overflow-hidden">
                       <div
                         className={'h-full rounded-full transition-all ' + scoreColor(h.score)}
                         style={{ width: Math.max(2, h.score) + '%' }}
@@ -186,7 +186,7 @@ export function OutlierDetection() {
               })}
             </div>
             {/* Average line */}
-            <div className="mt-3 pt-3 border-t border-stone-100 flex items-center gap-4 text-xs text-stone-500">
+            <div className="mt-3 pt-3 border-t border-stone-100 dark:border-stone-800 flex items-center gap-4 text-xs text-stone-500 dark:text-stone-400">
               <span>Avg health: {Math.round(report.apiaryAverage.health)}</span>
               <span>Avg population: {Math.round(report.apiaryAverage.population)}</span>
               <span>Avg concerns: {report.apiaryAverage.concerns.toFixed(1)}</span>
@@ -196,8 +196,8 @@ export function OutlierDetection() {
           {/* Outlier detail cards */}
           {report.outliers.length > 0 && (
             <div>
-              <h3 className="text-sm font-semibold text-stone-800 mb-2 flex items-center gap-2">
-                <TrendingDown size={16} className="text-red-500" /> Outliers
+              <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100 mb-2 flex items-center gap-2">
+                <TrendingDown size={16} className="text-red-500 dark:text-red-400" /> Outliers
               </h3>
               <div className="space-y-2">
                 {report.outliers.map((o, i) => {
@@ -210,14 +210,14 @@ export function OutlierDetection() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-stone-800">{o.hiveName}</span>
+                            <span className="font-medium text-stone-800 dark:text-stone-100">{o.hiveName}</span>
                             <span className={'px-2 py-0.5 rounded-full text-[11px] font-medium ' + meta.bg + ' ' + meta.text}>
                               {meta.label}
                             </span>
                           </div>
-                          <p className="text-sm text-stone-600 mt-1">{o.reason}</p>
+                          <p className="text-sm text-stone-600 dark:text-stone-300 mt-1">{o.reason}</p>
                           {expanded && (
-                            <div className="mt-2 pt-2 border-t border-stone-100 text-xs text-stone-500 space-y-1">
+                            <div className="mt-2 pt-2 border-t border-stone-100 dark:border-stone-800 text-xs text-stone-500 dark:text-stone-400 space-y-1">
                               <p>{o.detail}</p>
                               {stat && (
                                 <div className="flex flex-wrap gap-3 mt-1">
@@ -232,8 +232,8 @@ export function OutlierDetection() {
                             </div>
                           )}
                         </div>
-                        <button onClick={() => toggleHive(key)} className="shrink-0 p-1 rounded-lg hover:bg-stone-100">
-                          {expanded ? <ChevronDown size={16} className="text-stone-400" /> : <ChevronRight size={16} className="text-stone-400" />}
+                        <button onClick={() => toggleHive(key)} className="shrink-0 p-1 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-700">
+                          {expanded ? <ChevronDown size={16} className="text-stone-400 dark:text-stone-500" /> : <ChevronRight size={16} className="text-stone-400 dark:text-stone-500" />}
                         </button>
                       </div>
                     </Card>
@@ -245,11 +245,11 @@ export function OutlierDetection() {
 
           {/* Inspect next recommendation */}
           {report.outliers.length > 0 && (
-            <div className="rounded-2xl bg-honey-50 border border-honey-200 p-4 flex items-start gap-3">
-              <Lightbulb size={20} className="text-honey-600 shrink-0 mt-0.5" />
+            <div className="rounded-2xl bg-honey-50 dark:bg-honey-950 border border-honey-200 p-4 flex items-start gap-3">
+              <Lightbulb size={20} className="text-honey-600 dark:text-honey-400 shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium text-sm text-honey-800">Inspect this hive next</p>
-                <p className="text-xs text-honey-700 mt-0.5">
+                <p className="text-xs text-honey-700 dark:text-honey-300 mt-0.5">
                   Prioritize <strong>{report.outliers[0].hiveName}</strong> — {report.outliers[0].reason}
                 </p>
               </div>
@@ -258,7 +258,7 @@ export function OutlierDetection() {
 
           {report.outliers.length === 0 && (
             <Card>
-              <p className="text-sm text-green-700 text-center py-2">✓ All hives are within normal range.</p>
+              <p className="text-sm text-green-700 dark:text-green-300 text-center py-2">✓ All hives are within normal range.</p>
             </Card>
           )}
         </div>

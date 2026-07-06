@@ -11,7 +11,7 @@ import {
 import { PageHeader } from '../components/Layout';
 import { Card } from '../components/Card';
 
-const API_BASE = 'http://localhost:3001';
+import { API_BASE, apiFetch } from '../lib/apiBase';
 
 interface QueenRecord {
   id: string;
@@ -36,11 +36,11 @@ interface QueenStatus {
 
 const QUEEN_COLORS = [
   { name: 'blue', bg: 'bg-blue-500', text: 'text-white' },
-  { name: 'white', bg: 'bg-white border border-stone-300', text: 'text-stone-700' },
-  { name: 'yellow', bg: 'bg-yellow-400', text: 'text-stone-700' },
+  { name: 'white', bg: 'bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-700', text: 'text-stone-700 dark:text-stone-200' },
+  { name: 'yellow', bg: 'bg-yellow-400', text: 'text-stone-700 dark:text-stone-200' },
   { name: 'red', bg: 'bg-red-500', text: 'text-white' },
   { name: 'green', bg: 'bg-green-500', text: 'text-white' },
-  { name: 'unmarked', bg: 'bg-stone-200', text: 'text-stone-600' },
+  { name: 'unmarked', bg: 'bg-stone-200 dark:bg-stone-700', text: 'text-stone-600 dark:text-stone-300' },
 ];
 
 function colorMeta(colorName: string) {
@@ -77,7 +77,7 @@ export function QueenTracking() {
   function loadAll() {
     setLoading(true);
     setError(null);
-    fetch(API_BASE + '/api/queen/all')
+    apiFetch(API_BASE + '/api/queen/all')
       .then((r) => r.json())
       .then((data: QueenStatus[]) => {
         setStatuses(data);
@@ -124,7 +124,7 @@ export function QueenTracking() {
     setSaving(true);
     setError(null);
     try {
-      const resp = await fetch(API_BASE + '/api/queen/record', {
+      const resp = await apiFetch(API_BASE + '/api/queen/record', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -141,7 +141,7 @@ export function QueenTracking() {
         throw new Error(err.error || 'HTTP ' + resp.status);
       }
       // Refresh
-      const allResp = await fetch(API_BASE + '/api/queen/all');
+      const allResp = await apiFetch(API_BASE + '/api/queen/all');
       const allData = (await allResp.json()) as QueenStatus[];
       setStatuses(allData);
       const updated = allData.find((s) => s.hiveId === selectedHive.hiveId);
@@ -164,7 +164,7 @@ export function QueenTracking() {
       <div className="animate-fade-in space-y-5">
         <PageHeader title="Queen Tracking" subtitle="Track marked queens & detect supersedure" />
         <Card>
-          <div className="flex items-center justify-center py-8 text-stone-400 text-sm">
+          <div className="flex items-center justify-center py-8 text-stone-400 dark:text-stone-500 text-sm">
             <Loader2 size={20} className="animate-spin mr-2" /> Loading queen data…
           </div>
         </Card>
@@ -177,11 +177,11 @@ export function QueenTracking() {
       <div className="animate-fade-in space-y-5">
         <PageHeader title="Queen Tracking" subtitle="Track marked queens & detect supersedure" />
         <Card>
-          <div className="flex items-start gap-2 text-red-600">
+          <div className="flex items-start gap-2 text-red-600 dark:text-red-400">
             <AlertTriangle size={20} className="shrink-0 mt-0.5" />
             <div>
               <p className="font-medium text-sm">Error</p>
-              <p className="text-xs text-red-500 mt-0.5">{error}</p>
+              <p className="text-xs text-red-500 dark:text-red-400 mt-0.5">{error}</p>
             </div>
           </div>
         </Card>
@@ -195,91 +195,91 @@ export function QueenTracking() {
     return (
       <div className="animate-fade-in space-y-5">
         <div className="flex items-center gap-3">
-          <button onClick={backToList} className="p-1.5 rounded-lg hover:bg-stone-100">
-            <ChevronLeft size={20} className="text-stone-500" />
+          <button onClick={backToList} className="p-1.5 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-700">
+            <ChevronLeft size={20} className="text-stone-500 dark:text-stone-400" />
           </button>
           <PageHeader title={selectedHive.hiveName} subtitle="Queen history & tracking" />
         </div>
 
         {selectedHive.supersedureSuspected && (
-          <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4 flex items-start gap-3">
-            <AlertTriangle size={20} className="text-amber-600 shrink-0 mt-0.5" />
+          <div className="rounded-2xl bg-amber-50 dark:bg-amber-950 border border-amber-200 p-4 flex items-start gap-3">
+            <AlertTriangle size={20} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             <div>
               <p className="font-medium text-sm text-amber-800">Supersedure Suspected</p>
-              <p className="text-xs text-amber-700 mt-0.5">{selectedHive.notes}</p>
+              <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">{selectedHive.notes}</p>
             </div>
           </div>
         )}
 
         {/* Current queen */}
         <Card>
-          <h3 className="text-sm font-semibold text-stone-800 mb-3 flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100 mb-3 flex items-center gap-2">
             <Crown size={16} className="text-honey-500" /> Current Queen
           </h3>
           {selectedHive.currentQueen ? (
             <div className="space-y-2 text-sm">
               <div className="flex items-center gap-3">
                 <span className={'w-6 h-6 rounded-full ' + colorMeta(selectedHive.currentQueen.queenColor).bg} />
-                <span className="text-stone-700 capitalize">{selectedHive.currentQueen.queenColor}</span>
-                <span className="text-stone-400">·</span>
-                <span className="text-stone-700">{selectedHive.currentQueen.queenYear}</span>
+                <span className="text-stone-700 dark:text-stone-200 capitalize">{selectedHive.currentQueen.queenColor}</span>
+                <span className="text-stone-400 dark:text-stone-500">·</span>
+                <span className="text-stone-700 dark:text-stone-200">{selectedHive.currentQueen.queenYear}</span>
               </div>
-              <div className="text-stone-500 text-xs">
+              <div className="text-stone-500 dark:text-stone-400 text-xs">
                 Marked on {new Date(selectedHive.currentQueen.date).toLocaleDateString()}
               </div>
               {selectedHive.daysSinceLastSeen !== null && (
-                <div className="text-stone-500 text-xs">
+                <div className="text-stone-500 dark:text-stone-400 text-xs">
                   {selectedHive.daysSinceLastSeen} days since last sighting
                 </div>
               )}
               {selectedHive.currentQueen.notes && (
-                <div className="text-stone-600 text-sm mt-2">{selectedHive.currentQueen.notes}</div>
+                <div className="text-stone-600 dark:text-stone-300 text-sm mt-2">{selectedHive.currentQueen.notes}</div>
               )}
             </div>
           ) : (
-            <p className="text-sm text-stone-400">No queen recorded yet.</p>
+            <p className="text-sm text-stone-400 dark:text-stone-500">No queen recorded yet.</p>
           )}
         </Card>
 
         {/* Record form */}
         {showForm ? (
           <Card>
-            <h3 className="text-sm font-semibold text-stone-800 mb-3">Record Queen Sighting</h3>
+            <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100 mb-3">Record Queen Sighting</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-stone-600 mb-1.5">Marking Color</label>
+                <label className="block text-xs font-medium text-stone-600 dark:text-stone-300 mb-1.5">Marking Color</label>
                 <div className="flex flex-wrap gap-2">
                   {QUEEN_COLORS.map((c) => (
                     <button
                       key={c.name}
                       onClick={() => setFormColor(c.name)}
                       className={'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ' +
-                        (formColor === c.name ? 'border-honey-500 ring-2 ring-honey-100' : 'border-stone-200')}
+                        (formColor === c.name ? 'border-honey-500 ring-2 ring-honey-100' : 'border-stone-200 dark:border-stone-800')}
                     >
                       <span className={'w-4 h-4 rounded-full ' + c.bg} />
                       <span className="capitalize">{c.name}</span>
                     </button>
                   ))}
                 </div>
-                <p className="text-xs text-stone-400 mt-1">
+                <p className="text-xs text-stone-400 dark:text-stone-500 mt-1">
                   Year {formYear} → recommended: <span className="capitalize font-medium">{recommendedColor}</span>
                 </p>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-stone-600 mb-1.5">Year Introduced</label>
+                <label className="block text-xs font-medium text-stone-600 dark:text-stone-300 mb-1.5">Year Introduced</label>
                 <input
                   type="number"
-                  className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-stone-200 dark:border-stone-800 px-3 py-2 text-sm"
                   value={formYear}
                   onChange={(e) => setFormYear(Number(e.target.value) || new Date().getFullYear())}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-stone-600 mb-1.5">Source</label>
+                <label className="block text-xs font-medium text-stone-600 dark:text-stone-300 mb-1.5">Source</label>
                 <select
-                  className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-stone-200 dark:border-stone-800 px-3 py-2 text-sm"
                   value={formSource}
                   onChange={(e) => setFormSource(e.target.value as QueenRecord['source'])}
                 >
@@ -290,9 +290,9 @@ export function QueenTracking() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-stone-600 mb-1.5">Photos</label>
+                <label className="block text-xs font-medium text-stone-600 dark:text-stone-300 mb-1.5">Photos</label>
                 <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-stone-200 text-xs font-medium cursor-pointer hover:bg-stone-50">
+                  <label className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-stone-200 dark:border-stone-800 text-xs font-medium cursor-pointer hover:bg-stone-50 dark:hover:bg-stone-800">
                     <Camera size={16} /> Upload
                     <input type="file" accept="image/*" multiple className="hidden" onChange={handleFileUpload} />
                   </label>
@@ -315,9 +315,9 @@ export function QueenTracking() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-stone-600 mb-1.5">Notes</label>
+                <label className="block text-xs font-medium text-stone-600 dark:text-stone-300 mb-1.5">Notes</label>
                 <textarea
-                  className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm min-h-[60px]"
+                  className="w-full rounded-xl border border-stone-200 dark:border-stone-800 px-3 py-2 text-sm min-h-[60px]"
                   placeholder="e.g. Marked with blue dot, good laying pattern observed."
                   value={formNotes}
                   onChange={(e) => setFormNotes(e.target.value)}
@@ -325,7 +325,7 @@ export function QueenTracking() {
               </div>
 
               {error && (
-                <p className="text-xs text-red-500">{error}</p>
+                <p className="text-xs text-red-500 dark:text-red-400">{error}</p>
               )}
 
               <div className="flex gap-2">
@@ -339,7 +339,7 @@ export function QueenTracking() {
                 </button>
                 <button
                   onClick={() => setShowForm(false)}
-                  className="px-4 py-2.5 rounded-xl border border-stone-200 text-sm font-medium hover:bg-stone-50"
+                  className="px-4 py-2.5 rounded-xl border border-stone-200 dark:border-stone-800 text-sm font-medium hover:bg-stone-50 dark:hover:bg-stone-800"
                 >
                   Cancel
                 </button>
@@ -358,7 +358,7 @@ export function QueenTracking() {
         {/* History timeline */}
         {selectedHive.history.length > 0 && (
           <div>
-            <h3 className="text-sm font-semibold text-stone-800 mb-2">Queen History</h3>
+            <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100 mb-2">Queen History</h3>
             <div className="space-y-2">
               {selectedHive.history.map((rec) => (
                 <Card key={rec.id}>
@@ -366,11 +366,11 @@ export function QueenTracking() {
                     <span className={'shrink-0 w-6 h-6 rounded-full ' + colorMeta(rec.queenColor).bg} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-stone-800 capitalize">{rec.queenColor} · {rec.queenYear}</span>
-                        <span className="text-xs text-stone-400">{new Date(rec.date).toLocaleDateString()}</span>
+                        <span className="text-sm font-medium text-stone-800 dark:text-stone-100 capitalize">{rec.queenColor} · {rec.queenYear}</span>
+                        <span className="text-xs text-stone-400 dark:text-stone-500">{new Date(rec.date).toLocaleDateString()}</span>
                       </div>
-                      <span className="text-xs text-stone-500 capitalize">{rec.source.replace('-', ' ')}</span>
-                      {rec.notes && <p className="text-sm text-stone-600 mt-1">{rec.notes}</p>}
+                      <span className="text-xs text-stone-500 dark:text-stone-400 capitalize">{rec.source.replace('-', ' ')}</span>
+                      {rec.notes && <p className="text-sm text-stone-600 dark:text-stone-300 mt-1">{rec.notes}</p>}
                     </div>
                   </div>
                 </Card>
@@ -389,9 +389,9 @@ export function QueenTracking() {
 
       {error && (
         <Card>
-          <div className="flex items-start gap-2 text-red-600">
+          <div className="flex items-start gap-2 text-red-600 dark:text-red-400">
             <AlertTriangle size={20} className="shrink-0 mt-0.5" />
-            <p className="text-xs text-red-500">{error}</p>
+            <p className="text-xs text-red-500 dark:text-red-400">{error}</p>
           </div>
         </Card>
       )}
@@ -406,13 +406,13 @@ export function QueenTracking() {
                     <Crown size={16} className={colorMeta(s.currentQueen.queenColor).text} />
                   </span>
                 ) : (
-                  <span className="shrink-0 w-8 h-8 rounded-full bg-stone-100 flex items-center justify-center">
-                    <Crown size={16} className="text-stone-300" />
+                  <span className="shrink-0 w-8 h-8 rounded-full bg-stone-100 dark:bg-stone-800 flex items-center justify-center">
+                    <Crown size={16} className="text-stone-300 dark:text-stone-600" />
                   </span>
                 )}
                 <div className="min-w-0">
-                  <div className="font-medium text-stone-800 truncate">{s.hiveName}</div>
-                  <div className="text-xs text-stone-400">
+                  <div className="font-medium text-stone-800 dark:text-stone-100 truncate">{s.hiveName}</div>
+                  <div className="text-xs text-stone-400 dark:text-stone-500">
                     {s.currentQueen
                       ? 'Marked ' + s.currentQueen.queenColor + ' · ' + s.currentQueen.queenYear +
                         (s.daysSinceLastSeen !== null ? ' · ' + s.daysSinceLastSeen + 'd ago' : '')
@@ -421,7 +421,7 @@ export function QueenTracking() {
                 </div>
               </div>
               {s.supersedureSuspected && (
-                <span className="shrink-0 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-800">
+                <span className="shrink-0 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 dark:bg-amber-900 text-amber-800">
                   Supersedure?
                 </span>
               )}
@@ -430,7 +430,7 @@ export function QueenTracking() {
         ))}
         {statuses.length === 0 && (
           <Card>
-            <p className="text-sm text-stone-400 text-center py-4">No hives found.</p>
+            <p className="text-sm text-stone-400 dark:text-stone-500 text-center py-4">No hives found.</p>
           </Card>
         )}
       </div>

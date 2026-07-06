@@ -15,7 +15,7 @@ import { Card } from '../components/Card';
 import { useStore } from '../store/useStore';
 import type { TaskPriority } from '../types';
 
-const API_BASE = 'http://localhost:3001';
+import { API_BASE, apiFetch } from '../lib/apiBase';
 
 interface ScheduleFactor {
   factor: string;
@@ -35,10 +35,10 @@ interface InspectionRecommendation {
 }
 
 const PRIORITY_META: Record<Priority, { label: string; bg: string; text: string; dot: string; border: string }> = {
-  urgent: { label: 'Urgent', bg: 'bg-red-100', text: 'text-red-800', dot: 'bg-red-500', border: 'border-red-200' },
-  soon: { label: 'Soon', bg: 'bg-amber-100', text: 'text-amber-800', dot: 'bg-amber-500', border: 'border-amber-200' },
-  routine: { label: 'Routine', bg: 'bg-green-100', text: 'text-green-800', dot: 'bg-green-500', border: 'border-green-200' },
-  low: { label: 'Low', bg: 'bg-stone-100', text: 'text-stone-700', dot: 'bg-stone-400', border: 'border-stone-200' },
+  urgent: { label: 'Urgent', bg: 'bg-red-100 dark:bg-red-900', text: 'text-red-800', dot: 'bg-red-500', border: 'border-red-200' },
+  soon: { label: 'Soon', bg: 'bg-amber-100 dark:bg-amber-900', text: 'text-amber-800', dot: 'bg-amber-500', border: 'border-amber-200' },
+  routine: { label: 'Routine', bg: 'bg-green-100 dark:bg-green-900', text: 'text-green-800', dot: 'bg-green-500', border: 'border-green-200' },
+  low: { label: 'Low', bg: 'bg-stone-100 dark:bg-stone-800', text: 'text-stone-700 dark:text-stone-200', dot: 'bg-stone-400', border: 'border-stone-200 dark:border-stone-800' },
 };
 
 const PRIORITY_TO_TASK: Record<Priority, TaskPriority> = {
@@ -61,7 +61,7 @@ export function SmartSchedule() {
     setLoading(true);
     setError(null);
     try {
-      const resp = await fetch(API_BASE + '/api/schedule');
+      const resp = await apiFetch(API_BASE + '/api/schedule');
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const data = (await resp.json()) as InspectionRecommendation[];
       setRecs(data);
@@ -100,7 +100,7 @@ export function SmartSchedule() {
             <button
               onClick={load}
               disabled={loading}
-              className="flex items-center gap-1 text-sm text-stone-500 hover:text-stone-700 disabled:opacity-50"
+              className="flex items-center gap-1 text-sm text-stone-500 dark:text-stone-400 hover:text-stone-700 disabled:opacity-50"
               title="Refresh"
             >
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
@@ -108,7 +108,7 @@ export function SmartSchedule() {
             </button>
             <button
               onClick={() => navigate(-1)}
-              className="lg:hidden flex items-center gap-1 text-sm text-stone-500"
+              className="lg:hidden flex items-center gap-1 text-sm text-stone-500 dark:text-stone-400"
             >
               <ChevronLeft size={18} /> Back
             </button>
@@ -118,7 +118,7 @@ export function SmartSchedule() {
 
       {loading && (
         <Card>
-          <div className="flex items-center justify-center py-8 text-stone-400 text-sm">
+          <div className="flex items-center justify-center py-8 text-stone-400 dark:text-stone-500 text-sm">
             <Loader2 size={20} className="animate-spin mr-2" /> Calculating inspection schedule…
           </div>
         </Card>
@@ -126,11 +126,11 @@ export function SmartSchedule() {
 
       {error && (
         <Card>
-          <div className="flex items-start gap-2 text-red-600">
+          <div className="flex items-start gap-2 text-red-600 dark:text-red-400">
             <AlertTriangle size={20} className="shrink-0 mt-0.5" />
             <div>
               <p className="font-medium text-sm">Error</p>
-              <p className="text-xs text-red-500 mt-0.5">{error}</p>
+              <p className="text-xs text-red-500 dark:text-red-400 mt-0.5">{error}</p>
             </div>
           </div>
         </Card>
@@ -138,7 +138,7 @@ export function SmartSchedule() {
 
       {!loading && !error && recs.length === 0 && (
         <Card>
-          <p className="text-sm text-stone-500 text-center py-6">
+          <p className="text-sm text-stone-500 dark:text-stone-400 text-center py-6">
             No hives found. Add hives to see inspection recommendations.
           </p>
         </Card>
@@ -159,13 +159,13 @@ export function SmartSchedule() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-semibold text-stone-800 truncate">{rec.hiveName}</h3>
+                      <h3 className="font-semibold text-stone-800 dark:text-stone-100 truncate">{rec.hiveName}</h3>
                       <span className={'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ' + meta.bg + ' ' + meta.text}>
                         <span className={'w-1.5 h-1.5 rounded-full ' + meta.dot} />
                         {meta.label}
                       </span>
                     </div>
-                    <div className="text-xs text-stone-500 mt-0.5">
+                    <div className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
                       {dateStr}
                       {rec.daysUntil === 0
                         ? ' · today'
@@ -175,22 +175,22 @@ export function SmartSchedule() {
                 </div>
 
                 {/* Reason */}
-                <p className="text-sm text-stone-600 mt-3">{rec.reason}</p>
+                <p className="text-sm text-stone-600 dark:text-stone-300 mt-3">{rec.reason}</p>
 
                 {/* Factors */}
                 <div className="mt-3 space-y-1.5">
                   {rec.factors.map((f, i) => (
                     <div key={i} className="flex items-start gap-2">
-                      <span className="text-[11px] font-semibold text-stone-400 uppercase tracking-wide shrink-0 w-24">
+                      <span className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide shrink-0 w-24">
                         {f.factor}
                       </span>
-                      <span className="text-xs text-stone-500 flex-1">{f.detail}</span>
+                      <span className="text-xs text-stone-500 dark:text-stone-400 flex-1">{f.detail}</span>
                     </div>
                   ))}
                 </div>
 
                 {/* Actions */}
-                <div className="mt-3 pt-3 border-t border-stone-100 flex items-center gap-2">
+                <div className="mt-3 pt-3 border-t border-stone-100 dark:border-stone-800 flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => handleAddTask(rec)}
@@ -198,8 +198,8 @@ export function SmartSchedule() {
                     className={
                       'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ' +
                       (added
-                        ? 'bg-green-50 text-green-700 cursor-default'
-                        : 'bg-honey-50 text-honey-700 hover:bg-honey-100')
+                        ? 'bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 cursor-default'
+                        : 'bg-honey-50 dark:bg-honey-950 text-honey-700 dark:text-honey-300 hover:bg-honey-100')
                     }
                   >
                     {added ? <Check size={14} /> : <Plus size={14} />}
@@ -213,7 +213,7 @@ export function SmartSchedule() {
       )}
 
       {!loading && !error && recs.length > 0 && (
-        <p className="text-xs text-stone-400 text-center px-4">
+        <p className="text-xs text-stone-400 dark:text-stone-500 text-center px-4">
           Recommendations are based on inspection history, swarm risk, health status, and the season.
         </p>
       )}
