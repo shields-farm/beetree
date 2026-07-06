@@ -20,7 +20,7 @@ import { Card, SectionCard } from '../components/Card';
 import { useStore } from '../store/useStore';
 import type { Hive } from '../types';
 
-import { API_BASE, apiFetch } from '../lib/apiBase';
+import { API_BASE, apiFetch, statusToMessage } from '../lib/apiBase';
 
 // ─── Vision analysis types (mirror server/vision.ts) ──────────────────────────
 interface FrameAnalysisDisease {
@@ -162,7 +162,7 @@ export function FrameAnalysisPage() {
       });
       if (!resp.ok) {
         const errBody = await resp.json().catch(() => ({}));
-        throw new Error(errBody.error || 'HTTP ' + resp.status);
+        throw new Error(errBody.error || statusToMessage(resp.status));
       }
       const data = await resp.json() as { analysis: FrameAnalysis; timestamp: string };
       setAnalysis(data.analysis);
@@ -190,7 +190,7 @@ export function FrameAnalysisPage() {
       });
       if (!resp.ok) {
         const errBody = await resp.json().catch(() => ({}));
-        throw new Error(errBody.error || 'HTTP ' + resp.status);
+        throw new Error(errBody.error || statusToMessage(resp.status));
       }
       const data = await resp.json() as { inspection: { id: string } };
       setCreatedInspectionId(data.inspection.id);

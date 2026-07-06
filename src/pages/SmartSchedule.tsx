@@ -15,7 +15,7 @@ import { Card } from '../components/Card';
 import { useStore } from '../store/useStore';
 import type { TaskPriority } from '../types';
 
-import { API_BASE, apiFetch } from '../lib/apiBase';
+import { API_BASE, apiFetch, statusToMessage } from '../lib/apiBase';
 
 interface ScheduleFactor {
   factor: string;
@@ -62,7 +62,7 @@ export function SmartSchedule() {
     setError(null);
     try {
       const resp = await apiFetch(API_BASE + '/api/schedule');
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      if (!resp.ok) throw new Error(statusToMessage(resp.status));
       const data = (await resp.json()) as InspectionRecommendation[];
       setRecs(data);
     } catch (e) {

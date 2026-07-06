@@ -12,7 +12,7 @@ import { format } from 'date-fns';
 import { PageHeader } from '../components/Layout';
 import { Card } from '../components/Card';
 
-import { API_BASE, apiFetch } from '../lib/apiBase';
+import { API_BASE, apiFetch, statusToMessage } from '../lib/apiBase';
 
 interface HealthHistoryEntry {
   date: string;
@@ -60,7 +60,7 @@ export function HealthTrends() {
       setError(null);
       try {
         const resp = await apiFetch(API_BASE + '/api/trending');
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        if (!resp.ok) throw new Error(statusToMessage(resp.status));
         const data = (await resp.json()) as HealthTrend[];
         if (!cancelled) setTrends(data);
       } catch (e) {

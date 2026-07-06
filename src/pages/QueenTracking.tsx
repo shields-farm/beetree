@@ -11,7 +11,7 @@ import {
 import { PageHeader } from '../components/Layout';
 import { Card } from '../components/Card';
 
-import { API_BASE, apiFetch } from '../lib/apiBase';
+import { API_BASE, apiFetch, statusToMessage } from '../lib/apiBase';
 
 interface QueenRecord {
   id: string;
@@ -138,7 +138,7 @@ export function QueenTracking() {
       });
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
-        throw new Error(err.error || 'HTTP ' + resp.status);
+        throw new Error(err.error || statusToMessage(resp.status));
       }
       // Refresh
       const allResp = await apiFetch(API_BASE + '/api/queen/all');

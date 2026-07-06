@@ -26,7 +26,7 @@ import {
 } from '../lib/hiveTypes';
 import type { Concern, Inspection, PopulationSize, QueenLayingPattern, StoreLevel, Temperament } from '../types';
 
-import { API_BASE } from '../lib/apiBase';
+import { API_BASE, apiFetch, statusToMessage } from '../lib/apiBase';
 
 // ─── Voice transcript types ──────────────────────────────────────────────────
 
@@ -105,8 +105,8 @@ export function InspectionList() {
       setLoadingList(true);
       setListError(null);
       try {
-        const resp = await fetch(`${API_BASE}/api/omi/transcripts`);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const resp = await apiFetch(`${API_BASE}/api/omi/transcripts`);
+        if (!resp.ok) throw new Error(statusToMessage(resp.status));
         const data = (await resp.json()) as TranscriptSummary[];
         if (!cancelled) setTranscripts(data);
       } catch (e) {
@@ -128,8 +128,8 @@ export function InspectionList() {
     setMode('review');
 
     try {
-      const resp = await fetch(`${API_BASE}/api/omi/transcripts/${t.date}`);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const resp = await apiFetch(`${API_BASE}/api/omi/transcripts/${t.date}`);
+      if (!resp.ok) throw new Error(statusToMessage(resp.status));
       const data = (await resp.json()) as { text: string };
       setRawTranscript(data.text);
       await parseTranscript(data.text);
@@ -142,12 +142,12 @@ export function InspectionList() {
     setParsing(true);
     setParseError(null);
     try {
-      const resp = await fetch(`${API_BASE}/api/omi/transcript`, {
+      const resp = await apiFetch(`${API_BASE}/api/omi/transcript`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ transcript: text }),
       });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      if (!resp.ok) throw new Error(statusToMessage(resp.status));
       const data = (await resp.json()) as { parsed: ParsedInspection; raw: string };
       const p = { ...defaultParsed(), ...data.parsed };
       setParsed(p);
@@ -198,14 +198,14 @@ export function InspectionList() {
     setConfirming(true);
     setConfirmError(null);
     try {
-      const resp = await fetch(`${API_BASE}/api/omi/confirm`, {
+      const resp = await apiFetch(`${API_BASE}/api/omi/confirm`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ parsed, hiveId }),
       });
       if (!resp.ok) {
         const errBody = await resp.json().catch(() => ({}));
-        throw new Error(errBody.error || `HTTP ${resp.status}`);
+        throw new Error(errBody.error || statusToMessage(resp.status));
       }
       const created = await resp.json() as { id: string };
       setCreatedId(created.id);
