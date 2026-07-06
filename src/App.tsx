@@ -1,6 +1,7 @@
 import { HashRouter, Routes, Route } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { StoreProvider } from './store/useStore';
+import { ChatProvider } from './components/ChatContext';
 import { Dashboard } from './pages/Dashboard';
 import { Apiaries, ApiaryDetail } from './pages/Apiaries';
 import { Hives } from './pages/Hives';
@@ -14,8 +15,9 @@ import { Settings } from './pages/Settings';
 export default function App() {
   return (
     <StoreProvider>
-      <HashRouter>
-        <Layout>
+      <ChatProvider>
+        <HashRouter>
+          <Layout>
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/apiaries" element={<Apiaries />} />
@@ -30,8 +32,9 @@ export default function App() {
             <Route path="/tasks" element={<Tasks />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
-        </Layout>
-      </HashRouter>
+          </Layout>
+        </HashRouter>
+      </ChatProvider>
     </StoreProvider>
   );
 }

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Trash2, Pencil, Thermometer, ClipboardList, ChevronRight, Boxes } from 'lucide-react';
 import { format } from 'date-fns';
 import { useStore } from '../store/useStore';
+import { useChat, AskAIButton } from '../components/ChatContext';
 import { Card } from '../components/Card';
 import { GpsPin } from '../components/GpsPin';
 import { HiveVisual } from '../components/HiveVisual';
@@ -13,6 +14,7 @@ import type { HiveType } from '../types';
 
 export function HiveDetail({ id }: { id: string }) {
   const { hives, apiaries, inspections, sensors, updateHive, deleteHive, refreshSensorReadings } = useStore();
+  const { setQuickQuestions } = useChat();
   const navigate = useNavigate();
   const hive = hives.find((h) => h.id === id);
   const [editing, setEditing] = useState(false);
@@ -20,6 +22,27 @@ export function HiveDetail({ id }: { id: string }) {
   const [type, setType] = useState<HiveType>(hive?.type ?? 'langstroth-10');
   const [notes, setNotes] = useState(hive?.notes ?? '');
   const [showEditor, setShowEditor] = useState(false);
+
+  const apiary = hive ? apiaries.find((a) => a.id === hive.apiaryId) : undefined;
+  const meta = hive ? HEALTH_META[hive.healthStatus] : undefined;
+  const hiveInspections = hive ? inspections.filter((i) => i.hiveId === hive.id).sort((a, b) => b.date.localeCompare(a.date)) : [];
+  const hiveSensors = hive ? sensors.filter((s) => s.hiveId === hive.id) : [];
+
+  // Page-specific quick questions about this hive
+  useEffect(() => {
+    if (!hive) return;
+    const qs = [
+      `How is ${hive.name} doing overall?`,
+      `When should I next inspect ${hive.name}?`,
+      `What's the queen health like in ${hive.name}?`,
+    ];
+    if (hiveSensors.length > 0) qs.push(`Analyze ${hive.name}'s sensor trends`);
+    if (meta && (hive.healthStatus === 'poor' || hive.healthStatus === 'critical')) {
+      qs.unshift(`${hive.name} is in ${meta.label} health — what should I do?`);
+    }
+    setQuickQuestions(qs);
+    return () => setQuickQuestions([]);
+  }, [hive, hiveSensors.length, meta, setQuickQuestions]);
 
   if (!hive) {
     return (
@@ -30,10 +53,8 @@ export function HiveDetail({ id }: { id: string }) {
     );
   }
 
-  const apiary = apiaries.find((a) => a.id === hive.apiaryId);
-  const meta = HEALTH_META[hive.healthStatus];
-  const hiveInspections = inspections.filter((i) => i.hiveId === hive.id).sort((a, b) => b.date.localeCompare(a.date));
-  const hiveSensors = sensors.filter((s) => s.hiveId === hive.id);
+  // These are now computed above (before the early return)
+  // const apiary, meta, hiveInspections, hiveSensors moved up
 
   const save = () => {
     const def = HIVE_TYPES[type];
@@ -78,14 +99,15 @@ export function HiveDetail({ id }: { id: string }) {
       </div>
 
       {/* Health + quick stats */}
-      <div className="flex items-center gap-2 mb-4">
-        <span className={`text-xs px-2.5 py-1 rounded-full ${meta.bg} ${meta.text} font-medium`}>Health: {meta.label}</span>
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <span className={`text-xs px-2.5 py-1 rounded-full ${meta!.bg} ${meta!.text} font-medium`}>Health: {meta!.label}</span>
         <span className="text-xs px-2.5 py-1 rounded-full bg-stone-100 text-stone-600">{hive.boxes.length} box{hive.boxes.length !== 1 ? 'es' : ''}</span>
         {hiveSensors.length > 0 && (
           <span className="text-xs px-2.5 py-1 rounded-full bg-sky-50 text-sky-700 flex items-center gap-1">
             <Thermometer size={11} /> {hiveSensors.length} sensor{hiveSensors.length !== 1 ? 's' : ''}
           </span>
         )}
+        <AskAIButton prompt={`Give me a full assessment of ${hive.name}: queen health, nutrition, pests/diseases. What should I be watching for?`} label="Assess this hive" />
       </div>
 
       {/* GPS Location Pin */}

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { MessageCircle, Send, X, Sparkles, AlertCircle } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { useChat } from './ChatContext';
 import { generateAlerts } from '../lib/alerts';
 import { HEALTH_META } from '../lib/health';
 import { HIVE_TYPES } from '../lib/hiveTypes';
@@ -79,6 +80,7 @@ ${recentInspections.map((i) => {
 
 export function FloatingChat() {
   const { apiaries, hives, inspections, sensors, tasks } = useStore();
+  const { isOpen, setIsOpen, pendingPrompt, clearPendingPrompt, quickQuestions } = useChat();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -86,6 +88,26 @@ export function FloatingChat() {
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Sync local open state with context
+  useEffect(() => {
+    setOpen(isOpen);
+  }, [isOpen]);
+
+  const toggleOpen = useCallback((v: boolean) => {
+    setOpen(v);
+    setIsOpen(v);
+  }, [setIsOpen]);
+
+  // Consume pending prompt from context (e.g., from AskAIButton)
+  useEffect(() => {
+    if (pendingPrompt && open) {
+      setInput(pendingPrompt);
+      clearPendingPrompt();
+      // Auto-focus so user can hit Enter to send
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [pendingPrompt, open, clearPendingPrompt]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -165,7 +187,7 @@ export function FloatingChat() {
     }
   }, [input, loading, messages, apiaries, hives, inspections, sensors, tasks]);
 
-  const quickQuestions = [
+  const pageQuestions = quickQuestions.length > 0 ? quickQuestions : [
     "Which hive needs attention?",
     "What should I do this week?",
     "Any swarm risk?",
@@ -176,7 +198,7 @@ export function FloatingChat() {
       {/* Floating button */}
       {!open && (
         <button
-          onClick={() => setOpen(true)}
+          onClick={() => toggleOpen(true)}
           className="fixed bottom-20 lg:bottom-6 right-4 z-50 w-14 h-14 rounded-full bg-honey-500 text-white shadow-lg flex items-center justify-center hover:bg-honey-600 active:scale-95 transition-all"
           aria-label="Ask BeeTree AI"
         >
@@ -201,7 +223,7 @@ export function FloatingChat() {
                 <div className="text-[10px] opacity-90">UGA Master Craftsman</div>
               </div>
             </div>
-            <button onClick={() => setOpen(false)} className="p-1 hover:bg-white/20 rounded-lg">
+            <button onClick={() => toggleOpen(false)} className="p-1 hover:bg-white/20 rounded-lg">
               <X size={18} />
             </button>
           </div>
@@ -214,7 +236,7 @@ export function FloatingChat() {
                 <p className="text-sm text-stone-600 font-medium">Ask me about your hives</p>
                 <p className="text-xs text-stone-400 mt-1">I know your apiaries, sensors, and inspection history</p>
                 <div className="flex flex-wrap gap-1.5 mt-3 justify-center">
-                  {quickQuestions.map((q) => (
+                  {pageQuestions.map((q) => (
                     <button
                       key={q}
                       onClick={() => {
