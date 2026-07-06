@@ -559,6 +559,7 @@ app.delete('/api/media/:id', (req, res) => {
 // ============================================================================
 import {
   parseTranscriptToInspection,
+  parseFreeTextToInspection,
   calculateHealth,
   listRecentTranscripts,
   readTranscriptByDate,
@@ -667,7 +668,745 @@ app.get('/api/omi/transcripts/:date', (req, res) => {
 });
 
 // ============================================================================
-// Health check & 404
+// /api/vision — Frame photo analysis via synthetic.new vision API
+// ============================================================================
+import { analyzeFramePhoto, type FrameAnalysis } from './vision.js';
+
+// Store recent vision analyses in memory (simple ring buffer of 50)
+interface VisionAnalysisRecord {
+  id: string;
+  hiveId: string | null;
+  timestamp: string;
+  analysis: FrameAnalysis;
+}
+const recentVisionAnalyses: VisionAnalysisRecord[] = [];
+const MAX_RECENT_ANALYSES = 50;
+
+function normalizeImage(image: string): string {
+  // Accept either a data URL or raw base64; pass through to vision module.
+  return image;
+}
+
+app.post('/api/vision/analyze', async (req, res) => {
+  try {
+    const { image, hiveId } = req.body || {};
+    if (typeof image !== 'string' || !image.trim()) {
+      return res.status(400).json({ error: 'image (string, base64 data URL or raw base64) is required' });
+    }
+
+    // Look up hive name for better prompt context
+    let hiveName: string | undefined;
+    if (hiveId) {
+      const hiveRow = db.prepare('SELECT name FROM hives WHERE id = ?').get(hiveId) as { name: string } | undefined;
+      if (hiveRow) hiveName = hiveRow.name;
+    }
+
+    const analysis = await analyzeFramePhoto(normalizeImage(image), hiveName);
+    const timestamp = new Date().toISOString();
+    const record: VisionAnalysisRecord = {
+      id: genId('va'),
+      hiveId: hiveId ?? null,
+      timestamp,
+      analysis,
+    };
+    recentVisionAnalyses.unshift(record);
+    if (recentVisionAnalyses.length > MAX_RECENT_ANALYSES) {
+      recentVisionAnalyses.length = MAX_RECENT_ANALYSES;
+    }
+
+    res.json({ analysis, hiveId: hiveId ?? null, timestamp });
+  } catch (e) {
+    console.error('[vision/analyze] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'vision analysis failed' });
+  }
+});
+
+app.post('/api/vision/analyze-and-create', async (req, res) => {
+  try {
+    const { image, hiveId, notes } = req.body || {};
+    if (typeof image !== 'string' || !image.trim()) {
+      return res.status(400).json({ error: 'image (string, base64) is required' });
+    }
+    if (!hiveId) {
+      return res.status(400).json({ error: 'hiveId is required' });
+    }
+    const hiveExists = db.prepare('SELECT 1 FROM hives WHERE id = ?').get(hiveId);
+    if (!hiveExists) {
+      return res.status(404).json({ error: 'hive not found' });
+    }
+
+    const hiveRow = db.prepare('SELECT name FROM hives WHERE id = ?').get(hiveId) as { name: string };
+    const analysis = await analyzeFramePhoto(normalizeImage(image), hiveRow.name);
+
+    // Map analysis → inspection fields
+    const layingMap: Record<string, 'excellent' | 'good' | 'fair' | 'poor' | 'none'> = {
+      solid: 'excellent',
+      spotty: 'poor',
+      patchy: 'fair',
+      none: 'none',
+      unknown: 'none',
+    };
+    const queenLayingPattern = layingMap[analysis.broodPattern] ?? 'none';
+
+    // Derive honey/pollen store levels from ratios
+    function ratioToStore(r: number): 'none' | 'low' | 'medium' | 'high' {
+      if (r >= 0.5) return 'high';
+      if (r >= 0.25) return 'medium';
+      if (r >= 0.05) return 'low';
+      return 'none';
+    }
+    const honeyStores = ratioToStore(analysis.honeyRatio);
+    const pollenStores = ratioToStore(analysis.pollenRatio);
+
+    // Build concerns from diseases + pests + analysis concerns
+    const concerns: { type: string; count?: number; note?: string }[] = [];
+    for (const d of analysis.diseases) {
+      concerns.push({
+        type: d.type,
+        note: d.note + (d.confidence ? ' (confidence: ' + d.confidence + ')' : ''),
+      });
+    }
+    for (const p of analysis.pests) {
+      concerns.push({
+        type: p.type,
+        count: p.count,
+        note: p.note,
+      });
+    }
+    for (const c of analysis.concerns) {
+      concerns.push({ type: c.type, note: c.note });
+    }
+
+    // Build notes: overall assessment + optional user notes
+    const notesParts: string[] = [];
+    if (notes && typeof notes === 'string' && notes.trim()) {
+      notesParts.push(notes.trim());
+    }
+    notesParts.push('[AI Frame Analysis] ' + analysis.overallAssessment);
+    if (analysis.recommendations.length > 0) {
+      notesParts.push('Recommendations: ' + analysis.recommendations.join('; '));
+    }
+    if (analysis.queenSpotted) {
+      notesParts.push('Queen spotted: ' + analysis.queenLocation);
+    }
+    const inspectionNotes = notesParts.join('\n\n');
+
+    // Calculate health
+    const health = calculateHealth({
+      queenPresent: analysis.queenSpotted,
+      queenCells: false,
+      queenLayingPattern,
+      eggsPresent: analysis.eggsVisible,
+      larvaePresent: analysis.larvaeVisible,
+      cappedBrood: analysis.cappedBroodPresent,
+      temperament: 'normal',
+      honeyStores,
+      pollenStores,
+      populationSize: 'none', // not determinable from a single frame photo
+      concerns,
+      colonyDead: false,
+    });
+
+    // Insert inspection
+    const id = genId('insp');
+    db.prepare(
+      'INSERT INTO inspections (id, hiveId, date, queenPresent, queenCells, queenLayingPattern, eggsPresent, larvaePresent, cappedBrood, temperament, honeyStores, pollenStores, populationSize, hiveWeight, healthStatus, healthAutoCalculated, colonyDead, notes, photoUrls) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    ).run(
+      id,
+      hiveId,
+      new Date().toISOString(),
+      analysis.queenSpotted ? 1 : 0,
+      0, // queenCells not determinable from photo
+      queenLayingPattern,
+      analysis.eggsVisible ? 1 : 0,
+      analysis.larvaeVisible ? 1 : 0,
+      analysis.cappedBroodPresent ? 1 : 0,
+      'normal', // temperament not determinable from photo
+      honeyStores,
+      pollenStores,
+      'none', // population not determinable from single frame
+      0,
+      health,
+      1, // auto-calculated
+      0, // not dead
+      inspectionNotes,
+      JSON.stringify([]),
+    );
+
+    // Insert concerns
+    if (concerns.length > 0) {
+      const insConcern = db.prepare(
+        'INSERT INTO concerns (id, inspectionId, type, count, note) VALUES (?, ?, ?, ?, ?)',
+      );
+      for (const c of concerns) {
+        if (!c.type) continue;
+        insConcern.run(genId('c'), id, c.type, c.count ?? null, c.note ?? null);
+      }
+    }
+
+    // Update hive health status
+    db.prepare('UPDATE hives SET healthStatus = ? WHERE id = ?').run(health, hiveId);
+
+    const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(id) as InspectionRow;
+    const inspection = mapInspection(row, getConcernsFor(id));
+
+    // Store in recent analyses
+    const record: VisionAnalysisRecord = {
+      id: genId('va'),
+      hiveId,
+      timestamp: new Date().toISOString(),
+      analysis,
+    };
+    recentVisionAnalyses.unshift(record);
+    if (recentVisionAnalyses.length > MAX_RECENT_ANALYSES) {
+      recentVisionAnalyses.length = MAX_RECENT_ANALYSES;
+    }
+
+    res.status(201).json({ inspection, analysis });
+  } catch (e) {
+    console.error('[vision/analyze-and-create] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'vision analysis+create failed' });
+  }
+});
+
+app.get('/api/vision/analyses', (_req, res) => {
+  res.json(recentVisionAnalyses);
+});
+
+// ============================================================================
+// /api/vision/varroa — Varroa sticky board AI counter
+// ============================================================================
+import { analyzeStickyBoard, type VarroaCount } from './varroa.js';
+import { calculateSwarmRisk, calculateSwarmRiskAll, type SwarmRiskAssessment } from './swarm.js';
+
+app.post('/api/vision/varroa', async (req, res) => {
+  try {
+    const { image, hiveId } = req.body || {};
+    if (typeof image !== 'string' || !image.trim()) {
+      return res.status(400).json({ error: 'image (base64 string) is required' });
+    }
+    if (!hiveId) {
+      return res.status(400).json({ error: 'hiveId is required' });
+    }
+    const count = await analyzeStickyBoard(image);
+    res.json({ count, hiveId, timestamp: new Date().toISOString() });
+  } catch (e) {
+    console.error('[vision/varroa] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'varroa analysis failed' });
+  }
+});
+
+app.post('/api/vision/varroa/save', (req, res) => {
+  try {
+    const { image, hiveId, miteCount, date } = req.body || {};
+    if (!hiveId) return res.status(400).json({ error: 'hiveId is required' });
+    if (typeof miteCount !== 'number') return res.status(400).json({ error: 'miteCount (number) is required' });
+    const exists = db.prepare('SELECT 1 FROM hives WHERE id = ?').get(hiveId);
+    if (!exists) return res.status(404).json({ error: 'hive not found' });
+
+    const inspId = genId('insp');
+    const inspDate = date ?? new Date().toISOString();
+    const concernNote = 'Varroa sticky board count: ' + miteCount + ' mites.';
+
+    db.prepare(
+      'INSERT INTO inspections (id, hiveId, date, queenPresent, queenCells, queenLayingPattern, eggsPresent, larvaePresent, cappedBrood, temperament, honeyStores, pollenStores, populationSize, hiveWeight, healthStatus, healthAutoCalculated, colonyDead, notes, photoUrls) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    ).run(
+      inspId,
+      hiveId,
+      inspDate,
+      0, // queenPresent (unknown)
+      0,
+      'none',
+      0,
+      0,
+      0,
+      'normal',
+      'none',
+      'none',
+      'none',
+      0,
+      'fair', // placeholder health
+      1, // auto-calculated
+      0,
+      concernNote,
+      image ? JSON.stringify([image]) : JSON.stringify([]),
+    );
+
+    // Insert a varroa concern with the mite count
+    db.prepare(
+      'INSERT INTO concerns (id, inspectionId, type, count, note) VALUES (?, ?, ?, ?, ?)',
+    ).run(genId('c'), inspId, 'varroa', miteCount, concernNote);
+
+    const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(inspId) as InspectionRow;
+    res.status(201).json(mapInspection(row, getConcernsFor(inspId)));
+  } catch (e) {
+    console.error('[vision/varroa/save] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'save failed' });
+  }
+});
+
+app.get('/api/varroa/history/:hiveId', (req, res) => {
+  try {
+    const rows = db
+      .prepare('SELECT * FROM inspections WHERE hiveId = ? ORDER BY date DESC')
+      .all(req.params.hiveId) as InspectionRow[];
+    const history: any[] = [];
+    for (const r of rows) {
+      const concerns = getConcernsFor(r.id) as ConcernRowX[];
+      const varroa = concerns.find((c) => c.type.toLowerCase() === 'varroa');
+      if (varroa) {
+        history.push({
+          inspectionId: r.id,
+          hiveId: r.hiveId,
+          date: r.date,
+          miteCount: varroa.count ?? 0,
+          note: varroa.note ?? '',
+          healthStatus: r.healthStatus,
+        });
+      }
+    }
+    res.json(history);
+  } catch (e) {
+    console.error('[varroa/history] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'history failed' });
+  }
+});
+
+interface ConcernRowX {
+  id: string;
+  inspectionId: string;
+  type: string;
+  count: number | null;
+  note: string | null;
+}
+
+// ============================================================================
+// /api/swarm/risk — Swarm risk assessment
+// ============================================================================
+app.get('/api/swarm/risk/:hiveId', async (req, res) => {
+  try {
+    const exists = db.prepare('SELECT 1 FROM hives WHERE id = ?').get(req.params.hiveId);
+    if (!exists) return res.status(404).json({ error: 'hive not found' });
+    const assessment = await calculateSwarmRisk(req.params.hiveId);
+    res.json(assessment);
+  } catch (e) {
+    console.error('[swarm/risk/:hiveId] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'swarm risk failed' });
+  }
+});
+
+app.get('/api/swarm/risk', async (_req, res) => {
+  try {
+    const assessments = await calculateSwarmRiskAll();
+    res.json(assessments);
+  } catch (e) {
+    console.error('[swarm/risk] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'swarm risk failed' });
+  }
+});
+
+// ============================================================================
+// /api/schedule — Smart inspection scheduler
+// ============================================================================
+import { getInspectionSchedule, getHiveSchedule } from './scheduler.js';
+
+app.get('/api/schedule', async (_req, res) => {
+  try {
+    const recs = await getInspectionSchedule();
+    res.json(recs);
+  } catch (e) {
+    console.error('[schedule] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'schedule failed' });
+  }
+});
+
+app.get('/api/schedule/:hiveId', async (req, res) => {
+  try {
+    const exists = db.prepare('SELECT 1 FROM hives WHERE id = ?').get(req.params.hiveId);
+    if (!exists) return res.status(404).json({ error: 'hive not found' });
+    const rec = await getHiveSchedule(req.params.hiveId);
+    res.json(rec);
+  } catch (e) {
+    console.error('[schedule/:hiveId] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'schedule failed' });
+  }
+});
+
+// ============================================================================
+// /api/inspect — Free-text inspection parser (Buzz, no voice required)
+// ============================================================================
+app.post('/api/inspect/parse', async (req, res) => {
+  try {
+    const { text } = req.body || {};
+    if (typeof text !== 'string' || !text.trim()) {
+      return res.status(400).json({ error: 'text (string) is required' });
+    }
+    const hiveRows = db.prepare('SELECT id, name FROM hives').all() as { id: string; name: string }[];
+    const parsed = await parseFreeTextToInspection(text, hiveRows);
+    res.json({ parsed, raw: text });
+  } catch (e) {
+    console.error('[inspect/parse] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'parse failed' });
+  }
+});
+
+app.post('/api/inspect/confirm', (req, res) => {
+  try {
+    const { parsed, hiveId } = req.body || {};
+    if (!hiveId) return res.status(400).json({ error: 'hiveId is required' });
+    const exists = db.prepare('SELECT 1 FROM hives WHERE id = ?').get(hiveId);
+    if (!exists) return res.status(404).json({ error: 'hive not found' });
+
+    const p: ParsedInspection = parsed || {};
+    const health = calculateHealth({
+      queenPresent: p.queenPresent,
+      queenCells: p.queenCells,
+      queenLayingPattern: p.queenLayingPattern,
+      eggsPresent: p.eggsPresent,
+      larvaePresent: p.larvaePresent,
+      cappedBrood: p.cappedBrood,
+      temperament: p.temperament,
+      honeyStores: p.honeyStores,
+      pollenStores: p.pollenStores,
+      populationSize: p.populationSize,
+      concerns: p.concerns ?? [],
+      colonyDead: false,
+    });
+
+    const id = genId('insp');
+    db.prepare(
+      `INSERT INTO inspections (id, hiveId, date, queenPresent, queenCells, queenLayingPattern, eggsPresent, larvaePresent, cappedBrood, temperament, honeyStores, pollenStores, populationSize, hiveWeight, healthStatus, healthAutoCalculated, colonyDead, notes, photoUrls) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      id,
+      hiveId,
+      new Date().toISOString(),
+      p.queenPresent ? 1 : 0,
+      p.queenCells ? 1 : 0,
+      p.queenLayingPattern ?? 'none',
+      p.eggsPresent ? 1 : 0,
+      p.larvaePresent ? 1 : 0,
+      p.cappedBrood ? 1 : 0,
+      p.temperament ?? 'normal',
+      p.honeyStores ?? 'none',
+      p.pollenStores ?? 'none',
+      p.populationSize ?? 'none',
+      0,
+      health,
+      1, // auto-calculated
+      0, // not dead
+      p.notes ?? '',
+      JSON.stringify([]),
+    );
+
+    // Insert concerns
+    if (Array.isArray(p.concerns)) {
+      const insConcern = db.prepare(
+        `INSERT INTO concerns (id, inspectionId, type, count, note) VALUES (?, ?, ?, ?, ?)`,
+      );
+      for (const c of p.concerns) {
+        if (!c.type) continue;
+        insConcern.run(genId('c'), id, c.type, c.count ?? null, c.note ?? null);
+      }
+    }
+
+    const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(id) as InspectionRow;
+    // Update hive health status to match latest inspection
+    db.prepare('UPDATE hives SET healthStatus = ? WHERE id = ?').run(health, hiveId);
+    res.status(201).json(mapInspection(row, getConcernsFor(id)));
+  } catch (e) {
+    console.error('[inspect/confirm] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'confirm failed' });
+  }
+});
+
+// ============================================================================
+// /api/trending — Hive health trending
+// ============================================================================
+import { getHealthTrend, getAllHealthTrends } from './trending.js';
+
+app.get('/api/trending/:hiveId', (req, res) => {
+  try {
+    const exists = db.prepare('SELECT 1 FROM hives WHERE id = ?').get(req.params.hiveId);
+    if (!exists) return res.status(404).json({ error: 'hive not found' });
+    const trend = getHealthTrend(req.params.hiveId);
+    res.json(trend);
+  } catch (e) {
+    console.error('[trending/:hiveId] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'trending failed' });
+  }
+});
+
+app.get('/api/trending', (_req, res) => {
+  try {
+    const trends = getAllHealthTrends();
+    res.json(trends);
+  } catch (e) {
+    console.error('[trending] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'trending failed' });
+  }
+});
+
+// ============================================================================
+// /api/treatment — Treatment recommender
+// ============================================================================
+import { getTreatmentRecommendation, getAllTreatmentRecommendations } from './treatment.js';
+
+app.get('/api/treatment/:hiveId', (req, res) => {
+  try {
+    const exists = db.prepare('SELECT 1 FROM hives WHERE id = ?').get(req.params.hiveId);
+    if (!exists) return res.status(404).json({ error: 'hive not found' });
+    const rec = getTreatmentRecommendation(req.params.hiveId);
+    res.json(rec);
+  } catch (e) {
+    console.error('[treatment/:hiveId] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'treatment failed' });
+  }
+});
+
+app.get('/api/treatment', (_req, res) => {
+  try {
+    const recs = getAllTreatmentRecommendations();
+    res.json(recs);
+  } catch (e) {
+    console.error('[treatment] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'treatment failed' });
+  }
+});
+
+// ============================================================================
+// /api/forage — Forage & nectar flow forecast
+// ============================================================================
+import { getForageForecast, getForageForecastWithPreview } from './forage.js';
+
+app.get('/api/forage', (_req, res) => {
+  try {
+    const { current, next } = getForageForecastWithPreview();
+    res.json({ current, next });
+  } catch (e) {
+    console.error('[forage] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'forage failed' });
+  }
+});
+
+app.get('/api/forage/:month', (req, res) => {
+  try {
+    const m = Number(req.params.month);
+    if (!Number.isInteger(m) || m < 1 || m > 12) {
+      return res.status(400).json({ error: 'month must be an integer 1-12' });
+    }
+    const forecast = getForageForecast(m);
+    res.json(forecast);
+  } catch (e) {
+    console.error('[forage/:month] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'forage failed' });
+  }
+});
+
+// ============================================================================
+// /api/acoustics — Hive acoustics analysis
+// ============================================================================
+import { analyzeAcoustics, type AcousticAnalysis } from './acoustics.js';
+
+app.post('/api/acoustics/analyze', async (req, res) => {
+  try {
+    const { audio, duration, hiveId, description } = req.body || {};
+    if (!hiveId) return res.status(400).json({ error: 'hiveId is required' });
+    const exists = db.prepare('SELECT 1 FROM hives WHERE id = ?').get(hiveId);
+    if (!exists) return res.status(404).json({ error: 'hive not found' });
+
+    const analysis = await analyzeAcoustics({ hiveId, audio, duration, description });
+    res.json(analysis);
+  } catch (e) {
+    console.error('[acoustics/analyze] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'acoustic analysis failed' });
+  }
+});
+
+app.post('/api/acoustics/save', (req, res) => {
+  try {
+    const { hiveId, analysis, notes } = req.body || {};
+    if (!hiveId) return res.status(400).json({ error: 'hiveId is required' });
+    if (!analysis) return res.status(400).json({ error: 'analysis is required' });
+    const exists = db.prepare('SELECT 1 FROM hives WHERE id = ?').get(hiveId);
+    if (!exists) return res.status(404).json({ error: 'hive not found' });
+
+    const a: AcousticAnalysis = analysis;
+    const inspId = genId('insp');
+    const concernNote = 'Acoustic analysis: ' + a.interpretation + ' (confidence: ' + a.confidence + '). ' + a.notes;
+    const inspectionNotes = (notes ? notes + '\n\n' : '') + '[Acoustic Analysis]\n' +
+      'Interpretation: ' + a.interpretation + '\n' +
+      'Confidence: ' + a.confidence + '\n' +
+      'Frequency: ' + a.frequency + '\n' +
+      'Pattern: ' + a.pattern + '\n' +
+      'Recommendations: ' + (a.recommendations || []).join('; ');
+
+    db.prepare(
+      'INSERT INTO inspections (id, hiveId, date, queenPresent, queenCells, queenLayingPattern, eggsPresent, larvaePresent, cappedBrood, temperament, honeyStores, pollenStores, populationSize, hiveWeight, healthStatus, healthAutoCalculated, colonyDead, notes, photoUrls) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    ).run(
+      inspId,
+      hiveId,
+      new Date().toISOString(),
+      0,
+      0,
+      'none',
+      0,
+      0,
+      0,
+      a.interpretation === 'stressed' || a.interpretation === 'queenless' ? 'agitated' : 'normal',
+      'none',
+      'none',
+      'none',
+      0,
+      a.interpretation === 'queenless' ? 'poor' : a.interpretation === 'stressed' ? 'fair' : 'good',
+      1,
+      0,
+      inspectionNotes,
+      JSON.stringify([]),
+    );
+
+    // Insert an acoustic concern
+    db.prepare(
+      'INSERT INTO concerns (id, inspectionId, type, count, note) VALUES (?, ?, ?, ?, ?)',
+    ).run(genId('c'), inspId, 'acoustic', null, concernNote);
+
+    const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(inspId) as InspectionRow;
+    res.status(201).json(mapInspection(row, getConcernsFor(inspId)));
+  } catch (e) {
+    console.error('[acoustics/save] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'save failed' });
+  }
+});
+
+app.get('/api/acoustics/history/:hiveId', (req, res) => {
+  try {
+    const rows = db
+      .prepare('SELECT * FROM inspections WHERE hiveId = ? ORDER BY date DESC')
+      .all(req.params.hiveId) as InspectionRow[];
+    const history: any[] = [];
+    for (const r of rows) {
+      const concerns = getConcernsFor(r.id) as ConcernRowX[];
+      const acoustic = concerns.find((c) => c.type.toLowerCase() === 'acoustic');
+      if (acoustic) {
+        history.push({
+          inspectionId: r.id,
+          hiveId: r.hiveId,
+          date: r.date,
+          note: acoustic.note ?? '',
+          healthStatus: r.healthStatus,
+          notes: r.notes,
+        });
+      }
+    }
+    res.json(history);
+  } catch (e) {
+    console.error('[acoustics/history] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'history failed' });
+  }
+});
+
+// ============================================================================
+// /api/queen — Queen ID tracking
+// ============================================================================
+import {
+  getQueenStatus,
+  getAllQueenStatuses,
+  recordQueen,
+  queenColorForYear,
+} from './queenTracking.js';
+
+app.get('/api/queen/all', (_req, res) => {
+  try {
+    res.json(getAllQueenStatuses());
+  } catch (e) {
+    console.error('[queen/all] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'queen status failed' });
+  }
+});
+
+app.get('/api/queen/color/:year', (req, res) => {
+  const year = Number(req.params.year);
+  if (!Number.isInteger(year)) return res.status(400).json({ error: 'year must be an integer' });
+  res.json({ year, color: queenColorForYear(year) });
+});
+
+app.get('/api/queen/:hiveId', (req, res) => {
+  try {
+    const status = getQueenStatus(req.params.hiveId);
+    if (!status) return res.status(404).json({ error: 'hive not found' });
+    res.json(status);
+  } catch (e) {
+    console.error('[queen/:hiveId] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'queen status failed' });
+  }
+});
+
+app.post('/api/queen/record', (req, res) => {
+  try {
+    const { hiveId, queenColor, queenYear, imageUrls, notes, source } = req.body || {};
+    if (!hiveId) return res.status(400).json({ error: 'hiveId is required' });
+    if (!queenColor) return res.status(400).json({ error: 'queenColor is required' });
+    if (typeof queenYear !== 'number') return res.status(400).json({ error: 'queenYear (number) is required' });
+    const exists = db.prepare('SELECT 1 FROM hives WHERE id = ?').get(hiveId);
+    if (!exists) return res.status(404).json({ error: 'hive not found' });
+
+    const record = recordQueen({ hiveId, queenColor, queenYear, imageUrls, notes, source });
+    res.status(201).json(record);
+  } catch (e) {
+    console.error('[queen/record] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'record failed' });
+  }
+});
+
+// ============================================================================
+// /api/outlier — Apiary outlier detection
+// ============================================================================
+import { getOutlierReport, getAllOutlierReports, type OutlierReport } from './outlier.js';
+
+app.get('/api/outlier', (_req, res) => {
+  try {
+    res.json(getAllOutlierReports());
+  } catch (e) {
+    console.error('[outlier] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'outlier detection failed' });
+  }
+});
+
+app.get('/api/outlier/:apiaryId', (req, res) => {
+  try {
+    const report = getOutlierReport(req.params.apiaryId);
+    if (!report) return res.status(404).json({ error: 'apiary not found' });
+    res.json(report);
+  } catch (e) {
+    console.error('[outlier/:apiaryId] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'outlier detection failed' });
+  }
+});
+
+// ============================================================================
+// /api/vision/reconstruct — Multi-photo colony reconstruction
+// ============================================================================
+import { reconstructColony, type FrameReconstruction } from './reconstruction.js';
+
+app.post('/api/vision/reconstruct', async (req, res) => {
+  try {
+    const { images, hiveId } = req.body || {};
+    if (!hiveId) return res.status(400).json({ error: 'hiveId is required' });
+    if (!Array.isArray(images) || images.length === 0) {
+      return res.status(400).json({ error: 'images (string[]) is required' });
+    }
+    const exists = db.prepare('SELECT 1 FROM hives WHERE id = ?').get(hiveId);
+    if (!exists) return res.status(404).json({ error: 'hive not found' });
+
+    const result = await reconstructColony(images, hiveId);
+    res.json(result);
+  } catch (e) {
+    console.error('[vision/reconstruct] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'reconstruction failed' });
+  }
+});
+
+// ============================================================================
+// /api/health check & 404
 // ============================================================================
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
 
