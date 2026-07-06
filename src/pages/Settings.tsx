@@ -1,10 +1,14 @@
 import { useState } from 'react';
-import { Database, RotateCcw, Trash2, Download, Upload, Hexagon, Info, Sun, Moon, Monitor, Key, Check, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
+import { Database, RotateCcw, Trash2, Download, Upload, Hexagon, Info, Sun, Moon, Monitor, Key, Check, ShieldCheck, AlertCircle, Loader2, Bug } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useTheme, type Theme } from '../contexts/ThemeContext';
 import { PageHeader } from '../components/Layout';
 import { Card } from '../components/Card';
 import { setApiKey as saveApiKey, hasApiKey, API_BASE } from '../lib/apiBase';
+import {
+  PEST_PRODUCTS, CATEGORY_META, getPestPrefs, setPestPrefs,
+  type PestProduct,
+} from '../lib/pestPrefs';
 
 export function Settings() {
   const { apiaries, hives, inspections, sensors, tasks, resetToSeed, clearAll } = useStore();
@@ -100,6 +104,9 @@ export function Settings() {
 
       {/* API Key / Security */}
       <ApiKeyCard />
+
+      {/* Pest Control Preferences */}
+      <PestPrefsCard />
 
       {/* Data management */}
       <Card className="mb-4">
@@ -337,6 +344,86 @@ function ApiKeyCard() {
             {testing ? 'Testing…' : 'Auto-detect key (same machine only)'}
           </button>
         </div>
+      )}
+    </Card>
+  );
+}
+
+// ─── Pest Control Preferences Card ──────────────────────────────────────────
+function PestPrefsCard() {
+  const [prefs, setPrefs] = useState(getPestPrefs());
+  const [msg, setMsg] = useState('');
+
+  const flash = (m: string) => { setMsg(m); setTimeout(() => setMsg(''), 2500); };
+
+  const handleToggle = (productId: string) => {
+    const updated = { ...prefs, [productId]: !prefs[productId] };
+    setPestPrefs(updated);
+    setPrefs(updated);
+    flash(`${PEST_PRODUCTS.find(p => p.id === productId)?.name ?? productId} ${updated[productId] ? 'enabled' : 'disabled'}`);
+  };
+
+  // Group products by category
+  const categories = Object.keys(CATEGORY_META) as PestProduct['category'][];
+
+  return (
+    <Card className="mb-4">
+      <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 mb-1 flex items-center gap-2">
+        <Bug size={16} className="text-honey-600 dark:text-honey-400" /> Pest Control Preferences
+      </h3>
+      <p className="text-xs text-stone-400 dark:text-stone-500 mb-3">
+        Treatment recommendations will only show products you use. Toggle what's in your kit.
+      </p>
+
+      <div className="space-y-3">
+        {categories.map((cat) => {
+          const products = PEST_PRODUCTS.filter((p) => p.category === cat);
+          if (products.length === 0) return null;
+          const meta = CATEGORY_META[cat];
+          return (
+            <div key={cat}>
+              <p className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-1.5">
+                {meta.icon} {meta.label}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                {products.map((product) => {
+                  const enabled = prefs[product.id] ?? false;
+                  return (
+                    <button
+                      key={product.id}
+                      onClick={() => handleToggle(product.id)}
+                      className={
+                        'flex items-start gap-2.5 px-3 py-2 rounded-xl border text-left transition-colors ' +
+                        (enabled
+                          ? 'border-honey-300 dark:border-honey-700 bg-honey-50 dark:bg-honey-950'
+                          : 'border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-900')
+                      }
+                    >
+                      <div className={
+                        'shrink-0 mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center ' +
+                        (enabled ? 'bg-honey-500 border-honey-500' : 'border-stone-300 dark:border-stone-600')
+                      }>
+                        {enabled && <Check size={12} className="text-white" />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className={'text-xs font-medium ' + (enabled ? 'text-stone-800 dark:text-stone-100' : 'text-stone-500 dark:text-stone-400')}>
+                          {product.name}
+                        </div>
+                        <div className="text-[10px] text-stone-400 dark:text-stone-500 mt-0.5 leading-tight">
+                          {product.description}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {msg && (
+        <p className="text-xs text-green-600 dark:text-green-400 mt-2 text-center">{msg}</p>
       )}
     </Card>
   );
