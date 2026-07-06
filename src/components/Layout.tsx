@@ -28,7 +28,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </header>
 
         <main
-          className="flex-1 w-full max-w-3xl mx-auto px-4 py-4 sm:px-6 lg:px-8 pb-28 lg:pb-10"
+          className="flex-1 w-full max-w-6xl mx-auto px-4 py-4 sm:px-6 lg:px-8 pb-28 lg:pb-10"
         >
           <ApiKeyBanner />
           {children}
