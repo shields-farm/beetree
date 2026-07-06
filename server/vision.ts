@@ -1,8 +1,8 @@
-// server/vision.ts — Frame photo → structured analysis via synthetic.new vision API
-// Uses an OpenAI-compatible vision endpoint to analyze hive frame photos.
+// server/vision.ts — Frame photo → structured analysis via Ollama vision API
+// Uses gemini-3-flash-preview:cloud on local Ollama for vision-capable inference.
 
-const VISION_URL = 'https://api.synthetic.new/openai/v1/chat/completions';
-const VISION_MODEL = 'syn:large:vision';
+const VISION_URL = 'http://localhost:11434/v1/chat/completions';
+const VISION_MODEL = 'gemini-3-flash-preview:cloud';
 
 /** Structured result of analyzing a frame photo. */
 export interface FrameAnalysisDisease {
@@ -26,6 +26,7 @@ export interface FrameAnalysis {
   broodPattern: 'solid' | 'spotty' | 'patchy' | 'none' | 'unknown';
   queenSpotted: boolean;
   queenLocation: string;
+  queenCellsVisible: boolean;
   broodRatio: number; // 0-1
   honeyRatio: number; // 0-1
   pollenRatio: number; // 0-1
@@ -42,13 +43,26 @@ export interface FrameAnalysis {
 const SYSTEM_PROMPT = [
   'You are a UGA Master Craftsman Beekeeper with decades of experience inspecting honey bee colonies.',
   'You are analyzing a photograph of a single hive frame pulled from a Langstroth (or similar) hive.',
-  'Examine the photo carefully and identify brood patterns, queen presence, diseases, pests, and the ratio of brood/honey/pollen coverage.',
+  'Examine the photo very carefully and identify brood patterns, queen presence, diseases, pests, and the ratio of brood/honey/pollen coverage.',
+  '',
+  'CRITICAL: Be thorough in your visual inspection. Look for ALL of these indicators:',
+  '- Eggs: tiny white specks standing upright in the bottom of cells (very small, rice-like)',
+  '- Larvae: small white C-shaped grubs curled in the bottom of uncapped cells',
+  '- Capped brood: cells sealed with tan/brown wax cappings (pupae underneath)',
+  '- Queen: larger, elongated body with longer legs, may have a colored dot on thorax',
+  '- Queen cells: elongated peanut-shaped cells hanging from the face or bottom of a frame (swarm cells) or on the face (supersedure cells)',
+  '- If you see ANY brood pattern (solid/spotty/patchy), there MUST be eggs or larvae or capped brood visible.',
+  '  Set eggsVisible=true if you see tiny white specks in open cells.',
+  '  Set larvaeVisible=true if you see white grub-like shapes in open cells.',
+  '  Set cappedBroodPresent=true if you see sealed/tan-colored cell cappings.',
+  '- A solid brood pattern almost always means the queen was recently laying — set eggsVisible or larvaeVisible to true.',
   '',
   'Return ONLY a JSON object (no markdown fences, no explanation) with exactly these fields:',
   '{',
   '  "broodPattern": "solid" | "spotty" | "patchy" | "none" | "unknown",',
   '  "queenSpotted": boolean,',
   '  "queenLocation": string (e.g. "lower left quadrant" or "not visible"),',
+  '  "queenCellsVisible": boolean (true if any queen cells — peanut-shaped — are visible on the frame),',
   '  "broodRatio": number (0-1, fraction of frame area covered by brood),',
   '  "honeyRatio": number (0-1),',
   '  "pollenRatio": number (0-1),',
@@ -68,8 +82,9 @@ const SYSTEM_PROMPT = [
   '- "patchy" is between solid and spotty — uneven but not alarming.',
   '- "none" means no brood visible on this frame.',
   '- "unknown" if you cannot tell from the photo quality.',
+  '- If broodPattern is solid/spotty/patchy, at least one of eggsVisible/larvaeVisible/cappedBroodPresent MUST be true.',
   '- For diseases consider: chalkbrood, sacbrood, American Foulbrood (AFB), European Foulbrood (EFB), Nosema, deformed wing virus (DWV).',
-  '- For pests consider: Varroa mites (visible on bee bodies), small hive beetles (SHB), wax moth larvae, ants.',
+  '- For pests consider: Varroa mites (visible on bee bodies as tiny reddish-brown dots), small hive beetles (SHB), wax moth larvae, ants.',
   '- Only report diseases/pests you can reasonably identify from the photo. Use "low" confidence when unsure.',
   '- If the queen is visible, describe her location on the frame.',
   '- Ratios should sum to <= 1.0; estimate visually.',
@@ -114,10 +129,11 @@ function safeAnalysis(raw: any): FrameAnalysis {
     if (v === 'solid' || v === 'spotty' || v === 'patchy' || v === 'none' || v === 'unknown') return v;
     return 'unknown';
   };
-  return {
+  const result: FrameAnalysis = {
     broodPattern: pattern(raw?.broodPattern),
     queenSpotted: Boolean(raw?.queenSpotted),
     queenLocation: typeof raw?.queenLocation === 'string' ? raw.queenLocation : 'not visible',
+    queenCellsVisible: Boolean(raw?.queenCellsVisible),
     broodRatio: num01(raw?.broodRatio),
     honeyRatio: num01(raw?.honeyRatio),
     pollenRatio: num01(raw?.pollenRatio),
@@ -141,6 +157,15 @@ function safeAnalysis(raw: any): FrameAnalysis {
       note: String(c?.note ?? ''),
     })),
   };
+
+  // Consistency check: if broodPattern is solid/spotty/patchy but no brood indicators are set,
+  // infer cappedBroodPresent=true (a brood pattern visible almost certainly means capped brood)
+  const hasBrood = result.broodPattern === 'solid' || result.broodPattern === 'spotty' || result.broodPattern === 'patchy';
+  if (hasBrood && !result.eggsVisible && !result.larvaeVisible && !result.cappedBroodPresent) {
+    result.cappedBroodPresent = true;
+  }
+
+  return result;
 }
 
 /**
@@ -151,11 +176,6 @@ export async function analyzeFramePhoto(
   imageBase64: string,
   hiveName?: string,
 ): Promise<FrameAnalysis> {
-  const apiKey = process.env.SYNTHETIC_NEW_API_KEY;
-  if (!apiKey) {
-    throw new Error('SYNTHETIC_NEW_API_KEY environment variable is not set. Cannot call vision API.');
-  }
-
   const dataUrl = normalizeImageDataUrl(imageBase64);
   const userText = hiveName
     ? 'Analyze this frame photo from hive "' + hiveName + '". Return ONLY the JSON analysis.'
@@ -177,14 +197,12 @@ export async function analyzeFramePhoto(
     temperature: 0.2,
   };
 
-  const authHeader = 'Bearer ' + apiKey;
   let resp: Response;
   try {
     resp = await fetch(VISION_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': authHeader,
       },
       body: JSON.stringify(body),
     });
@@ -193,15 +211,7 @@ export async function analyzeFramePhoto(
   }
 
   if (resp.status === 429) {
-    const retryAfter = resp.headers.get('retry-after');
-    const msg = retryAfter
-      ? 'Vision API rate limit reached (429). Try again in ' + retryAfter + ' seconds.'
-      : 'Vision API rate limit reached (429). Please wait a moment and try again.';
-    throw new Error(msg);
-  }
-
-  if (resp.status === 401 || resp.status === 403) {
-    throw new Error('Vision API authentication failed (' + resp.status + '). Check SYNTHETIC_NEW_API_KEY.');
+    throw new Error('Vision API rate limit reached (429). Please wait a moment and try again.');
   }
 
   if (!resp.ok) {

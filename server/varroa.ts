@@ -1,7 +1,7 @@
-// server/varroa.ts — Varroa sticky board image analysis via Synthetic.new vision API
+// server/varroa.ts — Varroa sticky board image analysis via Ollama vision API
 
-const VISION_URL = 'https://api.synthetic.new/openai/v1/chat/completions';
-const VISION_MODEL = 'syn:large:vision';
+const VISION_URL = 'http://localhost:11434/v1/chat/completions';
+const VISION_MODEL = 'gemini-3-flash-preview:cloud';
 
 export interface VarroaCount {
   miteCount: number;
@@ -42,11 +42,6 @@ function buildRecommendation(level: VarroaCount['infestationLevel'], dropPerDay:
  * parse the returned JSON into a VarroaCount.
  */
 export async function analyzeStickyBoard(imageBase64: string): Promise<VarroaCount> {
-  const apiKey = process.env.SYNTHETIC_NEW_API_KEY;
-  if (!apiKey) {
-    throw new Error('SYNTHETIC_NEW_API_KEY environment variable is not set');
-  }
-
   // Ensure the image is a data URL the vision API accepts.
   const dataUrl = imageBase64.startsWith('data:')
     ? imageBase64
@@ -92,14 +87,11 @@ export async function analyzeStickyBoard(imageBase64: string): Promise<VarroaCou
     temperature: 0.1,
   };
 
-  const authHeader = 'Bearer ' + apiKey;
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  headers['Authorization'] = authHeader;
   const resp = await fetch(VISION_URL, {
     method: 'POST',
-    headers,
+    headers: {
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify(body),
   });
 
