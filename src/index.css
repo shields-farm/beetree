@@ -114,3 +114,11 @@ input[type='range']::-moz-range-thumb {
 .animate-slide-up {
   animation: slideUp 0.25s ease-out;
 }
+
+/* Buzz chat markdown styles */
+.buzz-markdown p { margin: 0 0 0.25rem 0; line-height: 1.5; }
+.buzz-markdown p:last-child { margin-bottom: 0; }
+.buzz-markdown strong { font-weight: 700; color: #44403c; }
+.buzz-markdown ul { margin: 0.25rem 0; padding-left: 1.1rem; list-style: disc; }
+.buzz-markdown li { margin: 0.1rem 0; }
+.buzz-markdown em { font-style: italic; color: #78716c; }
