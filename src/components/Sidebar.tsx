@@ -1,4 +1,4 @@
-import { MapPin, Boxes, ClipboardList, Thermometer, CheckSquare, Settings as SettingsIcon, Hexagon, Camera, Bug, Wind, CalendarClock, PenLine, TrendingUp, Pill, Flower2, AudioLines, Crown, GitCompare, Layers } from 'lucide-react';
+import { MapPin, Boxes, ClipboardList, Thermometer, CheckSquare, Settings as SettingsIcon, Hexagon, Camera, Bug, Wind, CalendarClock, PenLine, TrendingUp, Pill, Flower2, AudioLines, Crown, GitCompare, Layers, ShoppingBag } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 /** Custom icon: a 10-frame deep hive box (side view with vertical frame lines) */
@@ -36,6 +36,7 @@ const NAV_ITEMS = [
   { to: '/queen', label: 'Queen Track', icon: Crown },
   { to: '/outliers', label: 'Outliers', icon: GitCompare },
   { to: '/colony-map', label: 'Colony Map', icon: Layers },
+  { to: '/equipment', label: 'Equipment', icon: ShoppingBag },
   { to: '/sensors', label: 'Sensors', icon: Thermometer },
   { to: '/tasks', label: 'Tasks', icon: CheckSquare },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },

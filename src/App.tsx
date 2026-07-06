@@ -30,6 +30,7 @@ const AcousticAnalysis = lazy(() => import('./pages/AcousticAnalysis').then(m =>
 const QueenTracking = lazy(() => import('./pages/QueenTracking').then(m => ({ default: m.QueenTracking })));
 const OutlierDetection = lazy(() => import('./pages/OutlierDetection').then(m => ({ default: m.OutlierDetection })));
 const ColonyMap = lazy(() => import('./pages/ColonyMap').then(m => ({ default: m.ColonyMap })));
+const Equipment = lazy(() => import('./pages/Equipment').then(m => ({ default: m.Equipment })));
 
 import { useParams } from 'react-router-dom';
 function ApiaryDetailPage() {
@@ -89,6 +90,7 @@ export default function App() {
             <Route path="/queen" element={<QueenTracking />} />
             <Route path="/outliers" element={<OutlierDetection />} />
             <Route path="/colony-map" element={<ColonyMap />} />
+            <Route path="/equipment" element={<Equipment />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
           </Suspense>
