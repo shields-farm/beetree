@@ -1,19 +1,27 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Clock, ChevronRight, Thermometer, TrendingUp, TrendingDown, Minus, Flower2, MapPin, ExternalLink } from 'lucide-react';
+import {
+  Clock, ChevronRight, Thermometer, TrendingUp, TrendingDown, Minus,
+  Flower2, Crown, Bug, AlertTriangle, CheckCircle2,
+} from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useChat, AskAIButton } from '../components/ChatContext';
 import { generateAlerts, ALERT_META, type Alert } from '../lib/alerts';
 import { HEALTH_META } from '../lib/health';
 import { API_BASE, apiFetch } from '../lib/apiBase';
+import { getPestPrefs, filterTreatments } from '../lib/pestPrefs';
 
-// ─── Forage types (mirror server/forage.ts) ──────────────────────────────────
+// ─── Types (mirror server modules) ───────────────────────────────────────────
 interface ForageFlow {
   plant: string;
   status: 'upcoming' | 'active' | 'ending' | 'dormant';
   startMonth: string;
   endMonth: string;
   notes: string;
+  significant?: boolean;
+  commonness?: number;
+  latinName?: string;
+  plantType?: string;
 }
 interface ForageForecast {
   month: string;
@@ -22,37 +30,92 @@ interface ForageForecast {
   managementTips: string[];
 }
 
-const FLOW_STATUS_META: Record<string, { label: string; bg: string; text: string; dot: string }> = {
-  active: { label: 'Active', bg: 'bg-green-100 dark:bg-green-900', text: 'text-green-700 dark:text-green-300', dot: 'bg-green-500' },
-  ending: { label: 'Ending', bg: 'bg-amber-100 dark:bg-amber-900', text: 'text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' },
-  upcoming: { label: 'Upcoming', bg: 'bg-blue-100 dark:bg-blue-900', text: 'text-blue-700 dark:text-blue-300', dot: 'bg-blue-500' },
-  dormant: { label: 'Dormant', bg: 'bg-stone-100 dark:bg-stone-800', text: 'text-stone-500 dark:text-stone-400', dot: 'bg-stone-400' },
-};
+interface QueenStatus {
+  hiveId: string;
+  hiveName: string;
+  currentQueen: { date: string; queenColor: string; queenYear: number; source: string } | null;
+  history: any[];
+  supersedureSuspected: boolean;
+  daysSinceLastSeen: number | null;
+  notes: string;
+}
 
-// Coweta County, GA beekeeping resources
-const COWETA_LINKS = [
-  { label: 'Coweta Beekeepers Assoc.', url: 'https://www.cowetabeekeepers.org' },
-  { label: 'UGA Extension Coweta', url: 'https://extension.uga.edu/county-offices/coweta' },
-  { label: 'GA Dept of Ag Apiary Program', url: 'https://agr.georgia.gov/apiary-program.aspx' },
-];
+interface SwarmRiskAssessment {
+  hiveId: string;
+  riskScore: number;
+  riskLevel: 'low' | 'moderate' | 'high' | 'very-high';
+  factors: { factor: string; weight: number; detail: string }[];
+  recommendations: string[];
+  daysUntilLikelySwarm: number | null;
+}
 
+interface TreatmentRec {
+  hiveId: string;
+  hiveName: string;
+  treatments: { type: string; timing: string; reason: string; priority: 'high' | 'medium' | 'low'; notes: string }[];
+  season: string;
+  warnings: string[];
+}
+
+// ─── Feeding logic ───────────────────────────────────────────────────────────
+/** Determine syrup ratio recommendation by month for Georgia. */
+function syrupRatioFor(month: number): { ratio: string; reason: string } | null {
+  if (month === 0 || month === 11) return { ratio: '2:1', reason: 'Winter — feed fondant or 2:1 syrup if stores light' };
+  if (month === 1) return { ratio: '1:1', reason: 'Late winter — 1:1 syrup stimulates brood rearing' };
+  if (month === 2 || month === 3) return { ratio: '1:1', reason: 'Spring build-up — 1:1 syrup encourages expansion' };
+  if (month === 4 || month === 5) return { ratio: '1:1', reason: 'Flow starting — feed only if weather blocks forage' };
+  if (month >= 6 && month <= 7) return { ratio: '2:1', reason: 'Summer dearth — 2:1 syrup if stores are low' };
+  if (month >= 8 && month <= 9) return { ratio: '2:1', reason: 'Fall build-up — 2:1 syrup for winter stores' };
+  if (month === 10) return { ratio: '2:1', reason: 'Late fall — last chance to feed 2:1 before cold' };
+  return null;
+}
+
+/** Check if any hive has low honey/pollen stores based on latest inspection. */
+function checkLowStores(hives: any[], inspections: any[]): { hiveName: string; honey: string; pollen: string }[] {
+  const low: { hiveName: string; honey: string; pollen: string }[] = [];
+  for (const hive of hives) {
+    const hiveInspections = inspections
+      .filter((i) => i.hiveId === hive.id)
+      .sort((a: any, b: any) => b.date.localeCompare(a.date));
+    const last = hiveInspections[0];
+    if (!last) continue;
+    const daysSince = Math.floor((Date.now() - new Date(last.date).getTime()) / (24 * 60 * 60 * 1000));
+    if (daysSince > 30) continue;
+    if (last.honeyStores === 'none' || last.honeyStores === 'low' || last.pollenStores === 'none' || last.pollenStores === 'low') {
+      low.push({ hiveName: hive.name, honey: last.honeyStores, pollen: last.pollenStores });
+    }
+  }
+  return low;
+}
+
+// ============================================================================
+// DASHBOARD
+// ============================================================================
 export function Dashboard() {
   const { hives, inspections, sensors, tasks } = useStore();
   const { setQuickQuestions } = useChat();
   const alerts = generateAlerts(hives, inspections, sensors, tasks);
 
   const [forage, setForage] = useState<ForageForecast | null>(null);
+  const [queenStatuses, setQueenStatuses] = useState<QueenStatus[]>([]);
+  const [swarmRisks, setSwarmRisks] = useState<SwarmRiskAssessment[]>([]);
+  const [treatments, setTreatments] = useState<TreatmentRec[]>([]);
 
-  // Fetch current month forage forecast
+  // Fetch all dashboard data in parallel
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const resp = await apiFetch(API_BASE + '/api/forage');
-        if (!resp.ok) return;
-        const data = (await resp.json()) as { current: ForageForecast };
-        if (!cancelled) setForage(data.current);
-      } catch { /* server not running — skip */ }
+      const [forageRes, queenRes, swarmRes, treatmentRes] = await Promise.all([
+        apiFetch(API_BASE + '/api/forage').then((r) => r.ok ? r.json() : null).catch(() => null),
+        apiFetch(API_BASE + '/api/queen/all').then((r) => r.ok ? r.json() : null).catch(() => null),
+        apiFetch(API_BASE + '/api/swarm/risk').then((r) => r.ok ? r.json() : null).catch(() => null),
+        apiFetch(API_BASE + '/api/treatment').then((r) => r.ok ? r.json() : null).catch(() => null),
+      ]);
+      if (cancelled) return;
+      if (forageRes?.current) setForage(forageRes.current);
+      if (queenRes) setQueenStatuses(queenRes);
+      if (swarmRes) setSwarmRisks(swarmRes);
+      if (treatmentRes) setTreatments(treatmentRes);
     })();
     return () => { cancelled = true; };
   }, []);
@@ -61,11 +124,11 @@ export function Dashboard() {
 
   useEffect(() => {
     const qs = [
-      "What should I prioritize today?",
-      "Which hive needs attention most?",
+      'What should I prioritize today?',
+      'Which hive needs attention most?',
       "What's my seasonal focus right now?",
     ];
-    if (urgentCount > 0) qs.unshift("I have urgent alerts — walk me through them");
+    if (urgentCount > 0) qs.unshift('I have urgent alerts — walk me through them');
     setQuickQuestions(qs);
     return () => setQuickQuestions([]);
   }, [setQuickQuestions, urgentCount]);
@@ -74,7 +137,7 @@ export function Dashboard() {
   const topAlert = alerts[0];
   const moreCount = alerts.length - 1;
 
-  // Sensor data for graph
+  // Sensor data
   const sensorsWithReadings = sensors.filter((s) => s.latestReading);
   const avgTemp = sensorsWithReadings.length > 0
     ? sensorsWithReadings.reduce((sum, s) => sum + s.latestReading!.temperature, 0) / sensorsWithReadings.length
@@ -87,113 +150,281 @@ export function Dashboard() {
     return buckets;
   }, [hives]);
 
+  // Pillar data
+  const currentMonth = new Date().getMonth();
+  const lowStores = checkLowStores(hives, inspections);
+  const syrupRec = syrupRatioFor(currentMonth);
+  const significantActiveFlows = forage?.majorFlows.filter(
+    (f) => (f.status === 'active' || f.status === 'ending') && f.significant,
+  ) ?? [];
+  const allActiveFlows = forage?.majorFlows.filter(
+    (f) => f.status === 'active' || f.status === 'ending',
+  ) ?? [];
+
+  // Queen pillar summary
+  const queenIssues = queenStatuses.filter((q) => {
+    if (!q.currentQueen) return false;
+    if (q.supersedureSuspected) return true;
+    if (q.daysSinceLastSeen !== null && q.daysSinceLastSeen > 30) return true;
+    return false;
+  });
+  const hivesWithoutQueenRecords = queenStatuses.length > 0
+    ? queenStatuses.filter((q) => !q.currentQueen).length
+    : 0;
+
+  // Pests pillar — filter treatments by pest prefs
+  const pestPrefs = getPestPrefs();
+  const filteredTreatments = useMemo(() =>
+    treatments.map((t) => ({
+      ...t,
+      treatments: filterTreatments(t.treatments, pestPrefs),
+    })).filter((t) => t.treatments.length > 0 || t.warnings.length > 0),
+    [treatments, pestPrefs],
+  );
+  const highPriorityTreatments = filteredTreatments.filter((t) =>
+    t.treatments.some((tr) => tr.priority === 'high') || t.warnings.length > 0,
+  );
+
+  // Swarm risk
+  const elevatedSwarmRisks = swarmRisks.filter((s) => s.riskLevel === 'moderate' || s.riskLevel === 'high' || s.riskLevel === 'very-high');
+
   return (
     <div className="animate-fade-in space-y-5">
-      {/* ─── COWETA COUNTY FORAGE CARD ─── */}
-      {forage && (
-        <CowetaForageCard forage={forage} />
-      )}
+      {/* ─── TOP ROW: "It's Time To" + 3 Pillars (desktop grid) ───────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* It's Time To... — spans 2 cols on desktop */}
+        <div className="lg:col-span-2 space-y-3">
+          <div className="flex items-center gap-2">
+            <Clock size={20} className="text-honey-600 dark:text-honey-400" />
+            <h1 className="text-xl font-bold text-stone-800 dark:text-stone-100">It's Time To...</h1>
+          </div>
 
-      {/* ─── THE ONE THING ─── */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <Clock size={20} className="text-honey-600 dark:text-honey-400" />
-          <h1 className="text-xl font-bold text-stone-800 dark:text-stone-100">It's Time To...</h1>
+          {topAlert ? (
+            <>
+              <BigAlertCard alert={topAlert} />
+              {moreCount > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  {alerts.slice(1, 4).map((a) => (
+                    <Link
+                      key={a.id}
+                      to={a.actionRoute ?? '/tasks'}
+                      className="inline-flex items-center gap-1 text-xs bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-lg px-2.5 py-1.5 hover:border-honey-400 transition-colors"
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${ALERT_META[a.severity].dot}`} />
+                      <span className="text-stone-600 dark:text-stone-300 truncate max-w-[180px]">{a.title}</span>
+                    </Link>
+                  ))}
+                  {moreCount > 3 && (
+                    <Link to="/tasks" className="text-xs text-stone-400 hover:text-honey-600">
+                      +{moreCount - 3} more →
+                    </Link>
+                  )}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-6 text-center">
+              <p className="text-base text-emerald-700 dark:text-emerald-300 font-semibold">All caught up 🐝</p>
+              <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">Nothing urgent right now. Go enjoy your bees.</p>
+            </div>
+          )}
+
+          {/* Quick-glance secondary alerts inline */}
+          {elevatedSwarmRisks.length > 0 && (
+            <Link to="/swarm" className="block bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-xl p-3 hover:border-amber-400 transition-colors">
+              <div className="flex items-center gap-2">
+                <AlertTriangle size={16} className="text-amber-500 shrink-0" />
+                <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                  {elevatedSwarmRisks.length} hive{elevatedSwarmRisks.length !== 1 ? 's' : ''} with elevated swarm risk
+                </span>
+                <ChevronRight size={14} className="text-amber-400 ml-auto" />
+              </div>
+            </Link>
+          )}
         </div>
 
-        {topAlert ? (
-          <>
-            <BigAlertCard alert={topAlert} />
-            {moreCount > 0 && (
-              <Link to="/tasks" className="block text-center text-xs text-stone-400 dark:text-stone-500 hover:text-honey-600 mt-2">
-                +{moreCount} more {moreCount === 1 ? 'reminder' : 'reminders'} →
-              </Link>
+        {/* ─── 3 PILLARS (right column on desktop, stacked on mobile) ─────── */}
+        <div className="space-y-3">
+          <PillarCard
+            icon={Crown}
+            title="Queen"
+            status={queenIssues.length === 0 && hivesWithoutQueenRecords === 0 ? 'good' : queenIssues.length > 0 ? 'warning' : 'info'}
+            linkTo="/queen"
+          >
+            {queenStatuses.length === 0 ? (
+              <PillarLine text="No queen records yet" muted />
+            ) : queenIssues.length > 0 ? (
+              queenIssues.slice(0, 2).map((q) => (
+                <PillarLine
+                  key={q.hiveId}
+                  text={q.hiveName}
+                  detail={
+                    q.supersedureSuspected ? 'Supersedure suspected' :
+                    q.daysSinceLastSeen !== null ? `Not seen ${q.daysSinceLastSeen}d` : ''
+                  }
+                  warning
+                />
+              ))
+            ) : hivesWithoutQueenRecords > 0 ? (
+              <PillarLine text={`${hivesWithoutQueenRecords} hive${hivesWithoutQueenRecords !== 1 ? 's' : ''} without queen records`} muted />
+            ) : (
+              <PillarLine text="All queens tracked" check />
             )}
-          </>
-        ) : (
-          <div className="bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-6 text-center">
-            <p className="text-base text-emerald-700 dark:text-emerald-300 font-semibold">All caught up 🐝</p>
-            <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">Nothing urgent right now. Go enjoy your bees.</p>
+          </PillarCard>
+
+          <PillarCard
+            icon={Flower2}
+            title="Nutrition"
+            status={lowStores.length > 0 ? 'warning' : 'good'}
+            linkTo="/forage"
+          >
+            {/* Significant active flows */}
+            {significantActiveFlows.length > 0 ? (
+              <PillarLine
+                text={significantActiveFlows.map((f) => f.plant).join(', ')}
+                detail="flowing now"
+              />
+            ) : allActiveFlows.length === 0 ? (
+              <PillarLine text="No active nectar flow" muted />
+            ) : (
+              <PillarLine text="Minor flows only" muted />
+            )}
+            {/* Low stores alert */}
+            {lowStores.length > 0 && (
+              <PillarLine
+                text={`${lowStores.length} hive${lowStores.length !== 1 ? 's' : ''} low stores`}
+                detail={lowStores.slice(0, 2).map((s) => s.hiveName).join(', ')}
+                warning
+              />
+            )}
+            {/* Feeding recommendation */}
+            {syrupRec && (lowStores.length > 0 || currentMonth >= 8 || currentMonth <= 1) && (
+              <PillarLine
+                text={`Feed ${syrupRec.ratio} syrup`}
+                detail={syrupRec.reason}
+              />
+            )}
+          </PillarCard>
+
+          <PillarCard
+            icon={Bug}
+            title="Pests & Disease"
+            status={highPriorityTreatments.length > 0 ? 'warning' : 'good'}
+            linkTo="/treatments"
+          >
+            {highPriorityTreatments.length > 0 ? (
+              highPriorityTreatments.slice(0, 2).map((t) => (
+                <PillarLine
+                  key={t.hiveId}
+                  text={t.hiveName}
+                  detail={t.warnings.length > 0 ? t.warnings[0] : t.treatments.find((tr) => tr.priority === 'high')?.type ?? 'Treatment needed'}
+                  warning
+                />
+              ))
+            ) : filteredTreatments.length > 0 ? (
+              <PillarLine text={`${filteredTreatments.length} hive${filteredTreatments.length !== 1 ? 's' : ''} with treatments queued`} muted />
+            ) : (
+              <PillarLine text="No active pest concerns" check />
+            )}
+          </PillarCard>
+        </div>
+      </div>
+
+      {/* ─── SECOND ROW: Sensors + Health (desktop grid) ─────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Sensor temps */}
+        {sensorsWithReadings.length > 0 && (
+          <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-card border border-stone-100 dark:border-stone-800 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 flex items-center gap-1.5">
+                <Thermometer size={16} className="text-orange-500 dark:text-orange-400" /> Hive Temps
+              </h3>
+              <Link to="/sensors" className="text-xs text-stone-400 dark:text-stone-500 hover:text-honey-600">All →</Link>
+            </div>
+
+            <div className="space-y-2.5">
+              {sensorsWithReadings.slice(0, 4).map((s) => {
+                const r = s.latestReading!;
+                const hive = hives.find((h) => h.id === s.hiveId);
+                const tempPct = Math.max(0, Math.min(100, ((r.temperature - 80) / (105 - 80)) * 100));
+                const isHigh = r.temperature > 99;
+                const isLow = r.temperature > 0 && r.temperature < 88;
+                const trendIcon = isHigh ? <TrendingUp size={12} className="text-red-500 dark:text-red-400" /> : isLow ? <TrendingDown size={12} className="text-blue-500 dark:text-blue-400" /> : <Minus size={12} className="text-stone-300 dark:text-stone-600" />;
+                const barColor = isHigh ? 'bg-red-400' : isLow ? 'bg-blue-400' : 'bg-orange-400';
+                return (
+                  <div key={s.id} className="flex items-center gap-2">
+                    <span className="text-xs text-stone-600 dark:text-stone-300 w-20 truncate shrink-0">{hive?.name ?? s.name}</span>
+                    <div className="flex-1 h-6 bg-stone-50 dark:bg-stone-950 rounded-full overflow-hidden relative">
+                      <div className={`h-full ${barColor} rounded-full transition-all`} style={{ width: `${tempPct}%` }} />
+                    </div>
+                    <span className="text-xs font-semibold text-stone-700 dark:text-stone-200 w-12 text-right tabular-nums">{r.temperature.toFixed(1)}°F</span>
+                    {trendIcon}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-stone-50">
+              <Sparkline sensors={sensorsWithReadings} />
+            </div>
+
+            {avgTemp && (
+              <p className="text-[11px] text-stone-400 dark:text-stone-500 mt-2 text-center">
+                Avg: <span className="font-medium text-stone-600 dark:text-stone-300">{avgTemp.toFixed(1)}°F</span> across {sensorsWithReadings.length} sensor{sensorsWithReadings.length !== 1 ? 's' : ''}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Hive Health */}
+        {hives.length > 0 && (
+          <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-card border border-stone-100 dark:border-stone-800 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200">Hive Health</h3>
+              <Link to="/hives" className="text-xs text-stone-400 dark:text-stone-500 hover:text-honey-600">All hives →</Link>
+            </div>
+            <div className="flex gap-1.5">
+              {(['excellent', 'good', 'fair', 'poor', 'critical'] as const).map((status) => {
+                const count = healthBuckets[status] ?? 0;
+                if (count === 0) return null;
+                const meta = HEALTH_META[status];
+                const pct = (count / hives.length) * 100;
+                return (
+                  <div
+                    key={status}
+                    className={`${meta.bg} rounded-lg px-2 py-1.5 text-center`}
+                    style={{ flex: pct }}
+                    title={`${meta.label}: ${count}`}
+                  >
+                    <div className={`text-sm font-bold ${meta.text}`}>{count}</div>
+                    <div className={`text-[9px] ${meta.text} capitalize`}>{meta.label}</div>
+                  </div>
+                );
+              })}
+            </div>
+            {/* Quick hive list with health dots */}
+            <div className="mt-3 pt-3 border-t border-stone-50 space-y-1.5">
+              {hives.slice(0, 6).map((h) => {
+                const meta = HEALTH_META[h.healthStatus];
+                return (
+                  <Link key={h.id} to={`/hives/${h.id}`} className="flex items-center gap-2 text-xs hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg px-1 py-0.5 transition-colors">
+                    <span className={`w-2 h-2 rounded-full ${meta.dot} shrink-0`} />
+                    <span className="text-stone-600 dark:text-stone-300 truncate flex-1">{h.name}</span>
+                    <span className={`text-[10px] ${meta.text} capitalize`}>{meta.label}</span>
+                  </Link>
+                );
+              })}
+              {hives.length > 6 && (
+                <Link to="/hives" className="text-xs text-stone-400 hover:text-honey-600 block text-center pt-1">
+                  +{hives.length - 6} more →
+                </Link>
+              )}
+            </div>
           </div>
         )}
       </div>
 
-      {/* ─── SENSOR GRAPH ─── */}
-      {sensorsWithReadings.length > 0 && (
-        <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-card border border-stone-100 dark:border-stone-800 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 flex items-center gap-1.5">
-              <Thermometer size={16} className="text-orange-500 dark:text-orange-400" /> Hive Temperatures
-            </h3>
-            <Link to="/sensors" className="text-xs text-stone-400 dark:text-stone-500 hover:text-honey-600">All sensors →</Link>
-          </div>
-
-          {/* Current readings with mini bars */}
-          <div className="space-y-2.5">
-            {sensorsWithReadings.slice(0, 4).map((s) => {
-              const r = s.latestReading!;
-              const hive = hives.find((h) => h.id === s.hiveId);
-              const tempPct = Math.max(0, Math.min(100, ((r.temperature - 80) / (105 - 80)) * 100));
-              const isHigh = r.temperature > 99;
-              const isLow = r.temperature > 0 && r.temperature < 88;
-              const trendIcon = isHigh ? <TrendingUp size={12} className="text-red-500 dark:text-red-400" /> : isLow ? <TrendingDown size={12} className="text-blue-500 dark:text-blue-400" /> : <Minus size={12} className="text-stone-300 dark:text-stone-600" />;
-              const barColor = isHigh ? 'bg-red-400' : isLow ? 'bg-blue-400' : 'bg-orange-400';
-              return (
-                <div key={s.id} className="flex items-center gap-2">
-                  <span className="text-xs text-stone-600 dark:text-stone-300 w-20 truncate shrink-0">{hive?.name ?? s.name}</span>
-                  <div className="flex-1 h-6 bg-stone-50 dark:bg-stone-950 rounded-full overflow-hidden relative">
-                    <div className={`h-full ${barColor} rounded-full transition-all`} style={{ width: `${tempPct}%` }} />
-                  </div>
-                  <span className="text-xs font-semibold text-stone-700 dark:text-stone-200 w-12 text-right tabular-nums">{r.temperature.toFixed(1)}°F</span>
-                  {trendIcon}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* 48h sparkline */}
-          <div className="mt-4 pt-3 border-t border-stone-50">
-            <Sparkline sensors={sensorsWithReadings} />
-          </div>
-
-          {avgTemp && (
-            <p className="text-[11px] text-stone-400 dark:text-stone-500 mt-2 text-center">
-              Average: <span className="font-medium text-stone-600 dark:text-stone-300">{avgTemp.toFixed(1)}°F</span> across {sensorsWithReadings.length} sensor{sensorsWithReadings.length !== 1 ? 's' : ''}
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* ─── HIVE HEALTH OVERVIEW ─── */}
-      {hives.length > 0 && (
-        <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-card border border-stone-100 dark:border-stone-800 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200">Hive Health</h3>
-            <Link to="/hives" className="text-xs text-stone-400 dark:text-stone-500 hover:text-honey-600">All hives →</Link>
-          </div>
-          <div className="flex gap-1.5">
-            {(['excellent', 'good', 'fair', 'poor', 'critical'] as const).map((status) => {
-              const count = healthBuckets[status] ?? 0;
-              if (count === 0) return null;
-              const meta = HEALTH_META[status];
-              const pct = (count / hives.length) * 100;
-              return (
-                <div
-                  key={status}
-                  className={`${meta.bg} rounded-lg px-2 py-1.5 text-center`}
-                  style={{ flex: pct }}
-                  title={`${meta.label}: ${count}`}
-                >
-                  <div className={`text-sm font-bold ${meta.text}`}>{count}</div>
-                  <div className={`text-[9px] ${meta.text} capitalize`}>{meta.label}</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ─── ASK BUZZ ─── */}
+      {/* ─── Ask Buzz ────────────────────────────────────────────────────── */}
       <div className="pt-1">
         <AskAIButton prompt="What should I focus on right now? Give me the short version." label="Ask Buzz" />
       </div>
@@ -201,156 +432,81 @@ export function Dashboard() {
   );
 }
 
-// ─── Coweta County forage card ───
-function CowetaForageCard({ forage }: { forage: ForageForecast }) {
-  const [expanded, setExpanded] = useState(false);
-  const activeFlows = forage.majorFlows.filter((f) => f.status === 'active');
-  const endingFlows = forage.majorFlows.filter((f) => f.status === 'ending');
-  const upcomingFlows = forage.majorFlows.filter((f) => f.status === 'upcoming');
+// ─── Pillar Card ─────────────────────────────────────────────────────────────
+function PillarCard({
+  icon: Icon,
+  title,
+  status,
+  linkTo,
+  children,
+}: {
+  icon: typeof Crown;
+  title: string;
+  status: 'good' | 'warning' | 'info';
+  linkTo: string;
+  children: React.ReactNode;
+}) {
+  const statusMeta = {
+    good: { border: 'border-green-200 dark:border-green-900', accent: 'text-green-500' },
+    warning: { border: 'border-amber-200 dark:border-amber-900', accent: 'text-amber-500' },
+    info: { border: 'border-sky-200 dark:border-sky-900', accent: 'text-sky-500' },
+  };
+  const s = statusMeta[status];
 
   return (
-    <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-card border border-stone-100 dark:border-stone-800 overflow-hidden">
-      {/* Header bar */}
-      <div className="bg-gradient-to-r from-honey-500 to-honey-600 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Flower2 size={20} className="text-white" />
-          <div>
-            <div className="text-white font-bold text-sm leading-tight">Coweta County · {forage.month}</div>
-            <div className="text-white/80 text-[11px] leading-tight flex items-center gap-1">
-              <MapPin size={10} /> Nectar Flow Report
-            </div>
-          </div>
-        </div>
-        <Link
-          to="/forage"
-          className="text-white/90 text-xs font-medium bg-white/20 dark:bg-white/10 px-3 py-1.5 rounded-lg hover:bg-white/30 dark:hover:bg-white/20 transition-colors flex items-center gap-1"
-        >
-          Details
-          <ChevronRight size={14} />
-        </Link>
+    <Link
+      to={linkTo}
+      className={`block bg-white dark:bg-stone-900 rounded-2xl shadow-card border ${s.border} p-3.5 hover:shadow-md transition-shadow group`}
+    >
+      <div className="flex items-center gap-2 mb-2">
+        <Icon size={18} className={s.accent} />
+        <span className="text-sm font-semibold text-stone-800 dark:text-stone-100">{title}</span>
+        <ChevronRight size={14} className="text-stone-300 dark:text-stone-600 ml-auto group-hover:text-honey-500 transition-colors" />
       </div>
+      <div className="space-y-1">
+        {children}
+      </div>
+    </Link>
+  );
+}
 
-      {/* Active flows */}
-      <div className="p-4">
-        {activeFlows.length > 0 && (
-          <div className="mb-3">
-            <p className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-1.5">In Bloom Now</p>
-            <div className="space-y-1.5">
-              {activeFlows.map((f) => (
-                <div key={f.plant} className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
-                  <span className="text-sm font-medium text-stone-800 dark:text-stone-100">{f.plant}</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 font-medium">Active</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {endingFlows.length > 0 && (
-          <div className="mb-3">
-            <p className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-1.5">Ending</p>
-            <div className="space-y-1.5">
-              {endingFlows.map((f) => (
-                <div key={f.plant} className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
-                  <span className="text-sm font-medium text-stone-700 dark:text-stone-200">{f.plant}</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 font-medium">Ending</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {upcomingFlows.length > 0 && (
-          <div className="mb-3">
-            <p className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-1.5">Coming Up</p>
-            <div className="space-y-1.5">
-              {upcomingFlows.slice(0, 3).map((f) => (
-                <div key={f.plant} className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
-                  <span className="text-sm text-stone-500 dark:text-stone-400">{f.plant}</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium">Soon</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Recommendation */}
-        <p className="text-xs text-stone-500 dark:text-stone-400 leading-relaxed mt-3 pt-3 border-t border-stone-100 dark:border-stone-800">
-          {forage.recommendation}
-        </p>
-
-        {/* Expandable details */}
-        <button
-          onClick={() => setExpanded((v) => !v)}
-          className="mt-2 text-xs text-honey-600 dark:text-honey-400 font-medium flex items-center gap-1 hover:text-honey-700"
-        >
-          {expanded ? 'Hide' : 'Show'} tips & resources
-          <ChevronRight size={12} className={expanded ? 'rotate-90 transition-transform' : 'transition-transform'} />
-        </button>
-        {expanded && (
-          <div className="mt-2 space-y-2">
-            {/* Management tips */}
-            {forage.managementTips.length > 0 && (
-              <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3">
-                <p className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-1.5">This Month's Tips</p>
-                <ul className="space-y-1">
-                  {forage.managementTips.slice(0, 4).map((tip, i) => (
-                    <li key={i} className="text-xs text-stone-600 dark:text-stone-300 flex items-start gap-1.5">
-                      <span className="text-honey-500 mt-0.5">•</span>
-                      {tip}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Coweta resources */}
-            <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3">
-              <p className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-1.5">Local Resources</p>
-              <div className="space-y-1.5">
-                {COWETA_LINKS.map((link) => (
-                  <a
-                    key={link.url}
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-xs text-honey-700 dark:text-honey-300 hover:text-honey-800 font-medium"
-                  >
-                    <ExternalLink size={12} />
-                    {link.label}
-                  </a>
-                ))}
-              </div>
-            </div>
-
-            {/* Full per-plant details */}
-            <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3">
-              <p className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-1.5">All Active & Ending Flows</p>
-              <div className="space-y-2">
-                {activeFlows.concat(endingFlows).map((f) => (
-                  <div key={f.plant} className="text-xs">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-medium text-stone-700 dark:text-stone-200">{f.plant}</span>
-                      <span className={'text-[10px] px-1.5 py-0.5 rounded-full font-medium ' + (FLOW_STATUS_META[f.status]?.bg || '') + ' ' + (FLOW_STATUS_META[f.status]?.text || '')}>
-                        {FLOW_STATUS_META[f.status]?.label || f.status}
-                      </span>
-                    </div>
-                    <p className="text-stone-400 dark:text-stone-500 mt-0.5">{f.notes}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+function PillarLine({
+  text,
+  detail,
+  warning,
+  muted,
+  check,
+}: {
+  text: string;
+  detail?: string;
+  warning?: boolean;
+  muted?: boolean;
+  check?: boolean;
+}) {
+  return (
+    <div className="flex items-start gap-1.5 text-xs">
+      {check ? (
+        <CheckCircle2 size={12} className="text-green-500 mt-0.5 shrink-0" />
+      ) : warning ? (
+        <AlertTriangle size={12} className="text-amber-500 mt-0.5 shrink-0" />
+      ) : muted ? (
+        <span className="w-3 h-3 shrink-0" />
+      ) : (
+        <span className={`w-1.5 h-1.5 rounded-full mt-1 shrink-0 ${warning ? 'bg-amber-500' : 'bg-honey-400'}`} />
+      )}
+      <div className="min-w-0 flex-1">
+        <span className={muted ? 'text-stone-400 dark:text-stone-500' : warning ? 'text-amber-700 dark:text-amber-300 font-medium' : 'text-stone-700 dark:text-stone-200 font-medium'}>
+          {text}
+        </span>
+        {detail && (
+          <span className="text-stone-400 dark:text-stone-500 ml-1">— {detail}</span>
         )}
       </div>
     </div>
   );
 }
 
-// ─── THE big card ───
+// ─── THE big alert card ───
 function BigAlertCard({ alert }: { alert: Alert }) {
   const meta = ALERT_META[alert.severity];
   return (
@@ -365,7 +521,7 @@ function BigAlertCard({ alert }: { alert: Alert }) {
       {alert.actionRoute && (
         <Link
           to={alert.actionRoute}
-          className={`mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-honey-700 dark:text-honey-300 bg-white/80 dark:bg-stone-900/80 px-4 py-2 rounded-xl hover:bg-white transition-colors`}
+          className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-honey-700 dark:text-honey-300 bg-white/80 dark:bg-stone-900/80 px-4 py-2 rounded-xl hover:bg-white transition-colors"
         >
           {alert.actionLabel ?? 'Go'}
           <ChevronRight size={16} />
@@ -377,7 +533,6 @@ function BigAlertCard({ alert }: { alert: Alert }) {
 
 // ─── 48h temperature sparkline ───
 function Sparkline({ sensors }: { sensors: ReturnType<typeof useStore>['sensors'] }) {
-  // Generate a 48h mock trend per sensor (same pattern as SensorDetail)
   const colors = ['#f97316', '#f59e0b', '#eab308', '#84cc16'];
   const w = 320;
   const h = 60;
