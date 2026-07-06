@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Boxes, ClipboardList, Thermometer, CheckSquare, Camera, More, Hexagon, X, Flower2, Crown, Bug, MapPin, AudioLines, ShoppingBag, Settings as SettingsIcon, Home } from 'lucide-react';
+import { Boxes, ClipboardList, Thermometer, CheckSquare, MoreHorizontal, X, Flower2, Crown, Bug, MapPin, ShoppingBag, Settings as SettingsIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 /** Custom icon: a 10-frame deep hive box (side view with vertical frame lines) */
@@ -35,7 +35,6 @@ const SECONDARY_NAV = [
   { to: '/queen', label: 'Queen Track', icon: Crown },
   { to: '/forage', label: 'Forage', icon: Flower2 },
   { to: '/apiaries', label: 'Apiaries', icon: MapPin },
-  { to: '/acoustics', label: 'Acoustics', icon: AudioLines },
   { to: '/equipment', label: 'Equipment', icon: ShoppingBag },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ];
@@ -121,7 +120,7 @@ export function BottomNav() {
             onClick={() => setMoreOpen(true)}
             className="flex flex-col items-center justify-center gap-0.5 flex-1 py-2 text-[10px] font-medium text-stone-400 dark:text-stone-500"
           >
-            <More size={22} strokeWidth={2} />
+            <MoreHorizontal size={22} strokeWidth={2} />
             <span>More</span>
           </button>
         </div>
