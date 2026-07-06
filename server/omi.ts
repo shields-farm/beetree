@@ -1,9 +1,9 @@
 // server/omi.ts — Omi voice transcript → structured inspection parser
-// Uses the BeeTree (Buzz) LLM to parse spoken observations into inspection fields.
+// Uses Ollama (glm-5.2:cloud) directly with the Buzz beekeeper system prompt.
 
-const BUZZ_URL = 'http://192.168.1.40:8643/v1/chat/completions';
-const BUZZ_KEY = 'dev-beetree-api-key-replace-me';
-const BUZZ_MODEL = 'beetree';
+const BUZZ_URL = 'http://localhost:11434/v1/chat/completions';
+const BUZZ_MODEL = 'glm-5.2:cloud';
+// No API key needed — Ollama runs locally
 
 /** Fields Buzz may return (all optional — omit what can't be determined). */
 export interface ParsedInspection {
@@ -63,24 +63,25 @@ Return ONLY the JSON, no markdown, no explanation.`;
 
   const body = {
     model: BUZZ_MODEL,
-    messages: [{ role: 'user', content: systemPrompt }],
+    messages: [
+      { role: 'system', content: 'You are Buzz, a UGA Master Craftsman Beekeeper with decades of experience. You are helpful, concise, and practical. You know Georgia beekeeping, seasonal management, and Integrated Pest Management.' },
+      { role: 'user', content: systemPrompt }
+    ],
     stream: false,
     temperature: 0.2,
   };
 
-  const authHeader = 'Bearer ' + BUZZ_KEY;
   const resp = await fetch(BUZZ_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': authHeader,
     },
     body: JSON.stringify(body),
   });
 
   if (!resp.ok) {
     const txt = await resp.text().catch(() => '');
-    throw new Error(`Buzz API ${resp.status}: ${txt.slice(0, 200)}`);
+    throw new Error('Buzz API ' + resp.status + ': ' + txt.slice(0, 200));
   }
 
   const data = await resp.json() as any;
@@ -136,17 +137,18 @@ export async function parseFreeTextToInspection(
 
   const body = {
     model: BUZZ_MODEL,
-    messages: [{ role: 'user', content: systemPrompt }],
+    messages: [
+      { role: 'system', content: 'You are Buzz, a UGA Master Craftsman Beekeeper with decades of experience. You are helpful, concise, and practical. You know Georgia beekeeping, seasonal management, and Integrated Pest Management.' },
+      { role: 'user', content: systemPrompt }
+    ],
     stream: false,
     temperature: 0.2,
   };
 
-  const authHeader = 'Bearer ' + BUZZ_KEY;
   const resp = await fetch(BUZZ_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': authHeader,
     },
     body: JSON.stringify(body),
   });
