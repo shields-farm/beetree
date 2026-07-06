@@ -11,7 +11,18 @@ import { InspectionDetail } from './pages/InspectionDetail';
 import { Sensors, SensorDetail } from './pages/Sensors';
 import { Tasks } from './pages/Tasks';
 import { Settings } from './pages/Settings';
-import { OmiInspections } from './pages/OmiInspections';
+import { VarroaCounter } from './pages/VarroaCounter';
+import { SwarmRisk } from './pages/SwarmRisk';
+import { FrameAnalysisPage } from './pages/FrameAnalysis';
+import { SmartSchedule } from './pages/SmartSchedule';
+import { QuickInspect } from './pages/QuickInspect';
+import { HealthTrends } from './pages/HealthTrends';
+import { Treatments } from './pages/Treatments';
+import { ForageForecast } from './pages/ForageForecast';
+import { AcousticAnalysis } from './pages/AcousticAnalysis';
+import { QueenTracking } from './pages/QueenTracking';
+import { OutlierDetection } from './pages/OutlierDetection';
+import { ColonyMap } from './pages/ColonyMap';
 
 export default function App() {
   return (
@@ -31,7 +42,18 @@ export default function App() {
             <Route path="/sensors" element={<Sensors />} />
             <Route path="/sensors/:id" element={<SensorDetailPage />} />
             <Route path="/tasks" element={<Tasks />} />
-            <Route path="/omi" element={<OmiInspections />} />
+            <Route path="/frame-analysis" element={<FrameAnalysisPage />} />
+            <Route path="/varroa" element={<VarroaCounter />} />
+            <Route path="/swarm" element={<SwarmRisk />} />
+            <Route path="/schedule" element={<SmartSchedule />} />
+            <Route path="/quick-inspect" element={<QuickInspect />} />
+            <Route path="/trends" element={<HealthTrends />} />
+            <Route path="/treatments" element={<Treatments />} />
+            <Route path="/forage" element={<ForageForecast />} />
+            <Route path="/acoustics" element={<AcousticAnalysis />} />
+            <Route path="/queen" element={<QueenTracking />} />
+            <Route path="/outliers" element={<OutlierDetection />} />
+            <Route path="/colony-map" element={<ColonyMap />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
           </Layout>
