@@ -104,6 +104,79 @@ Return ONLY the JSON, no markdown, no explanation.`;
   return parsed;
 }
 
+/**
+ * Send free-text inspection notes to Buzz and get back a partial inspection
+ * object. Same as parseTranscriptToInspection but with a prompt tuned for typed
+ * notes rather than spoken voice transcripts.
+ */
+export async function parseFreeTextToInspection(
+  text: string,
+  hives: KnownHive[],
+): Promise<ParsedInspection> {
+  const hiveNames = hives.map((h) => h.name).join(', ');
+
+  const systemPrompt = 'You are Buzz, a UGA Master Craftsman Beekeeper. The user typed brief notes about a hive inspection. Parse their typed observations into a structured inspection.\n\n' +
+    'Return ONLY a JSON object with these fields (omit fields you can\'t determine from the notes):\n' +
+    '- hiveName: string (match to one of the known hives if possible)\n' +
+    '- queenPresent: boolean\n' +
+    '- queenCells: boolean\n' +
+    '- queenLayingPattern: "excellent" | "good" | "fair" | "poor" | "none"\n' +
+    '- eggsPresent: boolean\n' +
+    '- larvaePresent: boolean\n' +
+    '- cappedBrood: boolean\n' +
+    '- temperament: "very-calm" | "calm" | "normal" | "agitated" | "aggressive"\n' +
+    '- honeyStores: "none" | "low" | "medium" | "high"\n' +
+    '- pollenStores: "none" | "low" | "medium" | "high"\n' +
+    '- populationSize: "none" | "small" | "average" | "large"\n' +
+    '- concerns: array of {type: string, count?: number, note?: string}\n' +
+    '- notes: string (any other observations not captured above)\n\n' +
+    'Known hives: ' + hiveNames + '\n\n' +
+    'Notes: "' + text.replace(/"/g, '\\"') + '"\n\n' +
+    'Return ONLY the JSON, no markdown, no explanation.';
+
+  const body = {
+    model: BUZZ_MODEL,
+    messages: [{ role: 'user', content: systemPrompt }],
+    stream: false,
+    temperature: 0.2,
+  };
+
+  const authHeader = 'Bearer ' + BUZZ_KEY;
+  const resp = await fetch(BUZZ_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': authHeader,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!resp.ok) {
+    const txt = await resp.text().catch(() => '');
+    throw new Error('Buzz API ' + resp.status + ': ' + txt.slice(0, 200));
+  }
+
+  const data = await resp.json() as any;
+  const content: string = data.choices?.[0]?.message?.content ?? '';
+
+  // Buzz may wrap JSON in markdown fences despite instructions — strip them.
+  const jsonStr = extractJson(content);
+  let parsed: ParsedInspection;
+  try {
+    parsed = JSON.parse(jsonStr) as ParsedInspection;
+  } catch (e) {
+    throw new Error('Buzz returned non-JSON: ' + content.slice(0, 300));
+  }
+
+  // Match hiveName → hiveId
+  if (parsed.hiveName && hives.length > 0) {
+    const match = matchHiveByName(parsed.hiveName, hives);
+    if (match) parsed.hiveId = match.id;
+  }
+
+  return parsed;
+}
+
 /** Try to find the best hive match by name (case-insensitive, substring-aware). */
 export function matchHiveByName(name: string, hives: KnownHive[]): KnownHive | undefined {
   const lower = name.toLowerCase().trim();
