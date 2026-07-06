@@ -1,3 +1,8 @@
+// IMPORTANT: OpenTelemetry MUST be imported & started before other imports
+// so auto-instrumentation can patch Express, HTTP, fs, etc.
+import { startTelemetry, stopTelemetry, apiRequestDurationHistogram, hiveCountGauge, inspectionCountGauge, sensorTemperatureGauge, sensorHumidityGauge, sensorBatteryGauge } from './telemetry.js';
+startTelemetry();
+
 import express from 'express';
 import cors from 'cors';
 import {
@@ -39,6 +44,135 @@ app.use((req, _res, next) => {
   console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
   next();
 });
+
+// ============================================================================
+// OpenTelemetry: request duration histogram middleware
+// ============================================================================
+app.use((req, res, next) => {
+  const start = process.hrtime.bigint();
+  res.on('finish', () => {
+    const durationNs = Number(process.hrtime.bigint() - start);
+    const durationMs = durationNs / 1_000_000;
+    const route = req.route?.path || req.path || 'unknown';
+    const attrs = {
+      method: req.method,
+      route,
+      status: String(res.statusCode),
+    };
+    apiRequestDurationHistogram.record(durationMs, attrs);
+  });
+  next();
+});
+
+// ============================================================================
+// OpenTelemetry: periodic gauge updates (every 30s read from DB)
+// ============================================================================
+interface SensorRow {
+  id: string;
+  deviceId: string;
+  name: string;
+  hiveId: string | null;
+  latestReading: string | null;
+}
+interface HiveNameRow { id: string; name: string; }
+
+function updateGaugesFromDB(): void {
+  // ObservableGauge callbacks fire automatically on each metric export (every 10s).
+  // This periodic function is a place to trigger any side effects or logging.
+  try {
+    const hiveCount = (db.prepare('SELECT COUNT(*) as c FROM hives').get() as { c: number }).c;
+    const inspCount = (db.prepare('SELECT COUNT(*) as c FROM inspections').get() as { c: number }).c;
+    const sensorCount = (db.prepare('SELECT COUNT(*) as c FROM sensors').get() as { c: number }).c;
+    console.log(`[telemetry] gauge refresh — hives: ${hiveCount}, inspections: ${inspCount}, sensors: ${sensorCount}`);
+  } catch (e) {
+    console.error('[telemetry] gauge refresh error:', e);
+  }
+}
+
+// Register observable callbacks that read from DB when metrics are scraped/exported.
+hiveCountGauge.addCallback((result) => {
+  try {
+    const c = (db.prepare('SELECT COUNT(*) as c FROM hives').get() as { c: number }).c;
+    result.observe(c);
+  } catch { /* DB not ready */ }
+});
+
+inspectionCountGauge.addCallback((result) => {
+  try {
+    const c = (db.prepare('SELECT COUNT(*) as c FROM inspections').get() as { c: number }).c;
+    result.observe(c);
+  } catch { /* DB not ready */ }
+});
+
+sensorTemperatureGauge.addCallback((result) => {
+  try {
+    const sensors = db.prepare('SELECT id, deviceId, name, hiveId, latestReading FROM sensors').all() as SensorRow[];
+    const hives = db.prepare('SELECT id, name FROM hives').all() as HiveNameRow[];
+    const hiveNameMap = new Map(hives.map((h) => [h.id, h.name]));
+    for (const s of sensors) {
+      if (!s.latestReading) continue;
+      const r = JSON.parse(s.latestReading) as { temperature?: number };
+      if (typeof r.temperature === 'number') {
+        result.observe(r.temperature, {
+          hiveName: hiveNameMap.get(s.hiveId || '') || 'unassigned',
+          sensorName: s.name,
+          deviceId: s.deviceId,
+        });
+      }
+    }
+  } catch (e) {
+    console.error('[telemetry] sensor_temperature callback error:', e);
+  }
+});
+
+sensorHumidityGauge.addCallback((result) => {
+  try {
+    const sensors = db.prepare('SELECT id, deviceId, name, hiveId, latestReading FROM sensors').all() as SensorRow[];
+    const hives = db.prepare('SELECT id, name FROM hives').all() as HiveNameRow[];
+    const hiveNameMap = new Map(hives.map((h) => [h.id, h.name]));
+    for (const s of sensors) {
+      if (!s.latestReading) continue;
+      const r = JSON.parse(s.latestReading) as { humidity?: number };
+      if (typeof r.humidity === 'number') {
+        result.observe(r.humidity, {
+          hiveName: hiveNameMap.get(s.hiveId || '') || 'unassigned',
+          sensorName: s.name,
+          deviceId: s.deviceId,
+        });
+      }
+    }
+  } catch (e) {
+    console.error('[telemetry] sensor_humidity callback error:', e);
+  }
+});
+
+sensorBatteryGauge.addCallback((result) => {
+  try {
+    const sensors = db.prepare('SELECT id, deviceId, name, hiveId, latestReading FROM sensors').all() as SensorRow[];
+    const hives = db.prepare('SELECT id, name FROM hives').all() as HiveNameRow[];
+    const hiveNameMap = new Map(hives.map((h) => [h.id, h.name]));
+    for (const s of sensors) {
+      if (!s.latestReading) continue;
+      const r = JSON.parse(s.latestReading) as { batteryVoltage?: number };
+      if (typeof r.batteryVoltage === 'number') {
+        result.observe(r.batteryVoltage, {
+          hiveName: hiveNameMap.get(s.hiveId || '') || 'unassigned',
+          sensorName: s.name,
+          deviceId: s.deviceId,
+        });
+      }
+    }
+  } catch (e) {
+    console.error('[telemetry] sensor_battery callback error:', e);
+  }
+});
+
+// Periodic refresh (every 30s) — gauges are callback-based, so this just logs.
+// The callbacks fire on each metric export (every 10s). This interval ensures
+// we log gauge refresh activity and could trigger any side effects.
+setInterval(() => {
+  updateGaugesFromDB();
+}, 30_000);
 
 // ============================================================================
 // /api/apiaries
@@ -435,3 +569,7 @@ const HOST = '0.0.0.0';
 app.listen(PORT, HOST, () => {
   console.log(`🐝 BeeTree API listening on http://${HOST}:${PORT}`);
 });
+
+// Graceful shutdown for OpenTelemetry SDK
+process.on('SIGTERM', () => { void stopTelemetry(); process.exit(0); });
+process.on('SIGINT', () => { void stopTelemetry(); process.exit(0); });
