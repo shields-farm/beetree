@@ -82,12 +82,29 @@ export function FloatingChat() {
   const { apiaries, hives, inspections, sensors, tasks } = useStore();
   const { isOpen, setIsOpen, pendingPrompt, clearPendingPrompt, quickQuestions } = useChat();
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    // Restore from localStorage on mount
+    try {
+      const saved = localStorage.getItem('beetree-chat-messages');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Persist messages to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('beetree-chat-messages', JSON.stringify(messages));
+    } catch {
+      // Storage full or unavailable — silently ignore
+    }
+  }, [messages]);
 
   // Sync local open state with context
   useEffect(() => {
@@ -113,7 +130,12 @@ export function FloatingChat() {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, loading]);
+  }, [messages, loading, open]);
+
+  const clearChat = useCallback(() => {
+    setMessages([]);
+    localStorage.removeItem('beetree-chat-messages');
+  }, []);
 
   useEffect(() => {
     if (open && inputRef.current) {
@@ -223,9 +245,20 @@ export function FloatingChat() {
                 <div className="text-[10px] opacity-90">UGA Master Craftsman</div>
               </div>
             </div>
-            <button onClick={() => toggleOpen(false)} className="p-1 hover:bg-white/20 rounded-lg">
-              <X size={18} />
-            </button>
+            <div className="flex items-center gap-1">
+              {messages.length > 0 && (
+                <button
+                  onClick={clearChat}
+                  className="p-1.5 hover:bg-white/20 rounded-lg text-[10px] font-medium"
+                  title="Clear conversation"
+                >
+                  Clear
+                </button>
+              )}
+              <button onClick={() => toggleOpen(false)} className="p-1 hover:bg-white/20 rounded-lg">
+                <X size={18} />
+              </button>
+            </div>
           </div>
 
           {/* Messages */}
