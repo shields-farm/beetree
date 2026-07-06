@@ -1,14 +1,32 @@
-import { LayoutDashboard, MapPin, Boxes, ClipboardList, Thermometer, CheckSquare, Settings as SettingsIcon, Hexagon, Camera, Bug, Wind, CalendarClock, PenLine, TrendingUp, Pill, Flower2, AudioLines, Crown, GitCompare, Layers } from 'lucide-react';
+import { MapPin, Boxes, ClipboardList, Thermometer, CheckSquare, Settings as SettingsIcon, Hexagon, Camera, Bug, Wind, CalendarClock, PenLine, TrendingUp, Pill, Flower2, AudioLines, Crown, GitCompare, Layers } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
+/** Custom icon: a 10-frame deep hive box (side view with vertical frame lines) */
+function HiveBoxIcon({ size = 20, strokeWidth = 2 }: { size?: number; strokeWidth?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="5" width="18" height="14" rx="1.5" />
+      <line x1="4.8" y1="5" x2="4.8" y2="19" />
+      <line x1="6.6" y1="5" x2="6.6" y2="19" />
+      <line x1="8.4" y1="5" x2="8.4" y2="19" />
+      <line x1="10.2" y1="5" x2="10.2" y2="19" />
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="13.8" y1="5" x2="13.8" y2="19" />
+      <line x1="15.6" y1="5" x2="15.6" y2="19" />
+      <line x1="17.4" y1="5" x2="17.4" y2="19" />
+      <line x1="19.2" y1="5" x2="19.2" y2="19" />
+    </svg>
+  );
+}
+
 const NAV_ITEMS = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/', label: 'Dashboard', icon: HiveBoxIcon, end: true },
+  { to: '/inspections', label: 'Inspections', icon: ClipboardList },
+  { to: '/frame-analysis', label: 'AI Frame Analysis', icon: Camera },
   { to: '/apiaries', label: 'Apiaries', icon: MapPin },
   { to: '/hives', label: 'Hives', icon: Boxes },
-  { to: '/inspections', label: 'Inspections', icon: ClipboardList },
   { to: '/schedule', label: 'Schedule', icon: CalendarClock },
   { to: '/quick-inspect', label: 'Quick Inspect', icon: PenLine },
-  { to: '/frame-analysis', label: 'AI Frame Analysis', icon: Camera },
   { to: '/varroa', label: 'Varroa Counter', icon: Bug },
   { to: '/swarm', label: 'Swarm Risk', icon: Wind },
   { to: '/trends', label: 'Health Trends', icon: TrendingUp },
@@ -25,14 +43,14 @@ const NAV_ITEMS = [
 
 export function Sidebar() {
   return (
-    <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-stone-200 bg-white h-screen sticky top-0">
-      <div className="px-5 py-5 flex items-center gap-2 border-b border-stone-100">
+    <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 h-screen sticky top-0">
+      <div className="px-5 py-5 flex items-center gap-2 border-b border-stone-100 dark:border-stone-800">
         <div className="w-9 h-9 rounded-xl bg-honey-500 flex items-center justify-center shadow-sm">
           <Hexagon size={20} className="text-white" fill="white" />
         </div>
         <div>
-          <div className="font-bold text-stone-800 leading-tight">BeeTree</div>
-          <div className="text-[10px] text-stone-400 leading-tight">Beekeeping Manager</div>
+          <div className="font-bold text-stone-800 dark:text-stone-100 leading-tight">BeeTree</div>
+          <div className="text-[10px] text-stone-400 dark:text-stone-500 leading-tight">Beekeeping Manager</div>
         </div>
       </div>
       <nav className="flex-1 px-3 py-4 space-y-1">
@@ -46,8 +64,8 @@ export function Sidebar() {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                   isActive
-                    ? 'bg-honey-50 text-honey-700'
-                    : 'text-stone-500 hover:bg-stone-50 hover:text-stone-700'
+                    ? 'bg-honey-50 dark:bg-honey-950 text-honey-700 dark:text-honey-300'
+                    : 'text-stone-500 dark:text-stone-400 hover:bg-stone-50 dark:hover:bg-stone-800 hover:text-stone-700 dark:hover:text-stone-200'
                 }`
               }
             >
@@ -57,8 +75,8 @@ export function Sidebar() {
           );
         })}
       </nav>
-      <div className="px-4 py-3 border-t border-stone-100">
-        <p className="text-[10px] text-stone-300">BeeTree v0.1 · local-only</p>
+      <div className="px-4 py-3 border-t border-stone-100 dark:border-stone-800">
+        <p className="text-[10px] text-stone-300 dark:text-stone-600">BeeTree v0.2 · secure</p>
       </div>
     </aside>
   );

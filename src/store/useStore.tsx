@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Apiary, AppState, Hive, Inspection, Sensor, Task } from '../types';
 import { SEED_APIARIES, SEED_HIVES, SEED_INSPECTIONS, SEED_SENSORS, SEED_TASKS, makeMockReading } from '../lib/seedData';
+import { API_BASE, apiFetch } from '../lib/apiBase';
 
 const STORAGE_KEY = 'beelog-state-v1';
 
@@ -20,6 +21,27 @@ function loadState(): AppState {
     inspections: SEED_INSPECTIONS,
     sensors: SEED_SENSORS,
     tasks: SEED_TASKS,
+  };
+}
+
+/**
+ * Merge server data into local state, preferring server records when IDs collide.
+ * This keeps the store in sync with the SQLite backend without losing locally-created
+ * records that haven't been pushed to the server yet.
+ */
+function mergeState(local: AppState, remote: Partial<AppState>): AppState {
+  const mergeArrays = <T extends { id: string }>(a: T[], b: T[] | undefined): T[] => {
+    if (!b) return a;
+    const map = new Map(a.map((x) => [x.id, x]));
+    for (const item of b) map.set(item.id, item); // remote wins on collision
+    return Array.from(map.values());
+  };
+  return {
+    apiaries: mergeArrays(local.apiaries, remote.apiaries),
+    hives: mergeArrays(local.hives, remote.hives),
+    inspections: mergeArrays(local.inspections, remote.inspections),
+    sensors: mergeArrays(local.sensors, remote.sensors),
+    tasks: mergeArrays(local.tasks, remote.tasks),
   };
 }
 
@@ -59,6 +81,7 @@ interface StoreContextValue extends AppState {
   // Misc
   resetToSeed: () => void;
   clearAll: () => void;
+  syncFromServer: () => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null);
@@ -67,6 +90,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState>(loadState);
   const firstRender = useRef(true);
 
+  // Persist to localStorage on every change (except first render)
   useEffect(() => {
     if (firstRender.current) {
       firstRender.current = false;
@@ -78,6 +102,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       /* quota */
     }
   }, [state]);
+
+  // Sync from Express server on mount — merges server data (SQLite) into local store
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [apiaries, hives, inspections, sensors, tasks] = await Promise.all([
+          apiFetch(API_BASE + '/api/apiaries').then((r) => r.ok ? r.json() : []).catch(() => []),
+          apiFetch(API_BASE + '/api/hives').then((r) => r.ok ? r.json() : []).catch(() => []),
+          apiFetch(API_BASE + '/api/inspections').then((r) => r.ok ? r.json() : []).catch(() => []),
+          apiFetch(API_BASE + '/api/sensors').then((r) => r.ok ? r.json() : []).catch(() => []),
+          apiFetch(API_BASE + '/api/tasks').then((r) => r.ok ? r.json() : []).catch(() => []),
+        ]);
+        if (cancelled) return;
+        const remote = { apiaries, hives, inspections, sensors, tasks } as Partial<AppState>;
+        setState((local) => mergeState(local, remote));
+      } catch {
+        // Server not running — keep local state
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const value = useMemo<StoreContextValue>(() => {
     const update = (fn: (s: AppState) => AppState) => setState((s) => fn(s));
@@ -269,6 +315,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           tasks: SEED_TASKS,
         })),
       clearAll: () => update(() => ({ apiaries: [], hives: [], inspections: [], sensors: [], tasks: [] })),
+
+      syncFromServer: async () => {
+        try {
+          const [apiaries, hives, inspections, sensors, tasks] = await Promise.all([
+            apiFetch(API_BASE + '/api/apiaries').then((r) => r.ok ? r.json() : []).catch(() => []),
+            apiFetch(API_BASE + '/api/hives').then((r) => r.ok ? r.json() : []).catch(() => []),
+            apiFetch(API_BASE + '/api/inspections').then((r) => r.ok ? r.json() : []).catch(() => []),
+            apiFetch(API_BASE + '/api/sensors').then((r) => r.ok ? r.json() : []).catch(() => []),
+            apiFetch(API_BASE + '/api/tasks').then((r) => r.ok ? r.json() : []).catch(() => []),
+          ]);
+          const remote = { apiaries, hives, inspections, sensors, tasks } as Partial<AppState>;
+          setState((local) => mergeState(local, remote));
+        } catch {
+          // server not running — keep local state
+        }
+      },
     };
   }, [state]);
 
