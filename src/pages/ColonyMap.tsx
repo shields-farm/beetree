@@ -13,7 +13,7 @@ import {
 import { PageHeader } from '../components/Layout';
 import { Card } from '../components/Card';
 
-import { API_BASE, apiFetch } from '../lib/apiBase';
+import { API_BASE, apiFetch, statusToMessage } from '../lib/apiBase';
 
 interface Hive {
   id: string;
@@ -116,7 +116,7 @@ export function ColonyMap() {
       });
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
-        throw new Error(err.error || 'HTTP ' + resp.status);
+        throw new Error(err.error || statusToMessage(resp.status));
       }
       const data = (await resp.json()) as FrameReconstruction;
       setResult(data);

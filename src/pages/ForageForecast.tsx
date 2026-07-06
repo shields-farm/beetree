@@ -13,7 +13,7 @@ import {
 import { PageHeader } from '../components/Layout';
 import { Card } from '../components/Card';
 
-import { API_BASE, apiFetch } from '../lib/apiBase';
+import { API_BASE, apiFetch, statusToMessage } from '../lib/apiBase';
 
 interface ForageFlow {
   plant: string;
@@ -62,7 +62,7 @@ export function ForageForecast() {
       setError(null);
       try {
         const resp = await apiFetch(API_BASE + '/api/forage');
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        if (!resp.ok) throw new Error(statusToMessage(resp.status));
         const json = (await resp.json()) as ForageResponse;
         if (!cancelled) setData(json);
       } catch (e) {

@@ -24,7 +24,7 @@ import {
 } from '../lib/hiveTypes';
 import type { Concern, PopulationSize, QueenLayingPattern, StoreLevel, Temperament } from '../types';
 
-import { API_BASE, apiFetch } from '../lib/apiBase';
+import { API_BASE, apiFetch, statusToMessage } from '../lib/apiBase';
 
 interface ParsedInspection {
   hiveName?: string;
@@ -90,7 +90,7 @@ export function QuickInspect() {
       });
       if (!resp.ok) {
         const errBody = await resp.json().catch(() => ({}));
-        throw new Error(errBody.error || 'HTTP ' + resp.status);
+        throw new Error(errBody.error || statusToMessage(resp.status));
       }
       const data = (await resp.json()) as { parsed: ParsedInspection; raw: string };
       const p = { ...defaultParsed(), ...data.parsed };
@@ -123,7 +123,7 @@ export function QuickInspect() {
       });
       if (!resp.ok) {
         const errBody = await resp.json().catch(() => ({}));
-        throw new Error(errBody.error || 'HTTP ' + resp.status);
+        throw new Error(errBody.error || statusToMessage(resp.status));
       }
       const createdInsp = (await resp.json()) as { id: string };
       setCreated(createdInsp);

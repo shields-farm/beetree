@@ -4,6 +4,7 @@ import { Hexagon, Settings as SettingsIcon } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { BottomNav } from './BottomNav';
 import { FloatingChat } from './FloatingChat';
+import { ApiKeyBanner } from './ApiKeyBanner';
 
 export function Layout({ children }: { children: ReactNode }) {
   return (
@@ -29,6 +30,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <main
           className="flex-1 w-full max-w-3xl mx-auto px-4 py-4 sm:px-6 lg:px-8 pb-28 lg:pb-10"
         >
+          <ApiKeyBanner />
           {children}
         </main>
       </div>

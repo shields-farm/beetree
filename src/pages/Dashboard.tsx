@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Clock, ChevronRight, Thermometer, TrendingUp, TrendingDown, Minus, Flower2, MapPin, ExternalLink, KeyRound } from 'lucide-react';
+import { Clock, ChevronRight, Thermometer, TrendingUp, TrendingDown, Minus, Flower2, MapPin, ExternalLink } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useChat, AskAIButton } from '../components/ChatContext';
 import { generateAlerts, ALERT_META, type Alert } from '../lib/alerts';
 import { HEALTH_META } from '../lib/health';
-import { API_BASE, apiFetch, hasApiKey } from '../lib/apiBase';
+import { API_BASE, apiFetch } from '../lib/apiBase';
 
 // ─── Forage types (mirror server/forage.ts) ──────────────────────────────────
 interface ForageFlow {
@@ -89,18 +89,6 @@ export function Dashboard() {
 
   return (
     <div className="animate-fade-in space-y-5">
-      {/* ─── API KEY WARNING (if not set) ─── */}
-      {!hasApiKey() && (
-        <Link to="/settings" className="block bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 flex items-center gap-3 hover:bg-amber-100 dark:hover:bg-amber-900 transition-colors">
-          <KeyRound size={20} className="text-amber-600 dark:text-amber-400 shrink-0" />
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold text-amber-800 dark:text-amber-200">API key required</div>
-            <div className="text-xs text-amber-600 dark:text-amber-400">Set your API key in Settings to sync data from the server.</div>
-          </div>
-          <ChevronRight size={16} className="text-amber-400 shrink-0" />
-        </Link>
-      )}
-
       {/* ─── COWETA COUNTY FORAGE CARD ─── */}
       {forage && (
         <CowetaForageCard forage={forage} />
