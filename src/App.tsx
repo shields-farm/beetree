@@ -11,6 +11,7 @@ import { InspectionDetail } from './pages/InspectionDetail';
 import { Sensors, SensorDetail } from './pages/Sensors';
 import { Tasks } from './pages/Tasks';
 import { Settings } from './pages/Settings';
+import { OmiInspections } from './pages/OmiInspections';
 
 export default function App() {
   return (
@@ -30,6 +31,7 @@ export default function App() {
             <Route path="/sensors" element={<Sensors />} />
             <Route path="/sensors/:id" element={<SensorDetailPage />} />
             <Route path="/tasks" element={<Tasks />} />
+            <Route path="/omi" element={<OmiInspections />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
           </Layout>
