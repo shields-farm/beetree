@@ -6,6 +6,9 @@ export interface ForageFlow {
   startMonth: string;
   endMonth: string;
   notes: string;
+  significant?: boolean;
+  latinName?: string;
+  plantType?: string;
 }
 
 export interface ForageForecast {
@@ -21,28 +24,70 @@ const MONTH_NAMES = [
 ];
 
 // Each plant's bloom window in Georgia (0-indexed months: 0=Jan ... 11=Dec).
+// Data merged from NASA HoneyBeeNet Ayers & Harman forage map (GA_11 + GA_12 regions)
+// with locally-verified beekeeping notes.
 interface PlantBloom {
   plant: string;
   start: number;
   end: number;
   notes: string;
+  significant?: boolean; // NASA "significant nectar source" flag
+  latinName?: string;
+  plantType?: string;
 }
 
 const BLOOM_CALENDAR: PlantBloom[] = [
-  { plant: 'Maple', start: 0, end: 2, notes: 'Early pollen source; maples can bloom in January on warm days in GA. Important for early brood build-up.' },
-  { plant: 'Elm', start: 1, end: 2, notes: 'Pollen producer in late winter; helps colonies ramp up brood rearing.' },
-  { plant: 'Willow', start: 2, end: 3, notes: 'Pollen and some nectar; supports early colony expansion.' },
-  { plant: 'Redbud', start: 2, end: 3, notes: 'Ornamental/edge tree; modest nectar and pollen in early spring.' },
-  { plant: 'Tulip Poplar', start: 3, end: 5, notes: 'Major nectar flow in the Southeast. Peak in May. One of the most important honey plants in GA.' },
-  { plant: 'Blackberry', start: 3, end: 4, notes: 'Good nectar and pollen; brambles along field edges support colony growth.' },
-  { plant: 'Clover', start: 3, end: 5, notes: 'White and red clover provide a steady nectar flow through late spring. Begins in April.' },
-  { plant: 'Sumac', start: 5, end: 6, notes: 'Summer nectar source; helps bridge the gap after the tulip poplar flow.' },
-  { plant: 'Mimosa', start: 5, end: 6, notes: 'Nectar in early summer; fading by July. Invasive but bees love it.' },
-  { plant: 'Cotton', start: 6, end: 7, notes: 'Significant nectar flow in south Georgia. Cotton honey is light and mild. Watch for pesticide exposure.' },
-  { plant: 'Goldenrod', start: 7, end: 9, notes: 'Major fall flow; goldenrod honey is robust. Begins late August, peaks September, fades October.' },
-  { plant: 'Aster', start: 8, end: 10, notes: 'Fall pollen and nectar; critical for winter stores. Fades by November.' },
-  { plant: 'Spanish Needle', start: 8, end: 9, notes: 'Fall nectar source in the Southeast; supports colony weight gain before winter.' },
-  { plant: 'Ivy', start: 10, end: 10, notes: 'Late-season nectar in November; can help top off winter stores.' },
+  // ─── Winter / Early Spring (Jan–Feb) ────────────────────────────────────────
+  { plant: 'Maple', start: 0, end: 4, notes: 'Early pollen source; maples can bloom in January on warm days in GA. Important for early brood build-up.', latinName: 'Acer', plantType: 'Tree (deciduous)', significant: false },
+  { plant: 'Blueberry', start: 0, end: 5, notes: 'Blueberry and huckleberry provide pollen and some nectar through spring. Important for early brood build-up.', latinName: 'Vaccinium', plantType: 'Shrub (deciduous)', significant: false },
+  { plant: 'Pumpkin/Squash', start: 0, end: 11, notes: 'Cultivated cucurbits bloom across the growing season; bees work them intensively when present.', latinName: 'Cucurbita', plantType: 'Crop', significant: false },
+  { plant: 'Cucumber', start: 0, end: 11, notes: 'Cultivated; bees work cucumber flowers intensively when blooming.', latinName: 'Cucumis sativus', plantType: 'Crop', significant: false },
+  { plant: 'Dandelion', start: 1, end: 9, notes: 'One of the longest-blooming forage plants. Pollen and nectar from February through October. Important early build-up plant.', latinName: 'Taraxacum', plantType: 'Forb', significant: false },
+  { plant: 'Elm', start: 1, end: 3, notes: 'Pollen producer in late winter; helps colonies ramp up brood rearing.', latinName: 'Ulmus', plantType: 'Tree (deciduous)', significant: false },
+  { plant: 'Titi', start: 1, end: 3, notes: 'Significant nectar source in southwest GA. Titi (Cliftonia) blooms Feb–Apr and can produce a surplus. Also called buckwheat tree.', latinName: 'Cliftonia monophylla', plantType: 'Tree (deciduous)', significant: true },
+
+  // ─── Early Spring (Mar) ─────────────────────────────────────────────────────
+  { plant: 'Willow', start: 2, end: 5, notes: 'Pollen and some nectar; supports early colony expansion.', latinName: 'Salix', plantType: 'Tree (deciduous)', significant: false },
+  { plant: 'Redbud', start: 2, end: 3, notes: 'Ornamental/edge tree; modest nectar and pollen in early spring.', significant: false },
+  { plant: 'Gallberry', start: 2, end: 5, notes: 'Significant nectar source in GA. Evergreen holly shrub of wet acidic soils. Major honey plant in the Southeast.', latinName: 'Ilex glabra', plantType: 'Shrub (evergreen)', significant: true },
+  { plant: 'Tupelo', start: 2, end: 5, notes: 'Tupelo (Nyssa) — famous for premium monofloral honey from the Ogeechee River basin. Blooms Mar–Jun in GA.', latinName: 'Nyssa', plantType: 'Tree (deciduous)', significant: false },
+  { plant: 'Blackberry', start: 2, end: 5, notes: 'Good nectar and pollen; brambles along field edges support colony growth.', latinName: 'Rubus', plantType: 'Shrub/Crop', significant: false },
+  { plant: 'Apple', start: 2, end: 4, notes: 'Apple bloom in early spring; important pollen and nectar for colony build-up.', latinName: 'Malus', plantType: 'Tree (deciduous)', significant: false },
+  { plant: 'Cherry (wild)', start: 2, end: 4, notes: 'Wild cherry provides pollen and nectar in early spring.', latinName: 'Prunus', plantType: 'Tree (deciduous)', significant: false },
+  { plant: 'Box Elder', start: 2, end: 3, notes: 'Box elder (Acer negundo) provides early pollen in north GA.', latinName: 'Acer negundo', plantType: 'Tree (deciduous)', significant: false },
+
+  // ─── Spring Main Flow (Apr–May) ──────────────────────────────────────────────
+  { plant: 'Tulip Poplar', start: 3, end: 5, notes: 'Major nectar flow in the Southeast. Peak in May. One of the most important honey plants in GA. NASA-designated significant source.', latinName: 'Liriodendron tulipifera', plantType: 'Tree (deciduous)', significant: true },
+  { plant: 'Crimson Clover', start: 3, end: 5, notes: 'Crimson clover (Trifolium incarnatum) — good nectar flow in late spring.', latinName: 'Trifolium incarnatum', plantType: 'Forb (legume)', significant: false },
+  { plant: 'White Clover', start: 3, end: 9, notes: 'White/Dutch clover (Trifolium repens) — long nectar flow from April through October. Steady producer in pastures and lawns.', latinName: 'Trifolium repens', plantType: 'Forb (legume)', significant: false },
+  { plant: 'Vetch', start: 3, end: 8, notes: 'Vetch (Vicia) provides nectar and pollen from April through September.', latinName: 'Vicia', plantType: 'Forb (legume)', significant: false },
+  { plant: 'Privet', start: 3, end: 6, notes: 'Privet (Ligustrum) — significant nectar source in GA. Invasive hedge plant but bees love it. April–July bloom.', latinName: 'Ligustrum', plantType: 'Shrub', significant: true },
+  { plant: 'Huckleberry', start: 3, end: 5, notes: 'Huckleberry (Gaylussacia) — pollen and nectar in spring.', latinName: 'Gaylussacia', plantType: 'Shrub', significant: false },
+  { plant: 'Thistles', start: 3, end: 9, notes: 'Thistles (Cirsium) provide nectar from April through October. Bees work them heavily.', latinName: 'Cirsium', plantType: 'Forb', significant: false },
+
+  // ─── Early Summer (May–Jun) ──────────────────────────────────────────────────
+  { plant: 'Sourwood', start: 4, end: 6, notes: 'Sourwood (Oxydendrum arboreum) — significant nectar source in GA mountains. Premium monofloral honey. Blooms May–July.', latinName: 'Oxydendrum arboreum', plantType: 'Tree (deciduous)', significant: true },
+  { plant: 'Basswood', start: 4, end: 6, notes: 'Basswood/Linden (Tilia) — significant nectar source in north GA. Short but intense bloom. May–July.', latinName: 'Tilia', plantType: 'Tree (deciduous)', significant: true },
+  { plant: 'Palmetto', start: 4, end: 6, notes: 'Palmetto/cabbage palm (Sabal) — significant nectar in coastal/south GA. May–July.', latinName: 'Sabal', plantType: 'Tree (evergreen)', significant: true },
+  { plant: 'Sumac', start: 4, end: 8, notes: 'Sumac (Rhus) provides summer nectar; helps bridge the gap after the tulip poplar flow.', latinName: 'Rhus', plantType: 'Shrub', significant: false },
+  { plant: 'Prickly Pear', start: 4, end: 5, notes: 'Prickly pear cactus (Opuntia) — brief nectar source in May–June.', latinName: 'Opuntia', plantType: 'Shrub (succulent)', significant: false },
+  { plant: 'Mimosa', start: 5, end: 6, notes: 'Nectar in early summer; fading by July. Invasive but bees love it.', significant: false },
+  { plant: 'Watermelon', start: 4, end: 7, notes: 'Cultivated watermelon (Citrullus lanatus) — bees work flowers intensively during bloom.', latinName: 'Citrullus lanatus', plantType: 'Crop', significant: false },
+  { plant: 'Cantaloupe', start: 1, end: 7, notes: 'Cultivated muskmelon (Cucumis melo) — nectar and pollen during bloom.', latinName: 'Cucumis melo', plantType: 'Crop', significant: false },
+
+  // ─── Summer (Jun–Aug) ────────────────────────────────────────────────────────
+  { plant: 'Cotton', start: 6, end: 7, notes: 'Significant nectar flow in south Georgia. Cotton honey is light and mild. Watch for pesticide exposure.', significant: false },
+  { plant: 'Star Thistle', start: 5, end: 9, notes: 'Star thistle/knapweed (Centaurea) — nectar from June through October.', latinName: 'Centaurea', plantType: 'Forb', significant: false },
+  { plant: 'Bermuda Grass', start: 4, end: 10, notes: 'Bermuda grass (Cynodon dactylon) — wind-pollinated but bees collect pollen from May–November.', latinName: 'Cynodon dactylon', plantType: 'Grass', significant: false },
+  { plant: 'Carpet Grass', start: 4, end: 9, notes: 'Carpet grass/fogfruit (Phyla nodiflora) — nectar from May–October.', latinName: 'Phyla nodiflora', plantType: 'Forb', significant: false },
+
+  // ─── Fall Flow (Jul–Nov) ──────────────────────────────────────────────────────
+  { plant: 'Goldenrod', start: 6, end: 10, notes: 'Major fall flow; goldenrod honey is robust. NASA-confirmed July–November in GA. Critical for winter stores.', latinName: 'Solidago', plantType: 'Forb', significant: false },
+  { plant: 'Aster', start: 4, end: 10, notes: 'Fall pollen and nectar; critical for winter stores. NASA-confirmed May–November in GA.', latinName: 'Aster', plantType: 'Forb', significant: false },
+  { plant: 'Spanish Needle', start: 7, end: 8, notes: 'Fall nectar source in the Southeast; supports colony weight gain before winter.', significant: false },
+
+  // ─── Late Fall / Winter (Oct–Nov) ─────────────────────────────────────────────
+  { plant: 'Ivy', start: 10, end: 10, notes: 'Late-season nectar in November; can help top off winter stores.', significant: false },
 ];
 
 function monthName(m: number): string {
@@ -180,6 +225,9 @@ export function getForageForecast(month?: number): ForageForecast {
       startMonth: monthName(plant.start),
       endMonth: monthName(plant.end),
       notes: plant.notes,
+      significant: plant.significant,
+      latinName: plant.latinName,
+      plantType: plant.plantType,
     } as ForageFlow;
   }).filter((f): f is ForageFlow => f !== null);
 
@@ -207,4 +255,27 @@ export function getForageForecastWithPreview(): { current: ForageForecast; next:
     current: getForageForecast(now + 1),
     next: getForageForecast(((now + 1) % 12) + 1),
   };
+}
+
+/** Get all forage species with bloom windows for map overlay. */
+export function getAllForageSpecies(): ForageFlow[] {
+  const now = new Date().getMonth();
+  return BLOOM_CALENDAR.map((plant) => {
+    const status = plantStatus(plant, now);
+    return {
+      plant: plant.plant,
+      status,
+      startMonth: monthName(plant.start),
+      endMonth: monthName(plant.end),
+      notes: plant.notes,
+      significant: plant.significant,
+      latinName: plant.latinName,
+      plantType: plant.plantType,
+    } as ForageFlow;
+  }).sort((a, b) => {
+    // Sort: significant first, then by start month
+    if (a.significant && !b.significant) return -1;
+    if (!a.significant && b.significant) return 1;
+    return 0;
+  });
 }
