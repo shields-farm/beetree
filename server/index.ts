@@ -555,6 +555,118 @@ app.delete('/api/media/:id', (req, res) => {
 });
 
 // ============================================================================
+// /api/omi — Omi voice transcript integration
+// ============================================================================
+import {
+  parseTranscriptToInspection,
+  calculateHealth,
+  listRecentTranscripts,
+  readTranscriptByDate,
+  type ParsedInspection,
+} from './omi.js';
+
+app.post('/api/omi/transcript', async (req, res) => {
+  try {
+    const { transcript } = req.body || {};
+    if (typeof transcript !== 'string' || !transcript.trim()) {
+      return res.status(400).json({ error: 'transcript (string) is required' });
+    }
+    const hiveRows = db.prepare('SELECT id, name FROM hives').all() as { id: string; name: string }[];
+    const parsed = await parseTranscriptToInspection(transcript, hiveRows);
+    res.json({ parsed, raw: transcript });
+  } catch (e) {
+    console.error('[omi/transcript] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'parse failed' });
+  }
+});
+
+app.post('/api/omi/confirm', (req, res) => {
+  try {
+    const { parsed, hiveId } = req.body || {};
+    if (!hiveId) return res.status(400).json({ error: 'hiveId is required' });
+    const exists = db.prepare('SELECT 1 FROM hives WHERE id = ?').get(hiveId);
+    if (!exists) return res.status(404).json({ error: 'hive not found' });
+
+    const p: ParsedInspection = parsed || {};
+    const health = calculateHealth({
+      queenPresent: p.queenPresent,
+      queenCells: p.queenCells,
+      queenLayingPattern: p.queenLayingPattern,
+      eggsPresent: p.eggsPresent,
+      larvaePresent: p.larvaePresent,
+      cappedBrood: p.cappedBrood,
+      temperament: p.temperament,
+      honeyStores: p.honeyStores,
+      pollenStores: p.pollenStores,
+      populationSize: p.populationSize,
+      concerns: p.concerns ?? [],
+      colonyDead: false,
+    });
+
+    const id = genId('insp');
+    db.prepare(
+      `INSERT INTO inspections (id, hiveId, date, queenPresent, queenCells, queenLayingPattern, eggsPresent, larvaePresent, cappedBrood, temperament, honeyStores, pollenStores, populationSize, hiveWeight, healthStatus, healthAutoCalculated, colonyDead, notes, photoUrls) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      id,
+      hiveId,
+      new Date().toISOString(),
+      p.queenPresent ? 1 : 0,
+      p.queenCells ? 1 : 0,
+      p.queenLayingPattern ?? 'none',
+      p.eggsPresent ? 1 : 0,
+      p.larvaePresent ? 1 : 0,
+      p.cappedBrood ? 1 : 0,
+      p.temperament ?? 'normal',
+      p.honeyStores ?? 'none',
+      p.pollenStores ?? 'none',
+      p.populationSize ?? 'none',
+      0,
+      health,
+      1, // auto-calculated
+      0, // not dead
+      p.notes ?? '',
+      JSON.stringify([]),
+    );
+
+    // Insert concerns
+    if (Array.isArray(p.concerns)) {
+      const insConcern = db.prepare(
+        `INSERT INTO concerns (id, inspectionId, type, count, note) VALUES (?, ?, ?, ?, ?)`,
+      );
+      for (const c of p.concerns) {
+        if (!c.type) continue;
+        insConcern.run(genId('c'), id, c.type, c.count ?? null, c.note ?? null);
+      }
+    }
+
+    const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(id) as InspectionRow;
+    // Update hive health status to match latest inspection
+    db.prepare('UPDATE hives SET healthStatus = ? WHERE id = ?').run(health, hiveId);
+    res.status(201).json(mapInspection(row, getConcernsFor(id)));
+  } catch (e) {
+    console.error('[omi/confirm] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'confirm failed' });
+  }
+});
+
+app.get('/api/omi/transcripts', (_req, res) => {
+  try {
+    const transcripts = listRecentTranscripts(50);
+    res.json(transcripts);
+  } catch (e) {
+    console.error('[omi/transcripts] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'failed to list transcripts' });
+  }
+});
+
+// GET /api/omi/transcripts/:date — full text for a specific day
+app.get('/api/omi/transcripts/:date', (req, res) => {
+  const text = readTranscriptByDate(req.params.date);
+  if (text === null) return res.status(404).json({ error: 'no transcript for that date' });
+  res.json({ date: req.params.date, text });
+});
+
+// ============================================================================
 // Health check & 404
 // ============================================================================
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));

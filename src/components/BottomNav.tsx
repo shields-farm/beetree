@@ -1,10 +1,11 @@
-import { LayoutDashboard, Boxes, ClipboardList, Thermometer, CheckSquare } from 'lucide-react';
+import { LayoutDashboard, Boxes, ClipboardList, Thermometer, CheckSquare, Mic } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Home', icon: LayoutDashboard, end: true },
   { to: '/hives', label: 'Hives', icon: Boxes },
   { to: '/inspections', label: 'Inspect', icon: ClipboardList },
+  { to: '/omi', label: 'Voice', icon: Mic },
   { to: '/sensors', label: 'Sensors', icon: Thermometer },
   { to: '/tasks', label: 'Tasks', icon: CheckSquare },
 ];

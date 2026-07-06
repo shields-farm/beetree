@@ -1,4 +1,4 @@
-import { LayoutDashboard, MapPin, Boxes, ClipboardList, Thermometer, CheckSquare, Settings as SettingsIcon, Hexagon } from 'lucide-react';
+import { LayoutDashboard, MapPin, Boxes, ClipboardList, Thermometer, CheckSquare, Settings as SettingsIcon, Hexagon, Mic } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 const NAV_ITEMS = [
@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { to: '/apiaries', label: 'Apiaries', icon: MapPin },
   { to: '/hives', label: 'Hives', icon: Boxes },
   { to: '/inspections', label: 'Inspections', icon: ClipboardList },
+  { to: '/omi', label: 'Voice (Omi)', icon: Mic },
   { to: '/sensors', label: 'Sensors', icon: Thermometer },
   { to: '/tasks', label: 'Tasks', icon: CheckSquare },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
