@@ -1,8 +1,8 @@
 // server/vision.ts — Frame photo → structured analysis via Ollama vision API
-// Uses gemini-3-flash-preview:cloud on local Ollama for vision-capable inference.
+// Uses kimi-k2.7-code:cloud on local Ollama for vision-capable inference.
 
 const VISION_URL = 'http://localhost:11434/v1/chat/completions';
-const VISION_MODEL = 'gemini-3-flash-preview:cloud';
+const VISION_MODEL = 'kimi-k2.7-code:cloud';
 
 /** Structured result of analyzing a frame photo. */
 export interface FrameAnalysisDisease {
