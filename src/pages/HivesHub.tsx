@@ -42,9 +42,20 @@ export function HivesHub() {
   return (
     <div className="animate-fade-in">
       {/* Apiary chip picker — only show on hives and swarm tabs */}
-      {(tab === 'hives' || tab === 'swarm') && apiaries.length > 1 && (
+      {(tab === 'hives' || tab === 'swarm') && apiaries.length > 0 && (
         <div className="flex items-center gap-2 mb-3 overflow-x-auto pb-1">
           <MapPin size={14} className="text-stone-400 shrink-0" />
+          <button
+            onClick={() => switchApiary('')}
+            className={
+              'shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ' +
+              (selectedApiaryId === ''
+                ? 'bg-honey-500 text-white'
+                : 'bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-stone-700')
+            }
+          >
+            All
+          </button>
           {apiaries.map((a) => (
             <button
               key={a.id}
