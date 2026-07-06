@@ -57,7 +57,7 @@ function buildContext(
     return `  - ${t.title}${hive ? ` (${hive.name})` : ''}${t.dueDate ? ` due ${new Date(t.dueDate).toLocaleDateString()}` : ''}`;
   }).join('\n');
 
-  return `You are a UGA Master Craftsman Beekeeper (University of Georgia Master Beekeeper program) with the expertise, wit, and evidence-based approach of Dr. Jamie Ellis. You are Mark's dedicated beekeeping assistant. Be warm, witty, evidence-based, practical, and proactive. Keep responses concise. Use "it's time to..." framing for actionable suggestions. When you see something concerning, say so.
+  return `You are Buzz, a UGA Master Craftsman Beekeeper (University of Georgia Master Beekeeper program) with the expertise, wit, and evidence-based approach of Dr. Jamie Ellis. You are Mark's dedicated beekeeping assistant. Be warm, witty, evidence-based, practical, and proactive. Keep responses concise. Use "it's time to..." framing for actionable suggestions. When you see something concerning, say so.
 
 CURRENT STATE:
 ${apiaries.length} apiary(ies), ${hives.length} hive(s), ${sensors.length} sensor(s), ${inspections.length} inspection(s).
@@ -201,7 +201,7 @@ export function FloatingChat() {
       setMessages((m) => [...m, {
         id: uid(),
         role: 'assistant',
-        content: "I can't reach the BeeTree AI right now. Make sure the beetree gateway is running on the Mac Mini.",
+        content: "I can't reach Buzz right now. Make sure the beetree gateway is running on the Mac Mini.",
         timestamp: new Date().toISOString(),
       }]);
     } finally {
@@ -222,7 +222,7 @@ export function FloatingChat() {
         <button
           onClick={() => toggleOpen(true)}
           className="fixed bottom-20 lg:bottom-6 right-4 z-50 w-14 h-14 rounded-full bg-honey-500 text-white shadow-lg flex items-center justify-center hover:bg-honey-600 active:scale-95 transition-all"
-          aria-label="Ask BeeTree AI"
+          aria-label="Ask Buzz"
         >
           <MessageCircle size={26} />
           {(messages.length === 0 || loading) && (
@@ -241,7 +241,7 @@ export function FloatingChat() {
             <div className="flex items-center gap-2">
               <MessageCircle size={18} />
               <div>
-                <div className="text-sm font-bold">BeeTree AI</div>
+                <div className="text-sm font-bold">Buzz</div>
                 <div className="text-[10px] opacity-90">UGA Master Craftsman</div>
               </div>
             </div>
@@ -266,7 +266,7 @@ export function FloatingChat() {
             {messages.length === 0 && (
               <div className="text-center py-4">
                 <Sparkles size={24} className="text-honey-400 mx-auto mb-2" />
-                <p className="text-sm text-stone-600 font-medium">Ask me about your hives</p>
+                <p className="text-sm text-stone-600 font-medium">Ask Buzz about your hives</p>
                 <p className="text-xs text-stone-400 mt-1">I know your apiaries, sensors, and inspection history</p>
                 <div className="flex flex-wrap gap-1.5 mt-3 justify-center">
                   {pageQuestions.map((q) => (
