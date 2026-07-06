@@ -1,0 +1,213 @@
+import { useEffect, useState } from 'react';
+import {
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  Loader2,
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
+import { format } from 'date-fns';
+import { PageHeader } from '../components/Layout';
+import { Card } from '../components/Card';
+
+const API_BASE = 'http://localhost:3001';
+
+interface HealthHistoryEntry {
+  date: string;
+  healthStatus: string;
+  inspectionId: string;
+}
+
+interface HealthTrend {
+  hiveId: string;
+  hiveName: string;
+  history: HealthHistoryEntry[];
+  trend: 'improving' | 'stable' | 'declining' | 'insufficient-data';
+  commentary: string;
+}
+
+const HEALTH_META: Record<string, { label: string; dot: string; bg: string; text: string }> = {
+  excellent: { label: 'Excellent', dot: 'bg-green-500', bg: 'bg-green-50', text: 'text-green-700' },
+  good: { label: 'Good', dot: 'bg-blue-500', bg: 'bg-blue-50', text: 'text-blue-700' },
+  fair: { label: 'Fair', dot: 'bg-yellow-500', bg: 'bg-yellow-50', text: 'text-yellow-700' },
+  poor: { label: 'Poor', dot: 'bg-orange-500', bg: 'bg-orange-50', text: 'text-orange-700' },
+  critical: { label: 'Critical', dot: 'bg-red-500', bg: 'bg-red-50', text: 'text-red-700' },
+};
+
+function metaFor(status: string) {
+  return HEALTH_META[status?.toLowerCase()] ?? HEALTH_META.fair;
+}
+
+const TREND_META: Record<HealthTrend['trend'], { label: string; icon: typeof TrendingUp; bg: string; text: string }> = {
+  improving: { label: 'Improving', icon: TrendingUp, bg: 'bg-green-100', text: 'text-green-800' },
+  stable: { label: 'Stable', icon: Minus, bg: 'bg-stone-100', text: 'text-stone-700' },
+  declining: { label: 'Declining', icon: TrendingDown, bg: 'bg-red-100', text: 'text-red-800' },
+  'insufficient-data': { label: 'Insufficient data', icon: Minus, bg: 'bg-stone-100', text: 'text-stone-500' },
+};
+
+export function HealthTrends() {
+  const [trends, setTrends] = useState<HealthTrend[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<HealthTrend | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const resp = await fetch(API_BASE + '/api/trending');
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = (await resp.json()) as HealthTrend[];
+        if (!cancelled) setTrends(data);
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load trends');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  if (selected) {
+    const TrendIcon = TREND_META[selected.trend].icon;
+    return (
+      <div className="animate-fade-in space-y-5">
+        <PageHeader
+          title={selected.hiveName}
+          subtitle="Health trend detail"
+          action={
+            <button
+              onClick={() => setSelected(null)}
+              className="flex items-center gap-1 text-sm text-stone-500"
+            >
+              <ChevronLeft size={18} /> Back
+            </button>
+          }
+        />
+
+        <Card>
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-stone-500">Trend direction</div>
+            <div className={'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold ' + TREND_META[selected.trend].bg + ' ' + TREND_META[selected.trend].text}>
+              <TrendIcon size={14} />
+              {TREND_META[selected.trend].label}
+            </div>
+          </div>
+          <p className="mt-3 text-sm text-stone-700 leading-relaxed">{selected.commentary}</p>
+        </Card>
+
+        <Card>
+          <h3 className="text-sm font-semibold text-stone-800 mb-3">Full history</h3>
+          {selected.history.length === 0 ? (
+            <p className="text-sm text-stone-500 text-center py-4">No inspections recorded.</p>
+          ) : (
+            <div className="space-y-2">
+              {[...selected.history].reverse().map((h, i) => {
+                const m = metaFor(h.healthStatus);
+                return (
+                  <div key={h.inspectionId} className="flex items-center gap-3 py-2 border-b border-stone-50 last:border-0">
+                    <div className={'shrink-0 w-3 h-3 rounded-full ' + m.dot} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-stone-700">{m.label}</div>
+                      <div className="text-xs text-stone-400">{format(new Date(h.date), 'MMM d, yyyy')}</div>
+                    </div>
+                    <div className="text-xs text-stone-300">#{selected.history.length - i}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="animate-fade-in space-y-5">
+      <PageHeader title="Health Trends" subtitle="AI health trending for all hives" />
+
+      {loading && (
+        <Card>
+          <div className="flex items-center justify-center py-8 text-stone-400 text-sm">
+            <Loader2 size={20} className="animate-spin mr-2" /> Loading health trends…
+          </div>
+        </Card>
+      )}
+
+      {error && (
+        <Card>
+          <div className="flex items-start gap-2 text-red-600">
+            <AlertTriangle size={20} className="shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium text-sm">Error</p>
+              <p className="text-xs text-red-500 mt-0.5">{error}</p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {!loading && !error && trends.length === 0 && (
+        <Card>
+          <p className="text-sm text-stone-500 text-center py-6">No hives found. Add hives to see health trends.</p>
+        </Card>
+      )}
+
+      {!loading && trends.length > 0 && (
+        <div className="space-y-3">
+          {trends.map((t) => {
+            const TrendIcon = TREND_META[t.trend].icon;
+            // Show up to last 8 as sparkline dots
+            const recent = t.history.slice(-8);
+            return (
+              <Card key={t.hiveId} onClick={() => setSelected(t)}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-stone-800 truncate">{t.hiveName}</div>
+                    <div className={'inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[11px] font-medium ' + TREND_META[t.trend].bg + ' ' + TREND_META[t.trend].text}>
+                      <TrendIcon size={11} /> {TREND_META[t.trend].label}
+                    </div>
+                  </div>
+                  <ChevronRight size={18} className="text-stone-300 shrink-0 mt-1" />
+                </div>
+
+                {/* Sparkline dots */}
+                <div className="mt-3 flex items-center gap-1.5 flex-wrap">
+                  {recent.length === 0 && (
+                    <span className="text-xs text-stone-400">No inspections yet</span>
+                  )}
+                  {recent.map((h, i) => {
+                    const m = metaFor(h.healthStatus);
+                    return (
+                      <div
+                        key={i}
+                        className={'w-3 h-3 rounded-full ' + m.dot}
+                        title={m.label + ' — ' + format(new Date(h.date), 'MMM d, yyyy')}
+                      />
+                    );
+                  })}
+                  {recent.length > 0 && (
+                    <span className="text-xs text-stone-400 ml-1">
+                      {metaFor(recent[recent.length - 1].healthStatus).label}
+                    </span>
+                  )}
+                </div>
+
+                <p className="mt-2 text-xs text-stone-500 leading-relaxed line-clamp-2">{t.commentary}</p>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {!loading && !error && trends.length > 0 && (
+        <p className="text-xs text-stone-400 text-center px-4">
+          Green=excellent · Blue=good · Yellow=fair · Orange=poor · Red=critical. Tap a hive for full history.
+        </p>
+      )}
+    </div>
+  );
+}
