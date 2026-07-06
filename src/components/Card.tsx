@@ -8,7 +8,7 @@ interface CardProps {
 }
 
 export function Card({ children, className = '', onClick, pad = true }: CardProps) {
-  const base = 'bg-white rounded-2xl shadow-card border border-stone-100 transition-shadow';
+  const base = 'bg-white dark:bg-stone-900 rounded-2xl shadow-card border border-stone-100 dark:border-stone-800 transition-shadow';
   const interactive = onClick ? 'cursor-pointer active:scale-[0.99] hover:shadow-card-hover' : '';
   const padding = pad ? 'p-4' : '';
   return (
@@ -23,10 +23,10 @@ export function Card({ children, className = '', onClick, pad = true }: CardProp
 
 export function SectionCard({ title, icon, children, className = '', action }: { title?: string; icon?: ReactNode; children: ReactNode; className?: string; action?: ReactNode }) {
   return (
-    <div className={`bg-white rounded-2xl shadow-card border border-stone-100 ${className}`}>
+    <div className={`bg-white dark:bg-stone-900 rounded-2xl shadow-card border border-stone-100 dark:border-stone-800 ${className}`}>
       {title && (
         <div className="flex items-center justify-between px-4 pt-4 pb-2">
-          <h3 className="text-sm font-semibold text-stone-800 flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100 flex items-center gap-2">
             {icon}
             {title}
           </h3>

@@ -16,8 +16,8 @@ export function Slider({ value, min, max, step = 1, onChange, label, displayValu
     <div className={className}>
       {label && (
         <div className="flex items-center justify-between mb-1.5">
-          <span className="text-sm font-medium text-stone-700">{label}</span>
-          <span className="text-sm font-semibold text-honey-700">{displayValue ?? value}</span>
+          <span className="text-sm font-medium text-stone-700 dark:text-stone-200">{label}</span>
+          <span className="text-sm font-semibold text-honey-700 dark:text-honey-300">{displayValue ?? value}</span>
         </div>
       )}
       <div className="relative">
@@ -39,7 +39,7 @@ export function Slider({ value, min, max, step = 1, onChange, label, displayValu
       {labels && (
         <div className="flex justify-between mt-1 px-0.5">
           {labels.map((l, i) => (
-            <span key={i} className="text-[10px] text-stone-400 flex-1 text-center first:text-left last:text-right">
+            <span key={i} className="text-[10px] text-stone-400 dark:text-stone-500 flex-1 text-center first:text-left last:text-right">
               {l}
             </span>
           ))}
@@ -63,8 +63,8 @@ export function LabelSlider<T extends string>({ value, options, onChange, label,
   return (
     <div className={className}>
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-sm font-medium text-stone-700">{label}</span>
-        <span className="text-sm font-semibold text-honey-700">{options[idx]?.label ?? value}</span>
+        <span className="text-sm font-medium text-stone-700 dark:text-stone-200">{label}</span>
+        <span className="text-sm font-semibold text-honey-700 dark:text-honey-300">{options[idx]?.label ?? value}</span>
       </div>
       <div className="relative">
         <div
@@ -84,7 +84,7 @@ export function LabelSlider<T extends string>({ value, options, onChange, label,
       </div>
       <div className="flex justify-between mt-1 px-0.5">
         {options.map((o, i) => (
-          <span key={i} className="text-[10px] text-stone-400 flex-1 text-center first:text-left last:text-right">
+          <span key={i} className="text-[10px] text-stone-400 dark:text-stone-500 flex-1 text-center first:text-left last:text-right">
             {o.label}
           </span>
         ))}

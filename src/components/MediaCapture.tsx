@@ -176,7 +176,7 @@ export function MediaCapture({ media, onAdd, onRemove }: MediaCaptureProps) {
           <button
             type="button"
             onClick={() => photoCaptureRef.current?.click()}
-            className="w-full py-3 rounded-xl bg-honey-50 border border-honey-200 text-honey-700 text-xs font-medium flex flex-col items-center gap-1 hover:bg-honey-100"
+            className="w-full py-3 rounded-xl bg-honey-50 dark:bg-honey-950 border border-honey-200 text-honey-700 dark:text-honey-300 text-xs font-medium flex flex-col items-center gap-1 hover:bg-honey-100"
           >
             <Camera size={20} />
             Take Photo
@@ -193,7 +193,7 @@ export function MediaCapture({ media, onAdd, onRemove }: MediaCaptureProps) {
           <button
             type="button"
             onClick={() => photoInputRef.current?.click()}
-            className="w-full mt-1 py-1.5 rounded-lg bg-stone-50 border border-stone-200 text-stone-500 text-[10px] flex items-center justify-center gap-1"
+            className="w-full mt-1 py-1.5 rounded-lg bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 text-stone-500 dark:text-stone-400 text-[10px] flex items-center justify-center gap-1"
           >
             <ImageIcon size={11} /> Gallery
           </button>
@@ -227,7 +227,7 @@ export function MediaCapture({ media, onAdd, onRemove }: MediaCaptureProps) {
           <button
             type="button"
             onClick={() => videoInputRef.current?.click()}
-            className="w-full mt-1 py-1.5 rounded-lg bg-stone-50 border border-stone-200 text-stone-500 text-[10px] flex items-center justify-center gap-1"
+            className="w-full mt-1 py-1.5 rounded-lg bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 text-stone-500 dark:text-stone-400 text-[10px] flex items-center justify-center gap-1"
           >
             <ImageIcon size={11} /> Gallery
           </button>
@@ -255,7 +255,7 @@ export function MediaCapture({ media, onAdd, onRemove }: MediaCaptureProps) {
               <button
                 type="button"
                 onClick={cancelVoiceRecording}
-                className="w-full py-1.5 rounded-lg bg-stone-100 text-stone-500 text-[10px] flex items-center justify-center gap-1"
+                className="w-full py-1.5 rounded-lg bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 text-[10px] flex items-center justify-center gap-1"
               >
                 <X size={11} /> Cancel
               </button>
@@ -264,7 +264,7 @@ export function MediaCapture({ media, onAdd, onRemove }: MediaCaptureProps) {
             <button
               type="button"
               onClick={startVoiceRecording}
-              className="w-full py-3 rounded-xl bg-purple-50 border border-purple-200 text-purple-700 text-xs font-medium flex flex-col items-center gap-1 hover:bg-purple-100"
+              className="w-full py-3 rounded-xl bg-purple-50 dark:bg-purple-950 border border-purple-200 text-purple-700 dark:text-purple-300 text-xs font-medium flex flex-col items-center gap-1 hover:bg-purple-100"
             >
               <Mic size={20} />
               Voice Note
@@ -273,7 +273,7 @@ export function MediaCapture({ media, onAdd, onRemove }: MediaCaptureProps) {
         </div>
       </div>
 
-      {error && <p className="text-xs text-red-500 px-1">{error}</p>}
+      {error && <p className="text-xs text-red-500 dark:text-red-400 px-1">{error}</p>}
 
       {/* Media previews */}
       {media.length > 0 && (
@@ -281,7 +281,7 @@ export function MediaCapture({ media, onAdd, onRemove }: MediaCaptureProps) {
           {/* Photos grid */}
           {photos.length > 0 && (
             <div>
-              <div className="text-xs text-stone-500 font-medium mb-1.5">Photos ({photos.length})</div>
+              <div className="text-xs text-stone-500 dark:text-stone-400 font-medium mb-1.5">Photos ({photos.length})</div>
               <div className="grid grid-cols-3 gap-2">
                 {photos.map((p) => (
                   <div key={p.id} className="relative group rounded-lg overflow-hidden aspect-square">
@@ -302,7 +302,7 @@ export function MediaCapture({ media, onAdd, onRemove }: MediaCaptureProps) {
           {/* Videos */}
           {videos.length > 0 && (
             <div>
-              <div className="text-xs text-stone-500 font-medium mb-1.5">Videos ({videos.length})</div>
+              <div className="text-xs text-stone-500 dark:text-stone-400 font-medium mb-1.5">Videos ({videos.length})</div>
               <div className="space-y-2">
                 {videos.map((v) => (
                   <div key={v.id} className="relative rounded-lg overflow-hidden bg-stone-900">
@@ -328,19 +328,19 @@ export function MediaCapture({ media, onAdd, onRemove }: MediaCaptureProps) {
           {/* Audio */}
           {audios.length > 0 && (
             <div>
-              <div className="text-xs text-stone-500 font-medium mb-1.5">Voice Notes ({audios.length})</div>
+              <div className="text-xs text-stone-500 dark:text-stone-400 font-medium mb-1.5">Voice Notes ({audios.length})</div>
               <div className="space-y-2">
                 {audios.map((a) => (
-                  <div key={a.id} className="flex items-center gap-2 rounded-lg bg-purple-50 border border-purple-100 p-2.5">
-                    <Mic size={16} className="text-purple-600 shrink-0" />
+                  <div key={a.id} className="flex items-center gap-2 rounded-lg bg-purple-50 dark:bg-purple-950 border border-purple-100 p-2.5">
+                    <Mic size={16} className="text-purple-600 dark:text-purple-400 shrink-0" />
                     <audio src={a.dataUrl} controls className="flex-1 h-8" />
                     {a.duration && (
-                      <span className="text-[10px] text-stone-400">{formatDuration(a.duration)}</span>
+                      <span className="text-[10px] text-stone-400 dark:text-stone-500">{formatDuration(a.duration)}</span>
                     )}
                     <button
                       type="button"
                       onClick={() => onRemove(a.id)}
-                      className="w-6 h-6 rounded-full bg-stone-200 text-stone-500 flex items-center justify-center shrink-0"
+                      className="w-6 h-6 rounded-full bg-stone-200 dark:bg-stone-700 text-stone-500 dark:text-stone-400 flex items-center justify-center shrink-0"
                     >
                       <X size={12} />
                     </button>

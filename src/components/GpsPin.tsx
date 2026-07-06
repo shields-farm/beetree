@@ -69,11 +69,11 @@ export function GpsPin({ hive, onPin, onClear, compact = false }: GpsPinProps) {
   if (compact && loc) {
     // Compact mode: just show coords
     return (
-      <div className="flex items-center gap-1.5 text-xs text-stone-500">
-        <MapPin size={12} className="text-honey-600" />
+      <div className="flex items-center gap-1.5 text-xs text-stone-500 dark:text-stone-400">
+        <MapPin size={12} className="text-honey-600 dark:text-honey-400" />
         <span>{loc.lat.toFixed(6)}, {loc.lng.toFixed(6)}</span>
         {loc.accuracy && (
-          <span className="text-stone-400">±{Math.round(loc.accuracy)}m</span>
+          <span className="text-stone-400 dark:text-stone-500">±{Math.round(loc.accuracy)}m</span>
         )}
       </div>
     );
@@ -85,7 +85,7 @@ export function GpsPin({ hive, onPin, onClear, compact = false }: GpsPinProps) {
         <button
           onClick={get_location}
           disabled={loading}
-          className="w-full py-2.5 rounded-xl border-2 border-dashed border-honey-300 text-honey-700 text-sm font-medium flex items-center justify-center gap-2 hover:bg-honey-50 transition-colors disabled:opacity-50"
+          className="w-full py-2.5 rounded-xl border-2 border-dashed border-honey-300 text-honey-700 dark:text-honey-300 text-sm font-medium flex items-center justify-center gap-2 hover:bg-honey-50 transition-colors disabled:opacity-50"
         >
           {loading ? (
             <>
@@ -98,20 +98,20 @@ export function GpsPin({ hive, onPin, onClear, compact = false }: GpsPinProps) {
           )}
         </button>
         {error && (
-          <p className="text-xs text-red-500 mt-1.5 px-1">{error}</p>
+          <p className="text-xs text-red-500 dark:text-red-400 mt-1.5 px-1">{error}</p>
         )}
       </div>
     );
   }
 
   return (
-    <div className="rounded-xl bg-honey-50 border border-honey-200 p-3 space-y-2.5">
+    <div className="rounded-xl bg-honey-50 dark:bg-honey-950 border border-honey-200 p-3 space-y-2.5">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <MapPin size={18} className="text-honey-600 shrink-0" />
+          <MapPin size={18} className="text-honey-600 dark:text-honey-400 shrink-0" />
           <div className="min-w-0">
-            <div className="text-sm font-semibold text-stone-800 truncate">GPS Pin Dropped</div>
-            <div className="text-xs text-stone-500 font-mono">
+            <div className="text-sm font-semibold text-stone-800 dark:text-stone-100 truncate">GPS Pin Dropped</div>
+            <div className="text-xs text-stone-500 dark:text-stone-400 font-mono">
               {loc.lat.toFixed(6)}, {loc.lng.toFixed(6)}
             </div>
           </div>
@@ -119,19 +119,19 @@ export function GpsPin({ hive, onPin, onClear, compact = false }: GpsPinProps) {
         <button
           onClick={get_location}
           disabled={loading}
-          className="text-xs text-honey-700 font-medium px-2 py-1 rounded-lg hover:bg-honey-100 disabled:opacity-50"
+          className="text-xs text-honey-700 dark:text-honey-300 font-medium px-2 py-1 rounded-lg hover:bg-honey-100 disabled:opacity-50"
         >
           {loading ? 'Updating…' : 'Re-pin'}
         </button>
       </div>
 
       {loc.accuracy != null && (
-        <div className="flex items-center gap-1.5 text-xs text-stone-500">
+        <div className="flex items-center gap-1.5 text-xs text-stone-500 dark:text-stone-400">
           <span className="bg-honey-100 text-honey-800 px-1.5 py-0.5 rounded font-medium">
             ±{Math.round(loc.accuracy)}m accuracy
           </span>
           {loc.pinnedAt && (
-            <span className="text-stone-400">
+            <span className="text-stone-400 dark:text-stone-500">
               · {new Date(loc.pinnedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
             </span>
           )}
@@ -144,7 +144,7 @@ export function GpsPin({ hive, onPin, onClear, compact = false }: GpsPinProps) {
             value={label}
             onChange={(e) => setLabel(e.target.value)}
             placeholder="e.g., near the oak tree"
-            className="flex-1 rounded-lg border border-stone-200 px-3 py-1.5 text-sm"
+            className="flex-1 rounded-lg border border-stone-200 dark:border-stone-800 px-3 py-1.5 text-sm"
             autoFocus
           />
           <button
@@ -161,7 +161,7 @@ export function GpsPin({ hive, onPin, onClear, compact = false }: GpsPinProps) {
               setLabel(loc.label ?? '');
               setEditingLabel(false);
             }}
-            className="w-8 h-8 rounded-lg bg-stone-200 text-stone-600 flex items-center justify-center"
+            className="w-8 h-8 rounded-lg bg-stone-200 dark:bg-stone-700 text-stone-600 dark:text-stone-300 flex items-center justify-center"
           >
             <X size={14} />
           </button>
@@ -171,14 +171,14 @@ export function GpsPin({ hive, onPin, onClear, compact = false }: GpsPinProps) {
           {loc.label ? (
             <button
               onClick={() => setEditingLabel(true)}
-              className="text-xs text-stone-600 italic hover:text-honey-700"
+              className="text-xs text-stone-600 dark:text-stone-300 italic hover:text-honey-700"
             >
               "{loc.label}" ✎
             </button>
           ) : (
             <button
               onClick={() => setEditingLabel(true)}
-              className="text-xs text-stone-400 hover:text-honey-700"
+              className="text-xs text-stone-400 dark:text-stone-500 hover:text-honey-700"
             >
               + Add location label
             </button>
@@ -196,7 +196,7 @@ export function GpsPin({ hive, onPin, onClear, compact = false }: GpsPinProps) {
 
       <button
         onClick={onClear}
-        className="w-full py-1.5 rounded-lg border border-red-200 text-red-600 text-xs flex items-center justify-center gap-1.5 hover:bg-red-50"
+        className="w-full py-1.5 rounded-lg border border-red-200 text-red-600 dark:text-red-400 text-xs flex items-center justify-center gap-1.5 hover:bg-red-50"
       >
         <Trash2 size={12} /> Remove pin
       </button>

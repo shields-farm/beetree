@@ -12,7 +12,7 @@ import { format } from 'date-fns';
 import { PageHeader } from '../components/Layout';
 import { Card } from '../components/Card';
 
-const API_BASE = 'http://localhost:3001';
+import { API_BASE, apiFetch } from '../lib/apiBase';
 
 interface HealthHistoryEntry {
   date: string;
@@ -29,11 +29,11 @@ interface HealthTrend {
 }
 
 const HEALTH_META: Record<string, { label: string; dot: string; bg: string; text: string }> = {
-  excellent: { label: 'Excellent', dot: 'bg-green-500', bg: 'bg-green-50', text: 'text-green-700' },
-  good: { label: 'Good', dot: 'bg-blue-500', bg: 'bg-blue-50', text: 'text-blue-700' },
+  excellent: { label: 'Excellent', dot: 'bg-green-500', bg: 'bg-green-50 dark:bg-green-950', text: 'text-green-700 dark:text-green-300' },
+  good: { label: 'Good', dot: 'bg-blue-500', bg: 'bg-blue-50 dark:bg-blue-950', text: 'text-blue-700 dark:text-blue-300' },
   fair: { label: 'Fair', dot: 'bg-yellow-500', bg: 'bg-yellow-50', text: 'text-yellow-700' },
-  poor: { label: 'Poor', dot: 'bg-orange-500', bg: 'bg-orange-50', text: 'text-orange-700' },
-  critical: { label: 'Critical', dot: 'bg-red-500', bg: 'bg-red-50', text: 'text-red-700' },
+  poor: { label: 'Poor', dot: 'bg-orange-500', bg: 'bg-orange-50 dark:bg-orange-950', text: 'text-orange-700' },
+  critical: { label: 'Critical', dot: 'bg-red-500', bg: 'bg-red-50 dark:bg-red-950', text: 'text-red-700 dark:text-red-300' },
 };
 
 function metaFor(status: string) {
@@ -41,10 +41,10 @@ function metaFor(status: string) {
 }
 
 const TREND_META: Record<HealthTrend['trend'], { label: string; icon: typeof TrendingUp; bg: string; text: string }> = {
-  improving: { label: 'Improving', icon: TrendingUp, bg: 'bg-green-100', text: 'text-green-800' },
-  stable: { label: 'Stable', icon: Minus, bg: 'bg-stone-100', text: 'text-stone-700' },
-  declining: { label: 'Declining', icon: TrendingDown, bg: 'bg-red-100', text: 'text-red-800' },
-  'insufficient-data': { label: 'Insufficient data', icon: Minus, bg: 'bg-stone-100', text: 'text-stone-500' },
+  improving: { label: 'Improving', icon: TrendingUp, bg: 'bg-green-100 dark:bg-green-900', text: 'text-green-800' },
+  stable: { label: 'Stable', icon: Minus, bg: 'bg-stone-100 dark:bg-stone-800', text: 'text-stone-700 dark:text-stone-200' },
+  declining: { label: 'Declining', icon: TrendingDown, bg: 'bg-red-100 dark:bg-red-900', text: 'text-red-800' },
+  'insufficient-data': { label: 'Insufficient data', icon: Minus, bg: 'bg-stone-100 dark:bg-stone-800', text: 'text-stone-500 dark:text-stone-400' },
 };
 
 export function HealthTrends() {
@@ -59,7 +59,7 @@ export function HealthTrends() {
       setLoading(true);
       setError(null);
       try {
-        const resp = await fetch(API_BASE + '/api/trending');
+        const resp = await apiFetch(API_BASE + '/api/trending');
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const data = (await resp.json()) as HealthTrend[];
         if (!cancelled) setTrends(data);
@@ -82,7 +82,7 @@ export function HealthTrends() {
           action={
             <button
               onClick={() => setSelected(null)}
-              className="flex items-center gap-1 text-sm text-stone-500"
+              className="flex items-center gap-1 text-sm text-stone-500 dark:text-stone-400"
             >
               <ChevronLeft size={18} /> Back
             </button>
@@ -91,19 +91,19 @@ export function HealthTrends() {
 
         <Card>
           <div className="flex items-center justify-between">
-            <div className="text-sm text-stone-500">Trend direction</div>
+            <div className="text-sm text-stone-500 dark:text-stone-400">Trend direction</div>
             <div className={'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold ' + TREND_META[selected.trend].bg + ' ' + TREND_META[selected.trend].text}>
               <TrendIcon size={14} />
               {TREND_META[selected.trend].label}
             </div>
           </div>
-          <p className="mt-3 text-sm text-stone-700 leading-relaxed">{selected.commentary}</p>
+          <p className="mt-3 text-sm text-stone-700 dark:text-stone-200 leading-relaxed">{selected.commentary}</p>
         </Card>
 
         <Card>
-          <h3 className="text-sm font-semibold text-stone-800 mb-3">Full history</h3>
+          <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100 mb-3">Full history</h3>
           {selected.history.length === 0 ? (
-            <p className="text-sm text-stone-500 text-center py-4">No inspections recorded.</p>
+            <p className="text-sm text-stone-500 dark:text-stone-400 text-center py-4">No inspections recorded.</p>
           ) : (
             <div className="space-y-2">
               {[...selected.history].reverse().map((h, i) => {
@@ -112,10 +112,10 @@ export function HealthTrends() {
                   <div key={h.inspectionId} className="flex items-center gap-3 py-2 border-b border-stone-50 last:border-0">
                     <div className={'shrink-0 w-3 h-3 rounded-full ' + m.dot} />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-stone-700">{m.label}</div>
-                      <div className="text-xs text-stone-400">{format(new Date(h.date), 'MMM d, yyyy')}</div>
+                      <div className="text-sm font-medium text-stone-700 dark:text-stone-200">{m.label}</div>
+                      <div className="text-xs text-stone-400 dark:text-stone-500">{format(new Date(h.date), 'MMM d, yyyy')}</div>
                     </div>
-                    <div className="text-xs text-stone-300">#{selected.history.length - i}</div>
+                    <div className="text-xs text-stone-300 dark:text-stone-600">#{selected.history.length - i}</div>
                   </div>
                 );
               })}
@@ -132,7 +132,7 @@ export function HealthTrends() {
 
       {loading && (
         <Card>
-          <div className="flex items-center justify-center py-8 text-stone-400 text-sm">
+          <div className="flex items-center justify-center py-8 text-stone-400 dark:text-stone-500 text-sm">
             <Loader2 size={20} className="animate-spin mr-2" /> Loading health trends…
           </div>
         </Card>
@@ -140,11 +140,11 @@ export function HealthTrends() {
 
       {error && (
         <Card>
-          <div className="flex items-start gap-2 text-red-600">
+          <div className="flex items-start gap-2 text-red-600 dark:text-red-400">
             <AlertTriangle size={20} className="shrink-0 mt-0.5" />
             <div>
               <p className="font-medium text-sm">Error</p>
-              <p className="text-xs text-red-500 mt-0.5">{error}</p>
+              <p className="text-xs text-red-500 dark:text-red-400 mt-0.5">{error}</p>
             </div>
           </div>
         </Card>
@@ -152,7 +152,7 @@ export function HealthTrends() {
 
       {!loading && !error && trends.length === 0 && (
         <Card>
-          <p className="text-sm text-stone-500 text-center py-6">No hives found. Add hives to see health trends.</p>
+          <p className="text-sm text-stone-500 dark:text-stone-400 text-center py-6">No hives found. Add hives to see health trends.</p>
         </Card>
       )}
 
@@ -166,18 +166,18 @@ export function HealthTrends() {
               <Card key={t.hiveId} onClick={() => setSelected(t)}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <div className="font-semibold text-stone-800 truncate">{t.hiveName}</div>
+                    <div className="font-semibold text-stone-800 dark:text-stone-100 truncate">{t.hiveName}</div>
                     <div className={'inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[11px] font-medium ' + TREND_META[t.trend].bg + ' ' + TREND_META[t.trend].text}>
                       <TrendIcon size={11} /> {TREND_META[t.trend].label}
                     </div>
                   </div>
-                  <ChevronRight size={18} className="text-stone-300 shrink-0 mt-1" />
+                  <ChevronRight size={18} className="text-stone-300 dark:text-stone-600 shrink-0 mt-1" />
                 </div>
 
                 {/* Sparkline dots */}
                 <div className="mt-3 flex items-center gap-1.5 flex-wrap">
                   {recent.length === 0 && (
-                    <span className="text-xs text-stone-400">No inspections yet</span>
+                    <span className="text-xs text-stone-400 dark:text-stone-500">No inspections yet</span>
                   )}
                   {recent.map((h, i) => {
                     const m = metaFor(h.healthStatus);
@@ -190,13 +190,13 @@ export function HealthTrends() {
                     );
                   })}
                   {recent.length > 0 && (
-                    <span className="text-xs text-stone-400 ml-1">
+                    <span className="text-xs text-stone-400 dark:text-stone-500 ml-1">
                       {metaFor(recent[recent.length - 1].healthStatus).label}
                     </span>
                   )}
                 </div>
 
-                <p className="mt-2 text-xs text-stone-500 leading-relaxed line-clamp-2">{t.commentary}</p>
+                <p className="mt-2 text-xs text-stone-500 dark:text-stone-400 leading-relaxed line-clamp-2">{t.commentary}</p>
               </Card>
             );
           })}
@@ -204,7 +204,7 @@ export function HealthTrends() {
       )}
 
       {!loading && !error && trends.length > 0 && (
-        <p className="text-xs text-stone-400 text-center px-4">
+        <p className="text-xs text-stone-400 dark:text-stone-500 text-center px-4">
           Green=excellent · Blue=good · Yellow=fair · Orange=poor · Red=critical. Tap a hive for full history.
         </p>
       )}

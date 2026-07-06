@@ -79,7 +79,7 @@ export function Tasks() {
             key={f}
             onClick={() => setFilter(f)}
             className={`px-3 py-1.5 rounded-full text-xs font-medium capitalize whitespace-nowrap transition-colors ${
-              filter === f ? 'bg-honey-500 text-white' : 'bg-white border border-stone-200 text-stone-600'
+              filter === f ? 'bg-honey-500 text-white' : 'bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 text-stone-600 dark:text-stone-300'
             }`}
           >
             {f}
@@ -90,21 +90,21 @@ export function Tasks() {
       {showAdd && (
         <Card className="mb-4 animate-fade-in">
           <div className="space-y-3">
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Task title" className="w-full rounded-xl border border-stone-200 px-3.5 py-2.5 text-sm" />
-            <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Description (optional)" rows={2} className="w-full rounded-xl border border-stone-200 px-3.5 py-2.5 text-sm resize-y" />
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Task title" className="w-full rounded-xl border border-stone-200 dark:border-stone-800 px-3.5 py-2.5 text-sm" />
+            <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Description (optional)" rows={2} className="w-full rounded-xl border border-stone-200 dark:border-stone-800 px-3.5 py-2.5 text-sm resize-y" />
             <div className="grid grid-cols-2 gap-3">
-              <input type="date" value={dueDate ? new Date(dueDate).toISOString().slice(0, 10) : ''} onChange={(e) => setDueDate(e.target.value ? new Date(e.target.value).toISOString() : '')} className="rounded-xl border border-stone-200 px-3.5 py-2.5 text-sm" />
-              <select value={priority} onChange={(e) => setPriority(e.target.value as TaskPriority)} className="rounded-xl border border-stone-200 px-3.5 py-2.5 text-sm appearance-none">
+              <input type="date" value={dueDate ? new Date(dueDate).toISOString().slice(0, 10) : ''} onChange={(e) => setDueDate(e.target.value ? new Date(e.target.value).toISOString() : '')} className="rounded-xl border border-stone-200 dark:border-stone-800 px-3.5 py-2.5 text-sm" />
+              <select value={priority} onChange={(e) => setPriority(e.target.value as TaskPriority)} className="rounded-xl border border-stone-200 dark:border-stone-800 px-3.5 py-2.5 text-sm appearance-none">
                 <option value="low">Low priority</option>
                 <option value="medium">Medium priority</option>
                 <option value="high">High priority</option>
               </select>
             </div>
-            <select value={apiaryId} onChange={(e) => { setApiaryId(e.target.value); setHiveId(''); }} className="w-full rounded-xl border border-stone-200 px-3.5 py-2.5 text-sm appearance-none">
+            <select value={apiaryId} onChange={(e) => { setApiaryId(e.target.value); setHiveId(''); }} className="w-full rounded-xl border border-stone-200 dark:border-stone-800 px-3.5 py-2.5 text-sm appearance-none">
               <option value="">No apiary</option>
               {apiaries.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
-            <select value={hiveId} onChange={(e) => setHiveId(e.target.value)} className="w-full rounded-xl border border-stone-200 px-3.5 py-2.5 text-sm appearance-none">
+            <select value={hiveId} onChange={(e) => setHiveId(e.target.value)} className="w-full rounded-xl border border-stone-200 dark:border-stone-800 px-3.5 py-2.5 text-sm appearance-none">
               <option value="">No hive</option>
               {hives.filter((h) => !apiaryId || h.apiaryId === apiaryId).map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
             </select>
@@ -125,33 +125,33 @@ export function Tasks() {
               <button
                 onClick={() => toggleTask(t.id)}
                 className={`mt-0.5 w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition-colors ${
-                  t.completed ? 'bg-green-500 border-green-500' : 'border-stone-300 hover:border-honey-400'
+                  t.completed ? 'bg-green-500 border-green-500' : 'border-stone-300 dark:border-stone-700 hover:border-honey-400'
                 }`}
               >
                 {t.completed && <Check size={14} className="text-white" strokeWidth={3} />}
               </button>
               <div className="min-w-0 flex-1">
-                <div className={`text-sm font-medium ${t.completed ? 'text-stone-400 line-through' : 'text-stone-800'}`}>{t.title}</div>
-                {t.description && <p className="text-xs text-stone-400 mt-0.5">{t.description}</p>}
+                <div className={`text-sm font-medium ${t.completed ? 'text-stone-400 dark:text-stone-500 line-through' : 'text-stone-800 dark:text-stone-100'}`}>{t.title}</div>
+                {t.description && <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">{t.description}</p>}
                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                   <span className={`inline-block w-1.5 h-1.5 rounded-full ${priorityColor[t.priority]}`} />
                   {t.dueDate && (
-                    <span className={`text-[10px] flex items-center gap-0.5 ${overdue ? 'text-red-500' : 'text-stone-400'}`}>
+                    <span className={`text-[10px] flex items-center gap-0.5 ${overdue ? 'text-red-500 dark:text-red-400' : 'text-stone-400 dark:text-stone-500'}`}>
                       <Calendar size={10} /> {isToday(new Date(t.dueDate)) ? 'Today' : formatDistanceToNow(new Date(t.dueDate), { addSuffix: true })}
                     </span>
                   )}
-                  {hive && <Link to={`/hives/${hive.id}`} className="text-[10px] text-honey-600 hover:underline">{hive.name}</Link>}
-                  {apiary && !hive && <span className="text-[10px] text-stone-400">{apiary.name}</span>}
+                  {hive && <Link to={`/hives/${hive.id}`} className="text-[10px] text-honey-600 dark:text-honey-400 hover:underline">{hive.name}</Link>}
+                  {apiary && !hive && <span className="text-[10px] text-stone-400 dark:text-stone-500">{apiary.name}</span>}
                 </div>
               </div>
-              <button onClick={() => deleteTask(t.id)} className="text-stone-300 hover:text-red-500 p-1 shrink-0">
+              <button onClick={() => deleteTask(t.id)} className="text-stone-300 dark:text-stone-600 hover:text-red-500 p-1 shrink-0">
                 <Trash2 size={15} />
               </button>
             </Card>
           );
         })}
         {filtered.length === 0 && (
-          <p className="text-center text-sm text-stone-400 py-8">No tasks in this view.</p>
+          <p className="text-center text-sm text-stone-400 dark:text-stone-500 py-8">No tasks in this view.</p>
         )}
       </div>
     </div>

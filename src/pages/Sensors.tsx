@@ -44,13 +44,13 @@ export function Sensors() {
       {showAdd && (
         <Card className="mb-4 animate-fade-in">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-stone-800">Register Sensor</h3>
-            <button onClick={() => setShowAdd(false)} className="text-stone-400"><X size={18} /></button>
+            <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100">Register Sensor</h3>
+            <button onClick={() => setShowAdd(false)} className="text-stone-400 dark:text-stone-500"><X size={18} /></button>
           </div>
           <div className="space-y-3">
-            <input value={deviceId} onChange={(e) => setDeviceId(e.target.value)} placeholder="Device ID (e.g., 47:0B:AF)" className="w-full rounded-xl border border-stone-200 px-3.5 py-2.5 text-sm" />
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name (optional)" className="w-full rounded-xl border border-stone-200 px-3.5 py-2.5 text-sm" />
-            <select value={model} onChange={(e) => setModel(e.target.value)} className="w-full rounded-xl border border-stone-200 px-3.5 py-2.5 text-sm appearance-none">
+            <input value={deviceId} onChange={(e) => setDeviceId(e.target.value)} placeholder="Device ID (e.g., 47:0B:AF)" className="w-full rounded-xl border border-stone-200 dark:border-stone-800 px-3.5 py-2.5 text-sm" />
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name (optional)" className="w-full rounded-xl border border-stone-200 dark:border-stone-800 px-3.5 py-2.5 text-sm" />
+            <select value={model} onChange={(e) => setModel(e.target.value)} className="w-full rounded-xl border border-stone-200 dark:border-stone-800 px-3.5 py-2.5 text-sm appearance-none">
               <option value="TH">TH</option>
               <option value="TH-Pro">TH-Pro</option>
               <option value="TH-Pro2">TH-Pro2</option>
@@ -70,7 +70,7 @@ export function Sensors() {
       </button>
 
       {sensors.length === 0 ? (
-        <p className="text-center text-sm text-stone-400 py-8">No sensors registered yet.</p>
+        <p className="text-center text-sm text-stone-400 dark:text-stone-500 py-8">No sensors registered yet.</p>
       ) : (
         <div className="space-y-3">
           {sensors.map((s) => {
@@ -81,7 +81,7 @@ export function Sensors() {
                 {hive && (
                   <Link
                     to={`/hives/${hive.id}`}
-                    className="absolute top-2 right-2 text-[10px] bg-honey-50 text-honey-700 px-2 py-0.5 rounded-full"
+                    className="absolute top-2 right-2 text-[10px] bg-honey-50 dark:bg-honey-950 text-honey-700 dark:text-honey-300 px-2 py-0.5 rounded-full"
                   >
                     {hive.name}
                   </Link>
@@ -106,7 +106,7 @@ export function SensorDetail({ id }: { id: string }) {
   if (!sensor) {
     return (
       <div className="animate-fade-in">
-        <p className="text-sm text-stone-400">Sensor not found.</p>
+        <p className="text-sm text-stone-400 dark:text-stone-500">Sensor not found.</p>
         <Link to="/sensors" className="text-sky-600 text-sm underline mt-2 inline-block">Back to sensors</Link>
       </div>
     );
@@ -122,18 +122,18 @@ export function SensorDetail({ id }: { id: string }) {
 
   return (
     <div className="animate-fade-in">
-      <Link to="/sensors" className="text-xs text-stone-400 hover:text-stone-600 mb-2 inline-flex items-center gap-1">
+      <Link to="/sensors" className="text-xs text-stone-400 dark:text-stone-500 hover:text-stone-600 mb-2 inline-flex items-center gap-1">
         <ChevronRight size={14} className="rotate-180" /> Sensors
       </Link>
 
       <div className="flex items-start justify-between mb-3 gap-3">
         <div className="min-w-0">
-          <h1 className="text-xl font-bold text-stone-800 truncate">{sensor.name}</h1>
-          <p className="text-sm text-stone-500 flex items-center gap-1.5 mt-0.5">
+          <h1 className="text-xl font-bold text-stone-800 dark:text-stone-100 truncate">{sensor.name}</h1>
+          <p className="text-sm text-stone-500 dark:text-stone-400 flex items-center gap-1.5 mt-0.5">
             <Bluetooth size={14} className="text-sky-500" /> {sensor.deviceId} · {sensor.model}
           </p>
         </div>
-        <button onClick={() => setEditing(!editing)} className="w-10 h-10 rounded-full bg-stone-100 text-stone-600 flex items-center justify-center shrink-0">
+        <button onClick={() => setEditing(!editing)} className="w-10 h-10 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 flex items-center justify-center shrink-0">
           <Pencil size={16} />
         </button>
       </div>
@@ -141,14 +141,14 @@ export function SensorDetail({ id }: { id: string }) {
       {editing && (
         <Card className="mb-4 animate-fade-in">
           <div className="space-y-3">
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" className="w-full rounded-xl border border-stone-200 px-3.5 py-2.5 text-sm" />
-            <select value={model} onChange={(e) => setModel(e.target.value)} className="w-full rounded-xl border border-stone-200 px-3.5 py-2.5 text-sm appearance-none">
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" className="w-full rounded-xl border border-stone-200 dark:border-stone-800 px-3.5 py-2.5 text-sm" />
+            <select value={model} onChange={(e) => setModel(e.target.value)} className="w-full rounded-xl border border-stone-200 dark:border-stone-800 px-3.5 py-2.5 text-sm appearance-none">
               <option value="TH">TH</option>
               <option value="TH-Pro">TH-Pro</option>
               <option value="TH-Pro2">TH-Pro2</option>
             </select>
             <div className="flex gap-2">
-              <button onClick={() => setEditing(false)} className="flex-1 py-2 rounded-xl border border-stone-200 text-stone-600 text-sm">Cancel</button>
+              <button onClick={() => setEditing(false)} className="flex-1 py-2 rounded-xl border border-stone-200 dark:border-stone-800 text-stone-600 dark:text-stone-300 text-sm">Cancel</button>
               <button onClick={save} className="flex-1 py-2 rounded-xl bg-sky-500 text-white text-sm font-medium">Save</button>
             </div>
             <button
@@ -158,7 +158,7 @@ export function SensorDetail({ id }: { id: string }) {
                   navigate('/sensors');
                 }
               }}
-              className="w-full py-2 rounded-xl border border-red-200 text-red-600 text-sm flex items-center justify-center gap-1.5"
+              className="w-full py-2 rounded-xl border border-red-200 text-red-600 dark:text-red-400 text-sm flex items-center justify-center gap-1.5"
             >
               <Trash2 size={14} /> Delete sensor
             </button>
@@ -168,43 +168,43 @@ export function SensorDetail({ id }: { id: string }) {
 
       {/* Assignment */}
       <Card className="mb-4">
-        <h3 className="text-sm font-semibold text-stone-700 mb-2">Assignment</h3>
+        <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 mb-2">Assignment</h3>
         {hive ? (
           <div className="flex items-center justify-between">
-            <Link to={`/hives/${hive.id}`} className="text-sm text-honey-700 font-medium">{hive.name}</Link>
+            <Link to={`/hives/${hive.id}`} className="text-sm text-honey-700 dark:text-honey-300 font-medium">{hive.name}</Link>
             <button
               onClick={() => assignSensor(sensor.id, undefined, undefined, undefined)}
-              className="text-xs text-red-500 hover:underline"
+              className="text-xs text-red-500 dark:text-red-400 hover:underline"
             >
               Unassign
             </button>
           </div>
         ) : (
-          <p className="text-sm text-stone-400">Not assigned to any hive. Assign via a hive's box editor.</p>
+          <p className="text-sm text-stone-400 dark:text-stone-500">Not assigned to any hive. Assign via a hive's box editor.</p>
         )}
-        {sensor.position && <p className="text-xs text-stone-400 mt-1">Position: {sensor.position}</p>}
+        {sensor.position && <p className="text-xs text-stone-400 dark:text-stone-500 mt-1">Position: {sensor.position}</p>}
       </Card>
 
       {/* Latest reading */}
       {r && (
         <Card className="mb-4">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-stone-700">Latest Reading</h3>
+            <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200">Latest Reading</h3>
             <button onClick={refreshSensorReadings} className="text-xs text-sky-600 font-medium">Refresh</button>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <ReadingTile label="Temperature" value={`${r.temperature.toFixed(1)}°F`} color="bg-orange-50 text-orange-700" />
+            <ReadingTile label="Temperature" value={`${r.temperature.toFixed(1)}°F`} color="bg-orange-50 dark:bg-orange-950 text-orange-700" />
             <ReadingTile label="Humidity" value={`${r.humidity.toFixed(0)}%`} color="bg-sky-50 text-sky-700" />
-            <ReadingTile label="Battery" value={`${r.batteryVoltage}V`} color="bg-green-50 text-green-700" />
-            <ReadingTile label="Signal" value={`${r.signal} dBm`} color="bg-stone-100 text-stone-700" />
+            <ReadingTile label="Battery" value={`${r.batteryVoltage}V`} color="bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300" />
+            <ReadingTile label="Signal" value={`${r.signal} dBm`} color="bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-200" />
           </div>
-          <p className="text-xs text-stone-400 mt-2">Last seen: {new Date(r.timestamp).toLocaleString()}</p>
+          <p className="text-xs text-stone-400 dark:text-stone-500 mt-2">Last seen: {new Date(r.timestamp).toLocaleString()}</p>
         </Card>
       )}
 
       {/* Mock chart placeholder using recharts would go here — kept minimal for performance */}
       <Card>
-        <h3 className="text-sm font-semibold text-stone-700 mb-2">48h Trend (mock)</h3>
+        <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 mb-2">48h Trend (mock)</h3>
         <MockTrendChart deviceId={sensor.deviceId} />
       </Card>
     </div>
@@ -248,7 +248,7 @@ function MockTrendChart({ deviceId }: { deviceId: string }) {
       <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-20" preserveAspectRatio="none">
         <path d={path} fill="none" stroke="#f59e0b" strokeWidth="2" />
       </svg>
-      <div className="flex justify-between text-[10px] text-stone-400 mt-1">
+      <div className="flex justify-between text-[10px] text-stone-400 dark:text-stone-500 mt-1">
         <span>{min.toFixed(1)}°F</span>
         <span>48h ago → now</span>
         <span>{max.toFixed(1)}°F</span>

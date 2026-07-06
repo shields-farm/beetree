@@ -78,7 +78,7 @@ function SectionTitle({ children, icon }: { children: string; icon?: React.React
   return (
     <div className="flex items-center gap-2 mb-3">
       {icon}
-      <h3 className="text-sm font-semibold text-stone-700 uppercase tracking-wide">{children}</h3>
+      <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 uppercase tracking-wide">{children}</h3>
     </div>
   );
 }
@@ -88,12 +88,12 @@ function CheckRow({ label, checked, onChange }: { label: string; checked: boolea
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className="flex items-center gap-3 py-2.5 w-full text-left active:bg-stone-50 rounded-lg px-1 -mx-1"
+      className="flex items-center gap-3 py-2.5 w-full text-left active:bg-stone-50 dark:active:bg-stone-800 rounded-lg px-1 -mx-1"
     >
       <span className={`fancy-check ${checked ? 'checked' : ''}`}>
         {checked && <Check size={16} className="text-white" strokeWidth={3} />}
       </span>
-      <span className="text-sm text-stone-700">{label}</span>
+      <span className="text-sm text-stone-700 dark:text-stone-200">{label}</span>
     </button>
   );
 }
@@ -101,11 +101,11 @@ function CheckRow({ label, checked, onChange }: { label: string; checked: boolea
 function SelectRow({ label, value, options, onChange }: { label: string; value: string; options: { value: string; label: string }[]; onChange: (v: string) => void }) {
   return (
     <label className="block py-2">
-      <span className="text-sm font-medium text-stone-700 block mb-1.5">{label}</span>
+      <span className="text-sm font-medium text-stone-700 dark:text-stone-200 block mb-1.5">{label}</span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-sm appearance-none"
+        className="w-full rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 px-3.5 py-2.5 text-sm dark:text-stone-100 appearance-none"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>{o.label}</option>
@@ -153,12 +153,12 @@ export function InspectionForm({ hiveId, initial, onSubmit, onCancel, submitLabe
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* ─── PILLAR 1: QUEEN HEALTH ─── */}
-      <div className="bg-white rounded-2xl shadow-card border border-stone-100 p-4">
+      <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-card border border-stone-100 dark:border-stone-800 p-4">
         <div className="flex items-center gap-2 mb-3">
           <span className="text-lg">👑</span>
           <div>
-            <h3 className="text-sm font-semibold text-stone-700 uppercase tracking-wide">Queen Health</h3>
-            <p className="text-[10px] text-stone-400">Pillar 1 of 3 — Jamie Ellis</p>
+            <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 uppercase tracking-wide">Queen Health</h3>
+            <p className="text-[10px] text-stone-400 dark:text-stone-500">Pillar 1 of 3 — Jamie Ellis</p>
           </div>
         </div>
         <div className="divide-y divide-stone-100">
@@ -189,12 +189,12 @@ export function InspectionForm({ hiveId, initial, onSubmit, onCancel, submitLabe
       </div>
 
       {/* ─── PILLAR 2: NUTRITION ─── */}
-      <div className="bg-white rounded-2xl shadow-card border border-stone-100 p-4 space-y-5">
+      <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-card border border-stone-100 dark:border-stone-800 p-4 space-y-5">
         <div className="flex items-center gap-2 mb-1">
           <span className="text-lg">🍯</span>
           <div>
-            <h3 className="text-sm font-semibold text-stone-700 uppercase tracking-wide">Nutrition</h3>
-            <p className="text-[10px] text-stone-400">Pillar 2 of 3 — honey &amp; pollen stores, population</p>
+            <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 uppercase tracking-wide">Nutrition</h3>
+            <p className="text-[10px] text-stone-400 dark:text-stone-500">Pillar 2 of 3 — honey &amp; pollen stores, population</p>
           </div>
         </div>
         <LabelSlider<StoreLevel>
@@ -227,13 +227,13 @@ export function InspectionForm({ hiveId, initial, onSubmit, onCancel, submitLabe
       </div>
 
       {/* ─── PILLAR 3: PESTS & DISEASES ─── */}
-      <div className="bg-white rounded-2xl shadow-card border border-stone-100 p-4">
+      <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-card border border-stone-100 dark:border-stone-800 p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <span className="text-lg">🐝</span>
             <div>
-              <h3 className="text-sm font-semibold text-stone-700 uppercase tracking-wide">Pests &amp; Diseases</h3>
-              <p className="text-[10px] text-stone-400">Pillar 3 of 3 — varroa, SHB, concerns</p>
+              <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 uppercase tracking-wide">Pests &amp; Diseases</h3>
+              <p className="text-[10px] text-stone-400 dark:text-stone-500">Pillar 3 of 3 — varroa, SHB, concerns</p>
             </div>
           </div>
           <button type="button" onClick={addConcern} className="text-xs text-honey-600 font-medium flex items-center gap-1 hover:text-honey-700">
@@ -243,38 +243,38 @@ export function InspectionForm({ hiveId, initial, onSubmit, onCancel, submitLabe
 
         <div className="space-y-2">
           {form.concerns.map((c) => (
-            <div key={c.id} className="flex items-start gap-2 bg-stone-50 rounded-lg p-2">
+            <div key={c.id} className="flex items-start gap-2 bg-stone-50 dark:bg-stone-800 rounded-lg p-2">
               <input
                 value={c.type}
                 onChange={(e) => updateConcern(c.id, { type: e.target.value })}
                 placeholder="e.g., Varroa mites, Small hive beetles, Wax moths"
-                className="flex-1 min-w-0 bg-transparent text-sm border-b border-stone-200 pb-1 focus:border-honey-400 outline-none"
+                className="flex-1 min-w-0 bg-transparent text-sm dark:text-stone-100 border-b border-stone-200 dark:border-stone-700 pb-1 focus:border-honey-400 outline-none"
               />
               <input
                 type="number"
                 value={c.count ?? ''}
                 onChange={(e) => updateConcern(c.id, { count: e.target.value ? Number(e.target.value) : undefined })}
                 placeholder="count"
-                className="w-16 bg-transparent text-sm border-b border-stone-200 pb-1 text-right focus:border-honey-400 outline-none"
+                className="w-16 bg-transparent text-sm dark:text-stone-100 border-b border-stone-200 dark:border-stone-700 pb-1 text-right focus:border-honey-400 outline-none"
               />
-              <button type="button" onClick={() => removeConcern(c.id)} className="text-stone-400 hover:text-red-500 p-1">
+              <button type="button" onClick={() => removeConcern(c.id)} className="text-stone-400 dark:text-stone-500 hover:text-red-500 p-1">
                 <Trash2 size={14} />
               </button>
             </div>
           ))}
           {form.concerns.length === 0 && (
-            <p className="text-xs text-stone-400 italic">No concerns recorded. Tap "Add" to log varroa counts, beetles, moths, etc.</p>
+            <p className="text-xs text-stone-400 dark:text-stone-500 italic">No concerns recorded. Tap "Add" to log varroa counts, beetles, moths, etc.</p>
           )}
         </div>
 
-        <div className="mt-3 pt-3 border-t border-stone-100">
+        <div className="mt-3 pt-3 border-t border-stone-100 dark:border-stone-800">
           <CheckRow
             label="Colony found dead"
             checked={form.colonyDead}
             onChange={(v) => set('colonyDead', v)}
           />
           {form.colonyDead && (
-            <div className="mt-1 flex items-center gap-1.5 text-xs text-red-600">
+            <div className="mt-1 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
               <AlertTriangle size={13} /> Marked as dead — health will be set to Critical.
             </div>
           )}
@@ -282,17 +282,17 @@ export function InspectionForm({ hiveId, initial, onSubmit, onCancel, submitLabe
       </div>
 
       {/* Overall Health Summary */}
-      <div className="bg-white rounded-2xl shadow-card border border-stone-100 p-4">
+      <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-card border border-stone-100 dark:border-stone-800 p-4">
         <div className="flex items-center gap-2 mb-3">
           <span className="text-lg">📋</span>
-          <h3 className="text-sm font-semibold text-stone-700 uppercase tracking-wide">Overall Health</h3>
+          <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 uppercase tracking-wide">Overall Health</h3>
         </div>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <span className={`inline-block w-2.5 h-2.5 rounded-full ${hm.dot}`} />
             <span className={`text-sm font-semibold ${hm.text}`}>{hm.label}</span>
           </div>
-          <label className="flex items-center gap-2 text-xs text-stone-500">
+          <label className="flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
             <input
               type="checkbox"
               checked={manualHealth}
@@ -312,7 +312,7 @@ export function InspectionForm({ hiveId, initial, onSubmit, onCancel, submitLabe
                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                   form.healthStatus === o.value
                     ? 'bg-honey-500 text-white'
-                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                    : 'bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700'
                 }`}
               >
                 {o.label}
@@ -320,24 +320,24 @@ export function InspectionForm({ hiveId, initial, onSubmit, onCancel, submitLabe
             ))}
           </div>
         ) : (
-          <p className="text-xs text-stone-400">Auto-calculated from the three pillars above.</p>
+          <p className="text-xs text-stone-400 dark:text-stone-500">Auto-calculated from the three pillars above.</p>
         )}
       </div>
 
       {/* Notes */}
-      <div className="bg-white rounded-2xl shadow-card border border-stone-100 p-4">
+      <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-card border border-stone-100 dark:border-stone-800 p-4">
         <SectionTitle>Notes</SectionTitle>
         <textarea
           value={form.notes}
           onChange={(e) => set('notes', e.target.value)}
           placeholder="Observations, weather, forage notes…"
           rows={4}
-          className="w-full rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-sm resize-y"
+          className="w-full rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 px-3.5 py-2.5 text-sm dark:text-stone-100 resize-y"
         />
       </div>
 
       {/* Photos, Video & Voice */}
-      <div className="bg-white rounded-2xl shadow-card border border-stone-100 p-4">
+      <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-card border border-stone-100 dark:border-stone-800 p-4">
         <SectionTitle>Photos, Video &amp; Voice</SectionTitle>
         <MediaCapture
           media={form.media}
@@ -351,7 +351,7 @@ export function InspectionForm({ hiveId, initial, onSubmit, onCancel, submitLabe
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 py-3 rounded-xl border border-stone-200 text-stone-600 font-medium text-sm hover:bg-stone-50"
+          className="flex-1 py-3 rounded-xl border border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 font-medium text-sm hover:bg-stone-50 dark:hover:bg-stone-800"
         >
           Cancel
         </button>

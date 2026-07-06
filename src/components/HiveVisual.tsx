@@ -70,7 +70,7 @@ export function HiveVisual({ hive, editable = false, showSensors = true }: HiveV
         <button
           type="button"
           onClick={handleAddBox}
-          className="w-full py-2.5 rounded-xl border-2 border-dashed border-stone-300 text-stone-500 text-sm font-medium hover:border-honey-400 hover:text-honey-600 transition-colors flex items-center justify-center gap-1.5"
+          className="w-full py-2.5 rounded-xl border-2 border-dashed border-stone-300 dark:border-stone-700 text-stone-500 dark:text-stone-400 text-sm font-medium hover:border-honey-400 hover:text-honey-600 transition-colors flex items-center justify-center gap-1.5"
         >
           <Plus size={18} /> Add Box / Super
         </button>
@@ -120,18 +120,18 @@ function BoxView({
     medium: 'bg-amber-800/10 border-amber-800/30',
     shallow: 'bg-amber-700/10 border-amber-700/30',
     nuc: 'bg-stone-300/40 border-stone-400/40',
-    apimaye: 'bg-orange-100 border-orange-300',
-    'apimaye-split': 'bg-orange-50 border-orange-200',
-    'queen-castle-comp': 'bg-stone-200 border-stone-400',
+    apimaye: 'bg-orange-100 dark:bg-orange-900 border-orange-300',
+    'apimaye-split': 'bg-orange-50 dark:bg-orange-950 border-orange-200',
+    'queen-castle-comp': 'bg-stone-200 dark:bg-stone-700 border-stone-400',
   };
 
   return (
     <div className={`rounded-xl border-2 ${woodTone[box.type]} overflow-hidden`}>
       <div className="flex items-center justify-between px-2.5 py-1.5 bg-stone-900/5">
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-xs font-semibold text-stone-600">#{boxIndex + 1}</span>
-          <span className="text-xs font-medium text-stone-700 truncate">{BOX_TYPE_LABELS[box.type]}</span>
-          <span className="text-[10px] text-stone-400">· {frameCount} frames</span>
+          <span className="text-xs font-semibold text-stone-600 dark:text-stone-300">#{boxIndex + 1}</span>
+          <span className="text-xs font-medium text-stone-700 dark:text-stone-200 truncate">{BOX_TYPE_LABELS[box.type]}</span>
+          <span className="text-[10px] text-stone-400 dark:text-stone-500">· {frameCount} frames</span>
           {boxSensors.length > 0 && (
             <span className="inline-flex items-center gap-0.5 text-[10px] text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded-full">
               <Thermometer size={10} /> {boxSensors.length}
@@ -143,21 +143,21 @@ function BoxView({
             <button
               type="button"
               onClick={onRemoveBox}
-              className="p-1 text-stone-400 hover:text-red-500 transition-colors"
+              className="p-1 text-stone-400 dark:text-stone-500 hover:text-red-500 transition-colors"
               title="Remove box"
             >
               <Trash2 size={14} />
             </button>
           )}
           {editable && (
-            <button type="button" onClick={onToggleExpand} className="p-1 text-stone-400 hover:text-stone-700">
+            <button type="button" onClick={onToggleExpand} className="p-1 text-stone-400 dark:text-stone-500 hover:text-stone-700">
               {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
           )}
         </div>
       </div>
 
-      <div className="p-2 bg-white/60">
+      <div className="p-2 bg-white/60 dark:bg-stone-900/60">
         <div className={`flex gap-1 ${compact ? '' : 'gap-1.5'}`}>
           {box.frames.map((f) => (
             <FrameCell
@@ -171,12 +171,12 @@ function BoxView({
         </div>
 
         {editingFrame?.boxId === box.id && editable && (
-          <div className="mt-2 p-2 rounded-lg bg-honey-50 border border-honey-200 animate-fade-in">
+          <div className="mt-2 p-2 rounded-lg bg-honey-50 dark:bg-honey-950 border border-honey-200 animate-fade-in">
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-medium text-stone-700">
+              <span className="text-xs font-medium text-stone-700 dark:text-stone-200">
                 Frame {editingFrame.pos + 1} — tap to set content:
               </span>
-              <button onClick={() => onFrameClick(box.id, editingFrame.pos)} className="text-stone-400">
+              <button onClick={() => onFrameClick(box.id, editingFrame.pos)} className="text-stone-400 dark:text-stone-500">
                 <X size={14} />
               </button>
             </div>
@@ -192,7 +192,7 @@ function BoxView({
                   onFrameClick(box.id, editingFrame.pos);
                 }
               }}
-              className="mt-2 w-full text-xs py-1.5 rounded-lg bg-white border border-stone-200 text-stone-600 hover:bg-stone-50"
+              className="mt-2 w-full text-xs py-1.5 rounded-lg bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800"
             >
               Cycle to next →
             </button>
@@ -214,7 +214,7 @@ function BoxView({
         )}
 
         {expanded && editable && showSensors && (
-          <div className="mt-2 pt-2 border-t border-stone-200/60">
+          <div className="mt-2 pt-2 border-t border-stone-200/60 dark:border-stone-800/60">
             <SensorPicker hiveId={hive.id} boxId={box.id} boxSensorIds={box.sensorIds} />
           </div>
         )}

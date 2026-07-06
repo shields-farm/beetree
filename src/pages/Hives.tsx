@@ -60,12 +60,12 @@ export function Hives() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Hive name"
-              className="w-full rounded-xl border border-stone-200 px-3.5 py-2.5 text-sm"
+              className="w-full rounded-xl border border-stone-200 dark:border-stone-800 px-3.5 py-2.5 text-sm"
             />
             <select
               value={apiaryId}
               onChange={(e) => setApiaryId(e.target.value)}
-              className="w-full rounded-xl border border-stone-200 px-3.5 py-2.5 text-sm appearance-none"
+              className="w-full rounded-xl border border-stone-200 dark:border-stone-800 px-3.5 py-2.5 text-sm appearance-none"
             >
               {apiaries.map((a) => (
                 <option key={a.id} value={a.id}>{a.name}</option>
@@ -74,13 +74,13 @@ export function Hives() {
             <select
               value={type}
               onChange={(e) => setType(e.target.value as HiveType)}
-              className="w-full rounded-xl border border-stone-200 px-3.5 py-2.5 text-sm appearance-none"
+              className="w-full rounded-xl border border-stone-200 dark:border-stone-800 px-3.5 py-2.5 text-sm appearance-none"
             >
               {Object.values(HIVE_TYPES).map((def) => (
                 <option key={def.type} value={def.type}>{def.label}</option>
               ))}
             </select>
-            <p className="text-xs text-stone-400">{HIVE_TYPES[type].description}</p>
+            <p className="text-xs text-stone-400 dark:text-stone-500">{HIVE_TYPES[type].description}</p>
             <button
               onClick={handleAdd}
               disabled={!name.trim() || !apiaryId}
@@ -100,27 +100,27 @@ export function Hives() {
           return (
             <Card key={h.id} onClick={() => {}} pad={false}>
               <Link to={`/hives/${h.id}`} className="flex items-center gap-3 p-4">
-                <div className="w-11 h-11 rounded-xl bg-honey-50 text-honey-600 flex items-center justify-center shrink-0">
+                <div className="w-11 h-11 rounded-xl bg-honey-50 dark:bg-honey-950 text-honey-600 dark:text-honey-400 flex items-center justify-center shrink-0">
                   <Boxes size={22} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="font-semibold text-stone-800 truncate">{h.name}</div>
-                  <div className="text-xs text-stone-400 truncate flex items-center gap-1.5">
+                  <div className="font-semibold text-stone-800 dark:text-stone-100 truncate">{h.name}</div>
+                  <div className="text-xs text-stone-400 dark:text-stone-500 truncate flex items-center gap-1.5">
                     {apiary?.name ?? '—'}
-                    <span className="text-stone-300">·</span>
+                    <span className="text-stone-300 dark:text-stone-600">·</span>
                     {HIVE_TYPES[h.type].label}
                     {hasSensor && <Thermometer size={11} className="text-sky-500" />}
                     {h.location && <MapPin size={11} className="text-honey-500" />}
                   </div>
                 </div>
                 <span className={`text-[10px] px-2 py-0.5 rounded-full ${meta.bg} ${meta.text}`}>{meta.label}</span>
-                <ChevronRight size={18} className="text-stone-300" />
+                <ChevronRight size={18} className="text-stone-300 dark:text-stone-600" />
               </Link>
             </Card>
           );
         })}
         {hives.length === 0 && !showAdd && (
-          <p className="text-center text-sm text-stone-400 py-12">No hives yet. Tap + to add one.</p>
+          <p className="text-center text-sm text-stone-400 dark:text-stone-500 py-12">No hives yet. Tap + to add one.</p>
         )}
       </div>
     </div>
