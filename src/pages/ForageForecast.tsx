@@ -22,6 +22,7 @@ interface ForageFlow {
   endMonth: string;
   notes: string;
   significant?: boolean;
+  commonness?: number;
   latinName?: string;
   plantType?: string;
 }
@@ -119,6 +120,9 @@ export function ForageForecast() {
   return (
     <div className="animate-fade-in space-y-5">
       <PageHeader title="Forage Forecast" subtitle="Nectar flow calendar for Georgia" />
+
+      {/* Full species calendar with bloom timeline — now at the top */}
+      <ForageSpeciesCalendar />
 
       {/* Current month banner */}
       <div className={'rounded-2xl p-5 ' + season.bg}>
@@ -242,9 +246,6 @@ export function ForageForecast() {
         </div>
       )}
 
-      {/* Full species calendar with bloom timeline */}
-      <ForageSpeciesCalendar />
-
     </div>
   );
 }
@@ -280,8 +281,20 @@ function ForageSpeciesCalendar() {
 
   const currentMonth = new Date().getMonth();
   const significant = species.filter(s => s.significant);
-  const others = species.filter(s => !s.significant);
-  const display = showAll ? species : significant;
+  const others = species.filter(s => !s.significant)
+    .sort((a, b) => (b.commonness || 0) - (a.commonness || 0)); // most common first
+
+  // Display rule: show significant sources.
+  // If no significant sources, show top 3 most common insignificant ones instead.
+  // "Show all" toggle reveals everything.
+  let display: ForageFlow[];
+  if (showAll) {
+    display = species;
+  } else if (significant.length > 0) {
+    display = significant;
+  } else {
+    display = others.slice(0, 3);
+  }
 
   return (
     <div>
@@ -368,7 +381,11 @@ function ForageSpeciesCalendar() {
             onClick={() => setShowAll(!showAll)}
             className="mt-3 text-xs text-honey-600 dark:text-honey-400 font-medium hover:underline"
           >
-            {showAll ? 'Show significant sources only' : `Show all ${species.length} species`}
+            {showAll
+              ? 'Show significant sources only'
+              : significant.length > 0
+                ? `Show all ${species.length} species (${others.length} insignificant hidden)`
+                : `Show all ${species.length} species`}
           </button>
         )}
 
