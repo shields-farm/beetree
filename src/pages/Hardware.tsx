@@ -110,17 +110,20 @@ const AI_DIAGRAM = `graph TB
 
 const LORA_DIAGRAM = `graph LR
   subgraph Apiary["🐝 Far Apiary — Solar Powered"]
-    BM["6× BroodMinder<br/>TH · TH-Pro · TH-Pro2"]
+    BLE["Any BLE device<br/>in range"]
     RAK["WisMesh Repeater Mini<br/>RAK4631 · SX1262 LoRa<br/>3200mAh LiPo + solar<br/>IP67 · SMA antenna"]
   end
   subgraph House["🖥️ Mac Mini — 192.0.2.20"]
     USB["RAK4631 + RAK19009<br/>USB LoRa receiver<br/>/dev/cu.usbmodem*"]
+    PY["Python decoder<br/>company ID routing"]
     HA["Home Assistant"]
   end
 
-  BM -.->|"BLE 4.1"| RAK
-  RAK -.->|"LoRa 915MHz P2P<br/>~200 bytes / 5 min"| USB
-  USB -->|"Serial → Python"| HA
+  BLE -.->|"BLE adv"| RAK
+  RAK -.->|"LoRa 915MHz P2P<br/>raw BLE packets / 5 min"| USB
+  USB -->|"Serial"| PY
+  PY -->|"0x028D → BroodMinder"| HA
+  PY -.->|"unknown → log"| HA
 `;
 
 // ─── Hardware Page ─────────────────────────────────────────────────────────
@@ -281,16 +284,17 @@ export function Hardware() {
         <div className="flex items-start justify-between mb-3">
           <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 flex items-center gap-2">
             <Satellite size={16} className="text-honey-600 dark:text-honey-400" />
-            BroodMinder BLE → LoRa → Mac Mini
+            Generic BLE → LoRa Bridge
           </h3>
           <StatusBadge status="planned" label="Planned" />
         </div>
         <p className="text-xs text-stone-500 dark:text-stone-400 mb-3">
-          A RAKwireless WisMesh Repeater Mini at the far apiary scans BroodMinder BLE sensors and
-          sends readings via LoRa P2P to a second RAK4631 on the Mac Mini, which forwards to Home
-          Assistant. The Repeater Mini is a complete all-in-one node — RAK4631 core, 3200mAh LiPo
-          battery, integrated solar panel, IP67 enclosure, and SMA antenna — designed for unattended
-          off-grid LoRa deployments. All hardware sourced from RAKwireless.
+          A RAKwireless WisMesh Repeater Mini at the far apiary acts as a dumb BLE-to-LoRa relay — it
+          captures all BLE advertisements in range and forwards raw packets via LoRa P2P to a second
+          RAK4631 on the Mac Mini. All decoding happens in Python on the Mac Mini, so adding new
+          sensor types requires zero firmware changes on the apiary node. The Repeater Mini is a
+          complete all-in-one node — RAK4631 core, 3200mAh LiPo battery, integrated solar panel,
+          IP67 enclosure, and SMA antenna. All hardware sourced from RAKwireless.
         </p>
         <Mermaid chart={LORA_DIAGRAM} />
 
@@ -303,13 +307,13 @@ export function Hardware() {
             </div>
             <div className="space-y-1 text-[11px] text-stone-500 dark:text-stone-400">
               <div>• WisMesh Repeater Mini (RAK4631 + IP67 enclosure)</div>
-              <div>• Scans BroodMinder BLE every 5 min (20s scan window)</div>
-              <div>• Decodes 21-byte protocol (company ID 0x028D)</div>
-              <div>• Packs ~200 bytes, TX via SX1262 LoRa</div>
+              <div>• Passive BLE scan — captures all advertisements</div>
+              <div>• No protocol decoding on device — dumb relay</div>
+              <div>• Deduplicates by MAC, keeps latest per scan window</div>
+              <div>• Packs raw adv data, TX via SX1262 LoRa</div>
               <div>• Deep sleeps at 0.01W between scans</div>
               <div>• 3200mAh LiPo + integrated solar panel</div>
-              <div>• Arduino C (best BLE stack on nRF52840)</div>
-              <div>• SMA antenna connector + blade antenna</div>
+              <div>• Arduino C (~100 lines: scan, dedup, pack, TX, sleep)</div>
             </div>
           </div>
           <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3">
@@ -320,7 +324,9 @@ export function Hardware() {
             <div className="space-y-1 text-[11px] text-stone-500 dark:text-stone-400">
               <div>• RAK4631 module on RAK19009 mini base board</div>
               <div>• USB-C connected — appears as /dev/cu.usbmodem*</div>
-              <div>• Python script reads serial, forwards to HA</div>
+              <div>• Python script: routes by BLE company ID</div>
+              <div>• 0x028D → BroodMinder decoder → HA</div>
+              <div>• Unknown company IDs → logged for discovery</div>
               <div>• Powered by Mac Mini USB — no battery</div>
               <div>• Same SX1262 chip as apiary node for compatibility</div>
             </div>
@@ -358,7 +364,11 @@ export function Hardware() {
           <div className="space-y-1.5 text-[11px] text-stone-500 dark:text-stone-400">
             <div className="flex items-start gap-2">
               <CheckCircle2 size={12} className="text-green-500 shrink-0 mt-0.5" />
-              <span><strong className="text-green-700 dark:text-green-300">Telemetry fits easily.</strong> 6 sensors × 21 bytes = 126 bytes per batch. At SF7 (~11,000 bps) that's ~0.1s of airtime every 5 minutes.</span>
+              <span><strong className="text-green-700 dark:text-green-300">Protocol-agnostic relay.</strong> Apiary firmware captures all BLE advertisements and forwards raw data — no sensor-specific decoding. Adding new BLE devices (BroodMinder, RuuviTag, custom probes) requires only a Python decoder on the Mac Mini, zero firmware changes on the apiary node.</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <CheckCircle2 size={12} className="text-green-500 shrink-0 mt-0.5" />
+              <span><strong className="text-green-700 dark:text-green-300">Fits in one LoRa packet.</strong> Per sensor: 8B header (MAC + RSSI + len) + adv payload. 6 sensors × 29B = 174B — fits single SX1262 packet (255B max). At SF7, ~0.15s airtime per 5-min cycle.</span>
             </div>
             <div className="flex items-start gap-2">
               <AlertTriangle size={12} className="text-amber-500 shrink-0 mt-0.5" />
@@ -366,7 +376,11 @@ export function Hardware() {
             </div>
             <div className="flex items-start gap-2">
               <AlertTriangle size={12} className="text-amber-500 shrink-0 mt-0.5" />
-              <span><strong className="text-amber-700 dark:text-amber-300">Arduino C, not Python.</strong> RAK4631 runs Arduino IDE / PlatformIO (C/C++). No CircuitPython or MicroPython officially. BroodMinder's 21-byte BLE protocol decodes in ~20 lines of C using the nRF52840's native SoftDevice BLE API. More verbose than Python but more reliable BLE stack. Flash via USB — no Linux, no SD card.</span>
+              <span><strong className="text-amber-700 dark:text-amber-300">BLE noise filtering.</strong> Passive scan captures everything — passing phones, cars, etc. Python decoder on Mac Mini filters by company ID (0x028D = BroodMinder) and drops unknown devices. Relay sends everything; receiver decides what matters.</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <AlertTriangle size={12} className="text-amber-500 shrink-0 mt-0.5" />
+              <span><strong className="text-amber-700 dark:text-amber-300">Arduino C, not Python.</strong> RAK4631 runs Arduino IDE / PlatformIO (C/C++). The apiary firmware is ~100 lines (scan, dedup, pack, TX, sleep). All decoding logic lives on the Mac Mini in Python — easy to update without a site visit. Flash via USB-C.</span>
             </div>
           </div>
         </div>
