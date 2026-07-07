@@ -1,4 +1,4 @@
-import { Boxes, ClipboardList, Thermometer, CheckSquare, Settings as SettingsIcon, Hexagon, Bug, Flower2, ShoppingBag } from 'lucide-react';
+import { Boxes, ClipboardList, Thermometer, CheckSquare, Settings as SettingsIcon, Hexagon, Bug, Flower2, ShoppingBag, Cpu } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 /** Custom icon: a 10-frame deep hive box (side view with vertical frame lines) */
@@ -28,6 +28,7 @@ const NAV_ITEMS = [
   { to: '/forage', label: 'Forage', icon: Flower2 },
   { to: '/tasks', label: 'Tasks', icon: CheckSquare },
   { to: '/equipment', label: 'Equipment', icon: ShoppingBag },
+  { to: '/hardware', label: 'Hardware', icon: Cpu },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ];
 
