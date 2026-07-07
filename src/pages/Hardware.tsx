@@ -111,15 +111,15 @@ const AI_DIAGRAM = `graph TB
 const LORA_DIAGRAM = `graph LR
   subgraph Apiary["🐝 Far Apiary — Battery Powered"]
     BM["6× BroodMinder<br/>TH · TH-Pro · TH-Pro2"]
-    TECHO["LilyGO T-Echo<br/>nRF52840 BLE + SX1262 LoRa<br/>CircuitPython · 0.01W sleep<br/>4× AA lithium"]
+    RAK["RAK4631 WisBlock<br/>nRF52840 BLE + SX1262 LoRa<br/>Arduino C · 0.01W sleep<br/>4× AA lithium"]
   end
   subgraph House["🖥️ Mac Mini — 192.168.1.40"]
     USB["Waveshare USB LoRa<br/>SX1262 dongle<br/>/dev/cu.usbmodem*"]
     HA["Home Assistant"]
   end
 
-  BM -.->|"BLE 4.1"| TECHO
-  TECHO -.->|"LoRa 915MHz P2P<br/>~200 bytes / 5 min"| USB
+  BM -.->|"BLE 4.1"| RAK
+  RAK -.->|"LoRa 915MHz P2P<br/>~200 bytes / 5 min"| USB
   USB -->|"Serial → Python"| HA
 `;
 
@@ -274,7 +274,7 @@ export function Hardware() {
 
       {/* LoRa / T-Echo Section */}
       <h2 className="text-xs font-bold text-stone-400 dark:text-stone-500 uppercase tracking-wider mb-2 mt-6">
-        LoRa Relay — T-Echo
+        LoRa Relay — RAK4631
       </h2>
 
       <Card className="mb-4">
@@ -286,9 +286,10 @@ export function Hardware() {
           <StatusBadge status="planned" label="Planned" />
         </div>
         <p className="text-xs text-stone-500 dark:text-stone-400 mb-3">
-          A single LilyGO T-Echo at the far apiary scans BroodMinder BLE sensors, sends readings via
+          A RAK4631 WisBlock at the far apiary scans BroodMinder BLE sensors, sends readings via
           LoRa P2P to a USB dongle on the Mac Mini, which forwards to Home Assistant. No Pi, no solar,
-          no Linux — just a microcontroller on AA batteries talking to a USB receiver.
+          no Linux — just a modular microcontroller on AA batteries talking to a USB receiver.
+          Chosen over the LilyGO T-Echo for better build quality and field-repairable modular design.
         </p>
         <Mermaid chart={LORA_DIAGRAM} />
 
@@ -297,15 +298,15 @@ export function Hardware() {
           <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3">
             <div className="flex items-center gap-2 mb-2">
               <CpuIcon2 size={14} className="text-honey-600 dark:text-honey-400 shrink-0" />
-              <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">Apiary Node (T-Echo)</span>
+              <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">Apiary Node (RAK4631)</span>
             </div>
             <div className="space-y-1 text-[11px] text-stone-500 dark:text-stone-400">
               <div>• Scans BroodMinder BLE every 5 min (20s scan window)</div>
               <div>• Decodes 21-byte protocol (company ID 0x028D)</div>
               <div>• Packs ~200 bytes, TX via SX1262 LoRa</div>
               <div>• Deep sleeps at 0.01W between scans</div>
-              <div>• BME280 sensor logs ambient temp/humidity</div>
-              <div>• E-ink display shows last readings (zero power)</div>
+              <div>• Modular WisBlock — swap modules if one fails</div>
+              <div>• Arduino C (best BLE stack on nRF52840)</div>
               <div>• Runs on 4× AA lithium ≈ 2 weeks</div>
             </div>
           </div>
@@ -327,7 +328,7 @@ export function Hardware() {
         {/* Power budget */}
         <div className="mt-3 bg-stone-50 dark:bg-stone-950 rounded-xl p-3">
           <h4 className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase mb-2 flex items-center gap-1.5">
-            <Battery size={12} /> Power Budget (Apiary T-Echo)
+            <Battery size={12} /> Power Budget (Apiary RAK4631)
           </h4>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <Spec label="Active scan" value="0.05W" />
@@ -362,7 +363,7 @@ export function Hardware() {
             </div>
             <div className="flex items-start gap-2">
               <AlertTriangle size={12} className="text-amber-500 shrink-0 mt-0.5" />
-              <span><strong className="text-amber-700 dark:text-amber-300">CircuitPython, not CPython.</strong> BroodMinder's 21-byte BLE protocol decodes in ~10 lines using <code className="font-mono text-[10px]">ubluetooth.lescan()</code>. No <code className="font-mono text-[10px]">bleak</code>, no Linux, no SD card — flash a <code className="font-mono text-[10px]">.py</code> file over USB.</span>
+              <span><strong className="text-amber-700 dark:text-amber-300">Arduino C, not Python.</strong> RAK4631 runs Arduino IDE / PlatformIO (C/C++). No CircuitPython or MicroPython officially. BroodMinder's 21-byte BLE protocol decodes in ~20 lines of C using the nRF52840's native SoftDevice BLE API. More verbose than Python but more reliable BLE stack. Flash via USB — no Linux, no SD card.</span>
             </div>
           </div>
         </div>
@@ -374,11 +375,25 @@ export function Hardware() {
           </h4>
           <div className="space-y-2">
             <ProductLink
-              name="LilyGO T-Echo (915MHz, nRF52840 + SX1262 + BME280)"
-              desc="BLE scanner + LoRa TX · CircuitPython · e-ink display · GPS · Amazon's Choice"
-              price="$68.00"
-              url="https://www.amazon.com/dp/B0B658DZ9Z"
+              name="RAK4631 LPWAN Node (nRF52840 + SX1262, 915MHz)"
+              desc="Core module · BLE + LoRa · Arduino C · modular WisBlock system · RAK Wireless official"
+              price="$17.99"
+              url="https://store.rakwireless.com/products/rak4631-lpwan-node"
               tag="Apiary node"
+            />
+            <ProductLink
+              name="RAK19007 WisBlock Base Board (2nd Gen)"
+              desc="Required base board for RAK4631 · USB-C · battery connector · sensor slots"
+              price="$9.99"
+              url="https://store.rakwireless.com/products/rak19007-wisblock-base-board-2nd-gen"
+              tag="Required"
+            />
+            <ProductLink
+              name="RAK WisBlock Basic Starter Kit (RAK4631 + RAK19007, 915MHz)"
+              desc="Bundle: RAK4631 + base board + antenna + USB cable · Amazon listing"
+              price="$31.97"
+              url="https://www.amazon.com/dp/B0DP74SKM1"
+              tag="Amazon bundle"
             />
             <ProductLink
               name="Waveshare USB to LoRa Module (SX1262)"
@@ -389,14 +404,14 @@ export function Hardware() {
             />
             <ProductLink
               name="Energizer Ultimate Lithium AA (8-pack)"
-              desc="1.5V lithium · ~4.5Wh/cell · 4 for T-Echo + 4 spare · Amazon's Choice"
+              desc="1.5V lithium · ~4.5Wh/cell · 4 for RAK4631 + 4 spare · Amazon's Choice"
               price="$16.99"
               url="https://www.amazon.com/dp/B00EAKP8S0"
               tag="Prime"
             />
             <ProductLink
               name="4× AA Battery Holder with USB Port (2-pack)"
-              desc="4 AA → 6V USB output · on/off switch · powers T-Echo via USB-C"
+              desc="4 AA → 6V USB output · on/off switch · powers RAK4631 via USB-C"
               price="$5.99"
               url="https://www.amazon.com/dp/B0DDT2JGKZ"
             />
@@ -409,12 +424,13 @@ export function Hardware() {
             />
           </div>
           <div className="mt-3 flex items-center justify-between">
-            <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">Total (with Prime items)</span>
-            <span className="text-lg font-bold text-honey-600 dark:text-honey-400">~$120.97</span>
+            <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">Total (RAK store + Prime items)</span>
+            <span className="text-lg font-bold text-honey-600 dark:text-honey-400">~$81.94</span>
           </div>
           <p className="text-[10px] text-stone-400 dark:text-stone-500 mt-1">
-            T-Echo ($68) + USB LoRa dongle ($25.99) + AA lithium 8-pack ($16.99) + battery holder ($5.99) + waterproof case ($9.99).
-            The Mac Mini dongle and house T-Echo cable are powered by the Mac Mini — no batteries needed there.
+            RAK4631 ($17.99) + RAK19007 ($9.99) + USB LoRa dongle ($25.99) + AA lithium ($16.99) + battery holder ($5.99) + case ($9.99).
+            Or buy the Amazon starter kit bundle (B0DP74SKM1, $31.97) to get RAK4631 + base board + antenna in one package.
+            ~$40 cheaper than the T-Echo equivalent, and modular — replace individual modules if they fail.
           </p>
         </div>
       </Card>
