@@ -109,12 +109,12 @@ const AI_DIAGRAM = `graph TB
 `;
 
 const LORA_DIAGRAM = `graph LR
-  subgraph Apiary["🐝 Far Apiary — Battery Powered"]
+  subgraph Apiary["🐝 Far Apiary — Solar Powered"]
     BM["6× BroodMinder<br/>TH · TH-Pro · TH-Pro2"]
-    RAK["RAK4631 WisBlock<br/>nRF52840 BLE + SX1262 LoRa<br/>Arduino C · 0.01W sleep<br/>4× AA lithium"]
+    RAK["WisMesh Repeater Mini<br/>RAK4631 · SX1262 LoRa<br/>3200mAh LiPo + solar<br/>IP67 · SMA antenna"]
   end
   subgraph House["🖥️ Mac Mini — 192.168.1.40"]
-    USB["Waveshare USB LoRa<br/>SX1262 dongle<br/>/dev/cu.usbmodem*"]
+    USB["RAK4631 + RAK19009<br/>USB LoRa receiver<br/>/dev/cu.usbmodem*"]
     HA["Home Assistant"]
   end
 
@@ -272,9 +272,9 @@ export function Hardware() {
         </div>
       </Card>
 
-      {/* LoRa / T-Echo Section */}
+      {/* LoRa Relay Section */}
       <h2 className="text-xs font-bold text-stone-400 dark:text-stone-500 uppercase tracking-wider mb-2 mt-6">
-        LoRa Relay — RAK4631
+        LoRa Relay — WisMesh Repeater Mini
       </h2>
 
       <Card className="mb-4">
@@ -286,10 +286,11 @@ export function Hardware() {
           <StatusBadge status="planned" label="Planned" />
         </div>
         <p className="text-xs text-stone-500 dark:text-stone-400 mb-3">
-          A RAK4631 WisBlock at the far apiary scans BroodMinder BLE sensors, sends readings via
-          LoRa P2P to a USB dongle on the Mac Mini, which forwards to Home Assistant. No Pi, no solar,
-          no Linux — just a modular microcontroller on AA batteries talking to a USB receiver.
-          Chosen over the LilyGO T-Echo for better build quality and field-repairable modular design.
+          A RAKwireless WisMesh Repeater Mini at the far apiary scans BroodMinder BLE sensors and
+          sends readings via LoRa P2P to a second RAK4631 on the Mac Mini, which forwards to Home
+          Assistant. The Repeater Mini is a complete all-in-one node — RAK4631 core, 3200mAh LiPo
+          battery, integrated solar panel, IP67 enclosure, and SMA antenna — designed for unattended
+          off-grid LoRa deployments. All hardware sourced from RAKwireless.
         </p>
         <Mermaid chart={LORA_DIAGRAM} />
 
@@ -301,13 +302,14 @@ export function Hardware() {
               <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">Apiary Node (RAK4631)</span>
             </div>
             <div className="space-y-1 text-[11px] text-stone-500 dark:text-stone-400">
+              <div>• WisMesh Repeater Mini (RAK4631 + IP67 enclosure)</div>
               <div>• Scans BroodMinder BLE every 5 min (20s scan window)</div>
               <div>• Decodes 21-byte protocol (company ID 0x028D)</div>
               <div>• Packs ~200 bytes, TX via SX1262 LoRa</div>
               <div>• Deep sleeps at 0.01W between scans</div>
-              <div>• Modular WisBlock — swap modules if one fails</div>
+              <div>• 3200mAh LiPo + integrated solar panel</div>
               <div>• Arduino C (best BLE stack on nRF52840)</div>
-              <div>• Runs on 4× AA lithium ≈ 2 weeks</div>
+              <div>• SMA antenna connector + blade antenna</div>
             </div>
           </div>
           <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3">
@@ -316,11 +318,11 @@ export function Hardware() {
               <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">Mac Mini Receiver (USB)</span>
             </div>
             <div className="space-y-1 text-[11px] text-stone-500 dark:text-stone-400">
-              <div>• Waveshare USB LoRa dongle (SX1262, 915MHz)</div>
-              <div>• Appears as /dev/cu.usbmodem* — no drivers</div>
+              <div>• RAK4631 module on RAK19009 mini base board</div>
+              <div>• USB-C connected — appears as /dev/cu.usbmodem*</div>
               <div>• Python script reads serial, forwards to HA</div>
               <div>• Powered by Mac Mini USB — no battery</div>
-              <div>• Same SX1262 chip as T-Echo for compatibility</div>
+              <div>• Same SX1262 chip as apiary node for compatibility</div>
             </div>
           </div>
         </div>
@@ -328,7 +330,7 @@ export function Hardware() {
         {/* Power budget */}
         <div className="mt-3 bg-stone-50 dark:bg-stone-950 rounded-xl p-3">
           <h4 className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase mb-2 flex items-center gap-1.5">
-            <Battery size={12} /> Power Budget (Apiary RAK4631)
+            <Sun size={12} /> Power Budget (WisMesh Repeater Mini)
           </h4>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <Spec label="Active scan" value="0.05W" />
@@ -337,13 +339,14 @@ export function Hardware() {
             <Spec label="Avg (5min cycle)" value="~0.02W" />
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
-            <Spec label="4× AA lithium" value="~18 Wh" />
-            <Spec label="Runtime" value="~2 weeks" />
-            <Spec label="No solar needed" value="✓" />
+            <Spec label="LiPo battery" value="3200mAh" />
+            <Spec label="Solar panel" value="Integrated" />
+            <Spec label="IP rating" value="IP67" />
           </div>
           <p className="text-[9px] text-stone-400 dark:text-stone-500 mt-2">
-            20s active scan / 5min sleep = 6.7% duty cycle. Energizer Ultimate Lithium AA: 4.5Wh/cell × 4 = 18Wh.
-            At 0.02W avg, runtime ≈ 18Wh / 0.02W = 900h ≈ 37 days theoretical (real-world ~2 weeks with overhead).
+            20s active scan / 5min sleep = 6.7% duty cycle. 3200mAh at 3.7V = ~11.8Wh.
+            At 0.02W avg, battery-only runtime ≈ 24 days. Integrated solar panel trickle-charges
+            during daylight, extending runtime indefinitely with intermittent sun.
           </p>
         </div>
 
@@ -371,34 +374,29 @@ export function Hardware() {
         {/* Component Summary */}
         <div className="mt-4 pt-3 border-t border-stone-100 dark:border-stone-800">
           <h4 className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase mb-3">
-            Components Required
+            Components Required — All RAKwireless
           </h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div className="flex items-center gap-2 text-xs text-stone-600 dark:text-stone-300">
               <CheckCircle2 size={12} className="text-green-500 shrink-0" />
-              <span><strong>RAK4631 + RAK19007</strong> — WisBlock starter kit (base board + core module + 915MHz antenna)</span>
+              <span><strong>WisMesh Repeater Mini</strong> — RAK4631 + 3200mAh LiPo + solar + IP67 enclosure + SMA antenna (RAK10718)</span>
             </div>
             <div className="flex items-center gap-2 text-xs text-stone-600 dark:text-stone-300">
               <CheckCircle2 size={12} className="text-green-500 shrink-0" />
-              <span><strong>Waveshare USB LoRa SX1262</strong> — Mac Mini receiver dongle</span>
+              <span><strong>RAK4631 module</strong> — Mac Mini LoRa receiver (nRF52840 + SX1262)</span>
             </div>
             <div className="flex items-center gap-2 text-xs text-stone-600 dark:text-stone-300">
               <CheckCircle2 size={12} className="text-green-500 shrink-0" />
-              <span><strong>4× AA lithium batteries</strong> — powers apiary node (~2 weeks per set)</span>
+              <span><strong>RAK19009 mini base board</strong> — USB-C interface for Mac Mini receiver</span>
             </div>
             <div className="flex items-center gap-2 text-xs text-stone-600 dark:text-stone-300">
               <CheckCircle2 size={12} className="text-green-500 shrink-0" />
-              <span><strong>4× AA USB battery holder</strong> — connects batteries to RAK4631 via USB-C</span>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-stone-600 dark:text-stone-300">
-              <CheckCircle2 size={12} className="text-green-500 shrink-0" />
-              <span><strong>IP65 waterproof case</strong> — ABS plastic (RF-transparent), cable glands for antenna</span>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-stone-600 dark:text-stone-300">
-              <CheckCircle2 size={12} className="text-green-500 shrink-0" />
-              <span><strong>USB-C cable</strong> — included with RAK starter kit for flashing firmware</span>
+              <span><strong>USB-C cable</strong> — included with Repeater Mini for flashing firmware</span>
             </div>
           </div>
+          <p className="text-[9px] text-stone-400 dark:text-stone-500 mt-2">
+            All components sourced directly from RAKwireless store. No third-party cases, batteries, or antennas.
+          </p>
         </div>
       </Card>
 
