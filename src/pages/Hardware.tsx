@@ -375,6 +375,81 @@ export function Hardware() {
           </p>
         </div>
 
+        {/* LoRa vs LoRaWAN */}
+        <div className="mt-4 pt-3 border-t border-stone-100 dark:border-stone-800">
+          <h4 className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase mb-3 flex items-center gap-1.5">
+            <Radio size={12} /> LoRa P2P vs LoRaWAN
+          </h4>
+          <p className="text-xs text-stone-500 dark:text-stone-400 mb-3">
+            The recommended SX1262 hardware uses <strong>LoRa P2P</strong> (point-to-point) — two devices
+            talk directly with a simple send/receive protocol. This is the right choice for a single
+            apiary-to-house relay: simpler, cheaper, lower latency, no gateway infrastructure needed.
+          </p>
+          <div className="overflow-x-auto mb-3">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-[10px] text-stone-400 dark:text-stone-500 uppercase border-b border-stone-100 dark:border-stone-800">
+                  <th className="text-left py-1.5 pr-3"></th>
+                  <th className="text-left py-1.5 pr-3">LoRa P2P</th>
+                  <th className="text-left py-1.5 pr-3">LoRaWAN</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-50 dark:divide-stone-800">
+                <tr>
+                  <td className="py-1.5 pr-3 text-stone-400 dark:text-stone-500">Chip</td>
+                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">SX1262 (transceiver)</td>
+                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">SX1302 (concentrator)</td>
+                </tr>
+                <tr>
+                  <td className="py-1.5 pr-3 text-stone-400 dark:text-stone-500">Protocol</td>
+                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">Direct send/receive</td>
+                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">Join → gateway → network server</td>
+                </tr>
+                <tr>
+                  <td className="py-1.5 pr-3 text-stone-400 dark:text-stone-500">Channels</td>
+                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">1</td>
+                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">8 simultaneous</td>
+                </tr>
+                <tr>
+                  <td className="py-1.5 pr-3 text-stone-400 dark:text-stone-500">Infrastructure</td>
+                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">None — just 2 radios</td>
+                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">Gateway + network server (TTN, Chirpstack)</td>
+                </tr>
+                <tr>
+                  <td className="py-1.5 pr-3 text-stone-400 dark:text-stone-500">Best for</td>
+                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">Single relay link (our use case)</td>
+                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">Many devices, multi-site, TTN/Helium</td>
+                </tr>
+                <tr>
+                  <td className="py-1.5 pr-3 text-stone-400 dark:text-stone-500">Can do P2P?</td>
+                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400 font-medium">✓ Yes (native)</td>
+                  <td className="py-1.5 pr-3 text-amber-600 dark:text-amber-400 font-medium">✗ No (gateway-only)</td>
+                </tr>
+                <tr>
+                  <td className="py-1.5 pr-3 text-stone-400 dark:text-stone-500">Can do LoRaWAN?</td>
+                  <td className="py-1.5 pr-3 text-amber-600 dark:text-amber-400 font-medium">As node only</td>
+                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400 font-medium">✓ Yes (gateway)</td>
+                </tr>
+                <tr>
+                  <td className="py-1.5 pr-3 text-stone-400 dark:text-stone-500">Cost (both ends)</td>
+                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">~$61 (HAT + USB dongle)</td>
+                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">~$103+ (RAK2287 HAT + module)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div className="bg-stone-50 dark:bg-stone-950 rounded-lg p-2.5">
+            <p className="text-[10px] text-stone-500 dark:text-stone-400 leading-relaxed">
+              <strong className="text-stone-600 dark:text-stone-300">Why P2P here:</strong> One apiary → one Mac Mini.
+              No need for LoRaWAN's multi-device gateway infrastructure, join procedures, or network server.
+              The SX1302 concentrator can't do P2P — it's optimized for receiving 8 channels simultaneously
+              and forwarding raw frames to a packet forwarder. If you later scale to multiple scattered apiaries
+              or want to join The Things Network / Helium, add a RAK2287 gateway as a separate device alongside
+              the P2P link — it won't replace it.
+            </p>
+          </div>
+        </div>
+
         {/* LoRa Bandwidth & Limitations */}
         <div className="mt-4 pt-3 border-t border-stone-100 dark:border-stone-800">
           <h4 className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase mb-3 flex items-center gap-1.5">
