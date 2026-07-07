@@ -349,10 +349,10 @@ export function Hardware() {
             <div className="space-y-2">
               <ProductLink
                 name="Waveshare USB to LoRa Module (SX1262)"
-                desc="SX1262 · 850–930MHz · USB-A · CDC serial on macOS (/dev/cu.usbmodem*) · TCXO"
-                price="$26.99"
-                url="https://www.amazon.com/dp/B0C23QP97G"
-                tag="Top pick"
+                desc="SX1262 · 850–930MHz · USB-A · CDC serial on macOS (/dev/cu.usbmodem*) · Prime · XTAL"
+                price="$25.99"
+                url="https://www.amazon.com/dp/B0C24735XX"
+                tag="Top pick · Prime"
               />
               <ProductLink
                 name="Waveshare USB to LoRa (2-pack)"
