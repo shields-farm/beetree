@@ -368,70 +368,37 @@ export function Hardware() {
           </div>
         </div>
 
-        {/* Shopping List */}
+        {/* Component Summary */}
         <div className="mt-4 pt-3 border-t border-stone-100 dark:border-stone-800">
           <h4 className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase mb-3">
-            Shopping List
+            Components Required
           </h4>
-          <div className="space-y-2">
-            <ProductLink
-              name="RAK4631 LPWAN Node (nRF52840 + SX1262, 915MHz)"
-              desc="Core module · BLE + LoRa · Arduino C · modular WisBlock system · RAK Wireless official"
-              price="$17.99"
-              url="https://store.rakwireless.com/products/rak4631-lpwan-node"
-              tag="Apiary node"
-            />
-            <ProductLink
-              name="RAK19007 WisBlock Base Board (2nd Gen)"
-              desc="Required base board for RAK4631 · USB-C · battery connector · sensor slots"
-              price="$9.99"
-              url="https://store.rakwireless.com/products/rak19007-wisblock-base-board-2nd-gen"
-              tag="Required"
-            />
-            <ProductLink
-              name="RAK WisBlock Basic Starter Kit (RAK4631 + RAK19007, 915MHz)"
-              desc="Bundle: RAK4631 + base board + antenna + USB cable · Amazon listing"
-              price="$31.97"
-              url="https://www.amazon.com/dp/B0DP74SKM1"
-              tag="Amazon bundle"
-            />
-            <ProductLink
-              name="Waveshare USB to LoRa Module (SX1262)"
-              desc="USB-A · CDC serial on macOS (/dev/cu.usbmodem*) · Prime · XTAL"
-              price="$25.99"
-              url="https://www.amazon.com/dp/B0C24735XX"
-              tag="Mac Mini receiver · Prime"
-            />
-            <ProductLink
-              name="Energizer Ultimate Lithium AA (8-pack)"
-              desc="1.5V lithium · ~4.5Wh/cell · 4 for RAK4631 + 4 spare · Amazon's Choice"
-              price="$16.99"
-              url="https://www.amazon.com/dp/B00EAKP8S0"
-              tag="Prime"
-            />
-            <ProductLink
-              name="4× AA Battery Holder with USB Port (2-pack)"
-              desc="4 AA → 6V USB output · on/off switch · powers RAK4631 via USB-C"
-              price="$5.99"
-              url="https://www.amazon.com/dp/B0DDT2JGKZ"
-            />
-            <ProductLink
-              name="Zulkit IP65 Clear Box w/ Cable Glands"
-              desc="5.9 × 3.9 × 2.8 in · hinged clear cover · 2 cable glands · ABS (RF-transparent) · weatherproof"
-              price="$9.99"
-              url="https://www.amazon.com/dp/B08KY7VK8W"
-              tag="Prime"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="flex items-center gap-2 text-xs text-stone-600 dark:text-stone-300">
+              <CheckCircle2 size={12} className="text-green-500 shrink-0" />
+              <span><strong>RAK4631 + RAK19007</strong> — WisBlock starter kit (base board + core module + 915MHz antenna)</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-stone-600 dark:text-stone-300">
+              <CheckCircle2 size={12} className="text-green-500 shrink-0" />
+              <span><strong>Waveshare USB LoRa SX1262</strong> — Mac Mini receiver dongle</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-stone-600 dark:text-stone-300">
+              <CheckCircle2 size={12} className="text-green-500 shrink-0" />
+              <span><strong>4× AA lithium batteries</strong> — powers apiary node (~2 weeks per set)</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-stone-600 dark:text-stone-300">
+              <CheckCircle2 size={12} className="text-green-500 shrink-0" />
+              <span><strong>4× AA USB battery holder</strong> — connects batteries to RAK4631 via USB-C</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-stone-600 dark:text-stone-300">
+              <CheckCircle2 size={12} className="text-green-500 shrink-0" />
+              <span><strong>IP65 waterproof case</strong> — ABS plastic (RF-transparent), cable glands for antenna</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-stone-600 dark:text-stone-300">
+              <CheckCircle2 size={12} className="text-green-500 shrink-0" />
+              <span><strong>USB-C cable</strong> — included with RAK starter kit for flashing firmware</span>
+            </div>
           </div>
-          <div className="mt-3 flex items-center justify-between">
-            <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">Total (RAK store + Prime items)</span>
-            <span className="text-lg font-bold text-honey-600 dark:text-honey-400">~$81.94</span>
-          </div>
-          <p className="text-[10px] text-stone-400 dark:text-stone-500 mt-1">
-            RAK4631 ($17.99) + RAK19007 ($9.99) + USB LoRa dongle ($25.99) + AA lithium ($16.99) + battery holder ($5.99) + case ($9.99).
-            Or buy the Amazon starter kit bundle (B0DP74SKM1, $31.97) to get RAK4631 + base board + antenna in one package.
-            ~$40 cheaper than the T-Echo equivalent, and modular — replace individual modules if they fail.
-          </p>
         </div>
       </Card>
 
