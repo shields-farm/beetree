@@ -3,6 +3,7 @@ import {
   Cpu, Server, Radio, Thermometer, Activity, Cloud, Database,
   Zap, Wifi, HardDrive, Brain, Mic, ArrowDownRight, CheckCircle2,
   Circle, Satellite, ExternalLink, Gauge, AlertTriangle, Sun, Battery, Shield,
+  Moon, Cpu as CpuIcon2,
 } from 'lucide-react';
 import { PageHeader } from '../components/Layout';
 import { Card } from '../components/Card';
@@ -662,6 +663,246 @@ export function Hardware() {
             FlexSolar 20W ($31.99) + UPS HAT ($27.90) + Zulkit case ($9.99) + 18650 cells (not included).
             Add LoRa HAT ($34.55) for a complete remote relay node: ~$104.43.
           </p>
+        </div>
+      </Card>
+
+      {/* Low-Power Alternatives */}
+      <h2 className="text-xs font-bold text-stone-400 dark:text-stone-500 uppercase tracking-wider mb-2 mt-6">
+        Low-Power Alternatives
+      </h2>
+
+      <Card className="mb-4">
+        <div className="flex items-start justify-between mb-3">
+          <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 flex items-center gap-2">
+            <CpuIcon2 size={16} className="text-honey-600 dark:text-honey-400" />
+            Microcontroller vs Pi Zero W
+          </h3>
+          <StatusBadge status="planned" label="Alternative" />
+        </div>
+        <p className="text-xs text-stone-500 dark:text-stone-400 mb-3">
+          The Pi Zero W is a full Linux computer — great for flexibility, terrible for battery life.
+          It draws 0.4W even at idle and can't truly deep sleep. For a solar or battery-powered
+          remote relay, a microcontroller with built-in BLE + LoRa can run for weeks on AA batteries.
+        </p>
+
+        {/* Sleep comparison */}
+        <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3 mb-4">
+          <h4 className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase mb-2 flex items-center gap-1.5">
+            <Moon size={12} /> Pi Zero W Sleep: Why It's Bad
+          </h4>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-[10px] text-stone-400 dark:text-stone-500 uppercase border-b border-stone-100 dark:border-stone-800">
+                  <th className="text-left py-1.5 pr-3">Method</th>
+                  <th className="text-left py-1.5 pr-3">Power</th>
+                  <th className="text-left py-1.5 pr-3">Wake Time</th>
+                  <th className="text-left py-1.5 pr-3">AA Li Runtime</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-50 dark:divide-stone-800">
+                <tr>
+                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">Always on (current)</td>
+                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">0.4W</td>
+                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">—</td>
+                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">~1.5 days</td>
+                </tr>
+                <tr>
+                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">Suspend-to-RAM</td>
+                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">0.15W</td>
+                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">10–15s (WiFi/BLE re-init)</td>
+                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">~5 days</td>
+                </tr>
+                <tr>
+                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">Shutdown + RTC wake</td>
+                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">0.01W</td>
+                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">30–60s (full boot)</td>
+                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">~75 days*</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[9px] text-stone-400 dark:text-stone-500 mt-2">
+            *But every boot cycle wears the SD card and takes 30–60s. Suspend keeps RAM powered (0.15W floor).
+            The BCM2835 SoC has no deep sleep mode — 0.15W is the hardware floor.
+          </p>
+        </div>
+
+        {/* Microcontroller comparison */}
+        <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3 mb-4">
+          <h4 className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase mb-2 flex items-center gap-1.5">
+            <CpuIcon2 size={12} /> Microcontroller Alternatives
+          </h4>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-[10px] text-stone-400 dark:text-stone-500 uppercase border-b border-stone-100 dark:border-stone-800">
+                  <th className="text-left py-1.5 pr-3">Platform</th>
+                  <th className="text-left py-1.5 pr-3">BLE</th>
+                  <th className="text-left py-1.5 pr-3">LoRa</th>
+                  <th className="text-left py-1.5 pr-3">Python</th>
+                  <th className="text-left py-1.5 pr-3">Sleep</th>
+                  <th className="text-left py-1.5 pr-3">AA Li</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-50 dark:divide-stone-800">
+                <tr className="bg-honey-50/50 dark:bg-honey-950/20">
+                  <td className="py-1.5 pr-3 font-medium text-honey-700 dark:text-honey-300">LilyGO T-Echo</td>
+                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400">✓ nRF52840</td>
+                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400">✓ SX1262</td>
+                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">CircuitPython</td>
+                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400 font-medium">0.01W</td>
+                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400 font-medium">~2 weeks</td>
+                </tr>
+                <tr>
+                  <td className="py-1.5 pr-3 font-medium text-stone-700 dark:text-stone-200">Heltec LoRa 32 V3</td>
+                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400">✓ ESP32-S3</td>
+                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400">✓ SX1262</td>
+                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">MicroPython</td>
+                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">0.02W</td>
+                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">~1 week</td>
+                </tr>
+                <tr>
+                  <td className="py-1.5 pr-3 font-medium text-stone-700 dark:text-stone-200">Seeed XIAO nRF52840</td>
+                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400">✓ nRF52840</td>
+                  <td className="py-1.5 pr-3 text-amber-600 dark:text-amber-400">+ RFM95 wing</td>
+                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">CircuitPython</td>
+                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400">0.01W</td>
+                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400">~2 weeks</td>
+                </tr>
+                <tr>
+                  <td className="py-1.5 pr-3 font-medium text-stone-700 dark:text-stone-200">Pi Zero W + HAT</td>
+                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400">✓ built-in</td>
+                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400">✓ HAT</td>
+                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400">CPython</td>
+                  <td className="py-1.5 pr-3 text-red-500 dark:text-red-400">0.15W best</td>
+                  <td className="py-1.5 pr-3 text-red-500 dark:text-red-400">~5 days</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[10px] text-stone-400 dark:text-stone-500 mt-2">
+            All run a scan → send → deepsleep loop. No Linux boot, no SD card, no SSH.
+            BLE scan starts in milliseconds, not seconds. Runtime estimates use 20s scan / 5min sleep duty cycle.
+          </p>
+        </div>
+
+        {/* Product links */}
+        <div className="space-y-3">
+          {/* T-Echo */}
+          <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <CpuIcon2 size={14} className="text-honey-600 dark:text-honey-400 shrink-0" />
+              <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">Best: LilyGO T-Echo (all-in-one)</span>
+            </div>
+            <div className="space-y-2">
+              <ProductLink
+                name="LilyGO T-Echo (915MHz, nRF52840 + SX1262, BME280)"
+                desc="BLE + LoRa + GPS + e-ink display · CircuitPython · 0.01W sleep · built-in battery charging · Amazon's Choice"
+                price="$68.00"
+                url="https://www.amazon.com/dp/B0B658DZ9Z"
+                tag="Top pick"
+              />
+              <ProductLink
+                name="LilyGO T-Echo (915MHz, no BME280)"
+                desc="Same board without BME280 temp/humidity sensor · cheaper variant"
+                price="$62.00"
+                url="https://www.amazon.com/dp/B0B659536P"
+              />
+              <ProductLink
+                name="LilyGO T-Echo (older revision)"
+                desc="Original T-Echo · SoftRF lineage · $13 delivery fee · cheapest but slower shipping"
+                price="$48.00"
+                url="https://www.amazon.com/dp/B097T5TC3P"
+              />
+            </div>
+          </div>
+
+          {/* Heltec */}
+          <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Radio size={14} className="text-honey-600 dark:text-honey-400 shrink-0" />
+              <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">Budget: Heltec WiFi LoRa 32 V3</span>
+            </div>
+            <div className="space-y-2">
+              <ProductLink
+                name="Heltec LoRa 32 V3 (915MHz, ESP32-S3 + SX1262)"
+                desc="BLE + LoRa + OLED display · MicroPython · 0.02W sleep · cheapest option with display"
+                price="$22.99"
+                url="https://www.amazon.com/dp/B076MSLFC9"
+                tag="Budget"
+              />
+              <ProductLink
+                name="Heltec LoRa 32 V3 (2-pack + cases + batteries)"
+                desc="2× boards + 1100mAh batteries + protective cases · both ends of the link"
+                price="$63.99"
+                url="https://www.amazon.com/dp/B0F1CXG94J"
+              />
+            </div>
+          </div>
+
+          {/* XIAO nRF52840 */}
+          <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Cpu size={14} className="text-honey-600 dark:text-honey-400 shrink-0" />
+              <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">Modular: Seeed XIAO nRF52840 + LoRa Wing</span>
+            </div>
+            <div className="space-y-2">
+              <ProductLink
+                name="Seeed XIAO nRF52840 (CircuitPython, BLE 5.0)"
+                desc="Tiny nRF52840 board · CircuitPython · 0.01W sleep · needs separate LoRa module"
+                price="$16.99"
+                url="https://www.amazon.com/dp/B09T9VVQG7"
+              />
+              <ProductLink
+                name="RFM95W 915MHz LoRa Transceiver Module"
+                desc="SX1276 LoRa module · wire to XIAO via SPI · 915MHz · 2-pack available"
+                price="$11.64"
+                url="https://www.amazon.com/dp/B08BCGR7SK"
+              />
+            </div>
+          </div>
+
+          {/* Batteries */}
+          <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Battery size={14} className="text-honey-600 dark:text-honey-400 shrink-0" />
+              <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">Batteries (Lithium AA)</span>
+            </div>
+            <div className="space-y-2">
+              <ProductLink
+                name="Energizer Ultimate Lithium AA (8-pack)"
+                desc="1.5V lithium · ~4.5Wh per cell · 8 cells = ~36Wh · Amazon's Choice"
+                price="$16.99"
+                url="https://www.amazon.com/dp/B00EAKP8S0"
+                tag="Prime"
+              />
+              <ProductLink
+                name="4× AA Battery Holder with USB Port (2-pack)"
+                desc="4 AA → 6V USB output · on/off switch · fits T-Echo and Heltec USB input"
+                price="$5.99"
+                url="https://www.amazon.com/dp/B0DDT2JGKZ"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Trade-off note */}
+        <div className="mt-4 pt-3 border-t border-stone-100 dark:border-stone-800">
+          <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-2.5">
+            <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-300">
+              <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+              <div>
+                <span className="font-semibold">Trade-off:</span> Microcontrollers run CircuitPython/MicroPython,
+                not full CPython. The <code className="font-mono text-[10px]">bleak</code> scanner library is
+                CPython-only, but BroodMinder's 21-byte BLE protocol decodes in ~10 lines of MicroPython using
+                <code className="font-mono text-[10px]"> ubluetooth.lescan()</code>. No SSH, no Linux, no SD card —
+                just flash a <code className="font-mono text-[10px]">.py</code> file over USB. The Pi Zero W stays
+                the best choice for the garage (mains power, full Linux, bleak, HA REST API); microcontrollers
+                are better for the solar remote node.
+              </div>
+            </div>
+          </div>
         </div>
       </Card>
 
