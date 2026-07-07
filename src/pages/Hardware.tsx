@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Cpu, Server, Radio, Thermometer, Activity, Cloud, Database,
   Zap, Wifi, HardDrive, Brain, Mic, ArrowDownRight, CheckCircle2,
-  Circle, Satellite, ExternalLink, Gauge, AlertTriangle,
+  Circle, Satellite, ExternalLink, Gauge, AlertTriangle, Sun, Battery, Shield,
 } from 'lucide-react';
 import { PageHeader } from '../components/Layout';
 import { Card } from '../components/Card';
@@ -514,6 +514,154 @@ export function Hardware() {
               </div>
             </div>
           </div>
+        </div>
+      </Card>
+
+      {/* Solar Power Kit */}
+      <h2 className="text-xs font-bold text-stone-400 dark:text-stone-500 uppercase tracking-wider mb-2 mt-6">
+        Solar Power Kit
+      </h2>
+
+      <Card className="mb-4">
+        <div className="flex items-start justify-between mb-3">
+          <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 flex items-center gap-2">
+            <Sun size={16} className="text-honey-600 dark:text-honey-400" />
+            Off-Grid Power for Remote Pi
+          </h3>
+          <StatusBadge status="planned" label="Planned / Optional" />
+        </div>
+        <p className="text-xs text-stone-500 dark:text-stone-400 mb-3">
+          For a solar-powered LoRa relay at a far apiary. Pi Zero W + LoRa HAT draws ~1W total.
+          A 20W panel + UPS HAT with 18650 batteries provides indefinite off-grid runtime with 2+ days
+          of battery reserve for cloudy weather. All components Prime-eligible.
+        </p>
+
+        {/* Power budget */}
+        <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3 mb-4">
+          <h4 className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase mb-2">
+            Power Budget
+          </h4>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <Spec label="Pi Zero W idle" value="0.4W" />
+            <Spec label="BLE scanning" value="0.6W" />
+            <Spec label="LoRa HAT TX" value="0.3W" />
+            <Spec label="Total load" value="~1W" />
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
+            <Spec label="Daily usage" value="~12 Wh" />
+            <Spec label="20W panel" value="~80 Wh/day*" />
+            <Spec label="3× 18650" value="~33 Wh" />
+            <Spec label="Reserve" value="~2.7 days" />
+          </div>
+          <p className="text-[9px] text-stone-400 dark:text-stone-500 mt-2">
+            *At 4 hrs full sun equivalent. Georgia avg ~4.5 peak sun hours/day.
+          </p>
+        </div>
+
+        {/* Solar Panel */}
+        <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3 mb-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Sun size={14} className="text-honey-600 dark:text-honey-400 shrink-0" />
+            <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">Solar Panel</span>
+          </div>
+          <div className="space-y-2">
+            <ProductLink
+              name="FlexSolar 20W USB Solar Panel"
+              desc="5V USB-A + USB-C · IP67 waterproof · foldable · 20W headroom for charging + load"
+              price="$31.99"
+              url="https://www.amazon.com/dp/B0D7BTJJ2D"
+              tag="Top pick · Prime"
+            />
+            <ProductLink
+              name="BLAVOR 10W Portable Solar Charger"
+              desc="5V/2A USB-A + USB-C · IPX4 · foldable · budget option, adequate for ~1W load"
+              price="$26.99"
+              url="https://www.amazon.com/dp/B0BJDBQXQ3"
+              tag="Prime"
+            />
+          </div>
+        </div>
+
+        {/* Battery / UPS */}
+        <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3 mb-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Battery size={14} className="text-honey-600 dark:text-honey-400 shrink-0" />
+            <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">Battery / UPS (Pass-Through Charging)</span>
+          </div>
+          <div className="space-y-2">
+            <ProductLink
+              name="UPS HAT for Pi Zero (Solar 5V–24V Input)"
+              desc="Accepts solar directly · I2C battery monitoring · 5V stable output · uses 18650 cells · pass-through by design"
+              price="$27.90"
+              url="https://www.amazon.com/dp/B0F8MZM43C"
+              tag="Top pick · Prime"
+            />
+            <ProductLink
+              name="Waveshare Solar Power Management Module"
+              desc="MPPT charge controller · 6V–24V solar input · USB output to Pi · works with any Pi model"
+              price="$13.60"
+              url="https://www.amazon.com/dp/B07PBRK8KG"
+              tag="Prime"
+            />
+            <ProductLink
+              name="Waveshare Solar Power Mgmt Module (D)"
+              desc="MPPT · 6V–24V solar + Type-C input · newer variant with USB-C charging option"
+              price="$19.19"
+              url="https://www.amazon.com/dp/B0CT83WN6N"
+              tag="Prime"
+            />
+          </div>
+          <p className="text-[10px] text-stone-400 dark:text-stone-500 mt-2">
+            The UPS HAT handles solar input, battery charging, and 5V output to the Pi in one board —
+            no separate charge controller needed. Uses standard 18650 cells (not included).
+          </p>
+        </div>
+
+        {/* Waterproof Case */}
+        <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Shield size={14} className="text-honey-600 dark:text-honey-400 shrink-0" />
+            <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">Waterproof Enclosure (RF-Transparent)</span>
+          </div>
+          <div className="space-y-2">
+            <ProductLink
+              name="Zulkit IP65 Clear Box w/ Cable Glands"
+              desc="5.9 × 3.9 × 2.8 in · hinged clear cover · 2 cable glands · ABS (RF-transparent) · fits Pi Zero + HAT + battery"
+              price="$9.99"
+              url="https://www.amazon.com/dp/B08KY7VK8W"
+              tag="Top pick · Prime"
+            />
+            <ProductLink
+              name="LeMotech IP67 Clear Waterproof Box"
+              desc="11.8 × 7.7 × 5.2 in · IP67 (better sealing) · clear hinged cover · cable glands + mounting plate · room for battery"
+              price="$39.99"
+              url="https://www.amazon.com/dp/B0BP7DZCJG"
+              tag="Prime"
+            />
+            <ProductLink
+              name="Sixfab IP65 Pi Enclosure"
+              desc="4.9 × 8.3 × 2.3 in · purpose-built for Raspberry Pi · dustproof/water-resistant · IoT-rated"
+              price="$75.00"
+              url="https://www.amazon.com/dp/B09TRZ5BTB"
+              tag="Prime"
+            />
+          </div>
+          <p className="text-[10px] text-stone-400 dark:text-stone-500 mt-2">
+            All options are ABS plastic — critical for LoRa antenna signal penetration.
+            Metal enclosures block RF. Cable glands feed the solar panel cable and antenna through the case wall.
+          </p>
+        </div>
+
+        {/* Shopping list summary */}
+        <div className="mt-4 pt-3 border-t border-stone-100 dark:border-stone-800">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">Complete Solar Kit Total</span>
+            <span className="text-lg font-bold text-honey-600 dark:text-honey-400">~$69.88</span>
+          </div>
+          <p className="text-[10px] text-stone-400 dark:text-stone-500 mt-1">
+            FlexSolar 20W ($31.99) + UPS HAT ($27.90) + Zulkit case ($9.99) + 18650 cells (not included).
+            Add LoRa HAT ($34.55) for a complete remote relay node: ~$104.43.
+          </p>
         </div>
       </Card>
 
