@@ -19,6 +19,7 @@ const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.S
 const Pests = lazy(() => import('./pages/Pests').then(m => ({ default: m.Pests })));
 const ForageForecast = lazy(() => import('./pages/ForageForecast').then(m => ({ default: m.ForageForecast })));
 const Equipment = lazy(() => import('./pages/Equipment').then(m => ({ default: m.Equipment })));
+const Hardware = lazy(() => import('./pages/Hardware').then(m => ({ default: m.Hardware })));
 
 import { useParams } from 'react-router-dom';
 function HiveDetailPage() {
@@ -63,6 +64,7 @@ export default function App() {
             <Route path="/forage" element={<ForageForecast />} />
             <Route path="/tasks" element={<Tasks />} />
             <Route path="/equipment" element={<Equipment />} />
+            <Route path="/hardware" element={<Hardware />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
           </Suspense>

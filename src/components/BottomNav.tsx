@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Boxes, ClipboardList, Thermometer, CheckSquare, MoreHorizontal, X, Flower2, Bug, ShoppingBag, Settings as SettingsIcon } from 'lucide-react';
+import { Boxes, ClipboardList, Thermometer, CheckSquare, MoreHorizontal, X, Flower2, Bug, ShoppingBag, Settings as SettingsIcon, Cpu } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 /** Custom icon: a 10-frame deep hive box (side view with vertical frame lines) */
@@ -34,6 +34,7 @@ const SECONDARY_NAV = [
   { to: '/pests', label: 'Pests', icon: Bug },
   { to: '/forage', label: 'Forage', icon: Flower2 },
   { to: '/equipment', label: 'Equipment', icon: ShoppingBag },
+  { to: '/hardware', label: 'Hardware', icon: Cpu },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ];
 
