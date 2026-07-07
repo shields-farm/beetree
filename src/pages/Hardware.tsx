@@ -109,26 +109,18 @@ const AI_DIAGRAM = `graph TB
 `;
 
 const LORA_DIAGRAM = `graph LR
-  subgraph Near["Near Hives — WiFi Range"]
-    BM_NEAR["BroodMinder sensors"]
-    PI_GARAGE["Pi Zero W<br/>garage · mains power"]
+  subgraph Apiary["🐝 Far Apiary — Battery Powered"]
+    BM["6× BroodMinder<br/>TH · TH-Pro · TH-Pro2"]
+    TECHO["LilyGO T-Echo<br/>nRF52840 BLE + SX1262 LoRa<br/>CircuitPython · 0.01W sleep<br/>4× AA lithium"]
   end
-  subgraph Far["Far Hives — Beyond WiFi"]
-    BM_FAR["BroodMinder sensors"]
-    PI_SOLAR["Pi Zero 2 W<br/>solar · LoRa module"]
-  end
-  subgraph Gateway["House Gateway"]
-    PI_GW["Pi Zero 2 W<br/>LoRa → WiFi relay"]
-  end
-  subgraph MacMini["Mac Mini"]
-    HA_GW["Home Assistant"]
+  subgraph House["🖥️ Mac Mini — 192.0.2.10"]
+    USB["Waveshare USB LoRa<br/>SX1262 dongle<br/>/dev/cu.usbmodem*"]
+    HA["Home Assistant"]
   end
 
-  BM_NEAR -.->|"BLE"| PI_GARAGE
-  PI_GARAGE -->|"WiFi"| HA_GW
-  BM_FAR -.->|"BLE"| PI_SOLAR
-  PI_SOLAR -.->|"LoRa 915MHz<br/>1-2 mi"| PI_GW
-  PI_GW -->|"WiFi"| HA_GW
+  BM -.->|"BLE 4.1"| TECHO
+  TECHO -.->|"LoRa 915MHz P2P<br/>~200 bytes / 5 min"| USB
+  USB -->|"Serial → Python"| HA
 `;
 
 // ─── Hardware Page ─────────────────────────────────────────────────────────
@@ -280,629 +272,150 @@ export function Hardware() {
         </div>
       </Card>
 
-      {/* LoRa Section */}
+      {/* LoRa / T-Echo Section */}
       <h2 className="text-xs font-bold text-stone-400 dark:text-stone-500 uppercase tracking-wider mb-2 mt-6">
-        Connectivity
+        LoRa Relay — T-Echo
       </h2>
 
       <Card className="mb-4">
         <div className="flex items-start justify-between mb-3">
           <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 flex items-center gap-2">
-            <Satellite size={16} className="text-stone-400 dark:text-stone-500" />
-            LoRa — Long Range Extension
+            <Satellite size={16} className="text-honey-600 dark:text-honey-400" />
+            BroodMinder BLE → LoRa → Mac Mini
           </h3>
-          <StatusBadge status="planned" label="Planned / Optional" />
+          <StatusBadge status="planned" label="Planned" />
         </div>
         <p className="text-xs text-stone-500 dark:text-stone-400 mb-3">
-          Not currently deployed. LoRa at 915 MHz can extend sensor coverage to hives beyond WiFi range
-          (1–2 miles line-of-sight). Architecture: a solar-powered Pi Zero 2 W at the far apiary relays
-          BLE → LoRa, and a LoRa USB dongle on the Mac Mini receives LoRa → Home Assistant.
+          A single LilyGO T-Echo at the far apiary scans BroodMinder BLE sensors, sends readings via
+          LoRa P2P to a USB dongle on the Mac Mini, which forwards to Home Assistant. No Pi, no solar,
+          no Linux — just a microcontroller on AA batteries talking to a USB receiver.
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
-          <Spec label="Frequency" value="915 MHz" />
-          <Spec label="Range" value="1–2 mi LOS" />
-          <Spec label="Power" value="Solar + 18650" />
-        </div>
         <Mermaid chart={LORA_DIAGRAM} />
 
-        {/* Recommended Hardware */}
-        <div className="mt-4 pt-3 border-t border-stone-100 dark:border-stone-800">
-          <h4 className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase mb-3">
-            Recommended Hardware
-          </h4>
-
-          {/* Pi Zero W HAT */}
-          <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3 mb-3">
-            <div className="flex items-center gap-2 mb-2">
-              <Cpu size={14} className="text-honey-600 dark:text-honey-400 shrink-0" />
-              <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">For Pi Zero W — LoRa HAT</span>
-            </div>
-            <div className="space-y-2">
-              <ProductLink
-                name="Waveshare SX1262 LoRa HAT (B) 915MHz"
-                desc="SX1262 · 40-pin GPIO pass-through · +22 dBm · IPEX antenna · ~5km range"
-                price="$34.55"
-                url="https://www.amazon.com/dp/B0822Z3CX8"
-                tag="Top pick"
-              />
-              <ProductLink
-                name="Waveshare SX1262 LoRa HAT (868/915)"
-                desc="SX1262 · SMA antenna · full pass-through header · configurable pins"
-                price="$35.99"
-                url="https://www.amazon.com/dp/B07VS1S2P7"
-              />
-              <ProductLink
-                name="RAK2287/RAK5146 Pi HAT"
-                desc="SX1302 concentrator · multi-channel gateway · SPI/USB · for LoRaWAN gateway use"
-                price="$19.00 (HAT only) + $84.00 module"
-                url="https://store.rakwireless.com/products/rak2287-pi-hat"
-                tag="Gateway"
-              />
-            </div>
-          </div>
-
-          {/* Mac Mini USB */}
-          <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <Radio size={14} className="text-honey-600 dark:text-honey-400 shrink-0" />
-              <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">For Mac Mini — LoRa USB</span>
-            </div>
-            <div className="space-y-2">
-              <ProductLink
-                name="Waveshare USB to LoRa Module (SX1262)"
-                desc="SX1262 · 850–930MHz · USB-A · CDC serial on macOS (/dev/cu.usbmodem*) · Prime · XTAL"
-                price="$25.99"
-                url="https://www.amazon.com/dp/B0C24735XX"
-                tag="Top pick · Prime"
-              />
-              <ProductLink
-                name="Waveshare USB to LoRa (2-pack)"
-                desc="SX1262 · 2× USB dongles for both ends of the link · TCXO crystal"
-                price="$48.99"
-                url="https://www.amazon.com/dp/B0DTKDXMN2"
-              />
-              <ProductLink
-                name="RAK3172 Evaluation Board"
-                desc="STM32WLE5 + SX1262 · USB-CDC serial · AT commands · 915MHz · bare module $6"
-                price="$27.00"
-                url="https://store.rakwireless.com/collections/wisduo/products/rak3172-evaluation-board"
-              />
-            </div>
-          </div>
-
-          <p className="text-[10px] text-stone-400 dark:text-stone-500 mt-3">
-            Both ends use SX1262 for chip compatibility. The Waveshare USB dongle appears as a serial
-            device on macOS — no drivers needed. Pi HAT uses SPI pins but passes through all unused GPIO.
-          </p>
-        </div>
-
-        {/* LoRa vs LoRaWAN */}
-        <div className="mt-4 pt-3 border-t border-stone-100 dark:border-stone-800">
-          <h4 className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase mb-3 flex items-center gap-1.5">
-            <Radio size={12} /> LoRa P2P vs LoRaWAN
-          </h4>
-          <p className="text-xs text-stone-500 dark:text-stone-400 mb-3">
-            The recommended SX1262 hardware uses <strong>LoRa P2P</strong> (point-to-point) — two devices
-            talk directly with a simple send/receive protocol. This is the right choice for a single
-            apiary-to-house relay: simpler, cheaper, lower latency, no gateway infrastructure needed.
-          </p>
-          <div className="overflow-x-auto mb-3">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-[10px] text-stone-400 dark:text-stone-500 uppercase border-b border-stone-100 dark:border-stone-800">
-                  <th className="text-left py-1.5 pr-3"></th>
-                  <th className="text-left py-1.5 pr-3">LoRa P2P</th>
-                  <th className="text-left py-1.5 pr-3">LoRaWAN</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-50 dark:divide-stone-800">
-                <tr>
-                  <td className="py-1.5 pr-3 text-stone-400 dark:text-stone-500">Chip</td>
-                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">SX1262 (transceiver)</td>
-                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">SX1302 (concentrator)</td>
-                </tr>
-                <tr>
-                  <td className="py-1.5 pr-3 text-stone-400 dark:text-stone-500">Protocol</td>
-                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">Direct send/receive</td>
-                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">Join → gateway → network server</td>
-                </tr>
-                <tr>
-                  <td className="py-1.5 pr-3 text-stone-400 dark:text-stone-500">Channels</td>
-                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">1</td>
-                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">8 simultaneous</td>
-                </tr>
-                <tr>
-                  <td className="py-1.5 pr-3 text-stone-400 dark:text-stone-500">Infrastructure</td>
-                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">None — just 2 radios</td>
-                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">Gateway + network server (TTN, Chirpstack)</td>
-                </tr>
-                <tr>
-                  <td className="py-1.5 pr-3 text-stone-400 dark:text-stone-500">Best for</td>
-                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">Single relay link (our use case)</td>
-                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">Many devices, multi-site, TTN/Helium</td>
-                </tr>
-                <tr>
-                  <td className="py-1.5 pr-3 text-stone-400 dark:text-stone-500">Can do P2P?</td>
-                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400 font-medium">✓ Yes (native)</td>
-                  <td className="py-1.5 pr-3 text-amber-600 dark:text-amber-400 font-medium">✗ No (gateway-only)</td>
-                </tr>
-                <tr>
-                  <td className="py-1.5 pr-3 text-stone-400 dark:text-stone-500">Can do LoRaWAN?</td>
-                  <td className="py-1.5 pr-3 text-amber-600 dark:text-amber-400 font-medium">As node only</td>
-                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400 font-medium">✓ Yes (gateway)</td>
-                </tr>
-                <tr>
-                  <td className="py-1.5 pr-3 text-stone-400 dark:text-stone-500">Cost (both ends)</td>
-                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">~$61 (HAT + USB dongle)</td>
-                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">~$103+ (RAK2287 HAT + module)</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div className="bg-stone-50 dark:bg-stone-950 rounded-lg p-2.5">
-            <p className="text-[10px] text-stone-500 dark:text-stone-400 leading-relaxed">
-              <strong className="text-stone-600 dark:text-stone-300">Why P2P here:</strong> One apiary → one Mac Mini.
-              No need for LoRaWAN's multi-device gateway infrastructure, join procedures, or network server.
-              The SX1302 concentrator can't do P2P — it's optimized for receiving 8 channels simultaneously
-              and forwarding raw frames to a packet forwarder. If you later scale to multiple scattered apiaries
-              or want to join The Things Network / Helium, add a RAK2287 gateway as a separate device alongside
-              the P2P link — it won't replace it.
-            </p>
-          </div>
-        </div>
-
-        {/* LoRa Bandwidth & Limitations */}
-        <div className="mt-4 pt-3 border-t border-stone-100 dark:border-stone-800">
-          <h4 className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase mb-3 flex items-center gap-1.5">
-            <Gauge size={12} /> Bandwidth &amp; Limitations
-          </h4>
-
-          {/* Bandwidth table */}
-          <div className="overflow-x-auto mb-3">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-[10px] text-stone-400 dark:text-stone-500 uppercase border-b border-stone-100 dark:border-stone-800">
-                  <th className="text-left py-1.5 pr-3">Spreading Factor</th>
-                  <th className="text-left py-1.5 pr-3">Bit Rate</th>
-                  <th className="text-left py-1.5 pr-3">Latency</th>
-                  <th className="text-left py-1.5 pr-3">Range (LOS)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-50 dark:divide-stone-800">
-                <tr>
-                  <td className="py-1.5 pr-3 font-mono text-stone-600 dark:text-stone-300">SF7</td>
-                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">~11,000 bps (1,375 B/s)</td>
-                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">~47ms</td>
-                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">1–2 km</td>
-                </tr>
-                <tr>
-                  <td className="py-1.5 pr-3 font-mono text-stone-600 dark:text-stone-300">SF9</td>
-                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">~3,000 bps (375 B/s)</td>
-                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">~227ms</td>
-                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">3–4 km</td>
-                </tr>
-                <tr>
-                  <td className="py-1.5 pr-3 font-mono text-stone-600 dark:text-stone-300">SF12</td>
-                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">~530 bps (66 B/s)</td>
-                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">1.8 seconds</td>
-                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">8–15 km</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* Telemetry fit assessment */}
-          <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-2.5 mb-2.5">
-            <div className="flex items-start gap-2 text-xs text-green-700 dark:text-green-300">
-              <CheckCircle2 size={14} className="shrink-0 mt-0.5" />
-              <div>
-                <span className="font-semibold">Telemetry fits comfortably.</span> 6 sensors × 21 bytes = 126 bytes
-                per 20s scan cycle. With framing: ~200–300 bytes. Even at SF12 (66 B/s), that's ~4.5s of airtime
-                — well within the cycle.
-              </div>
-            </div>
-          </div>
-
-          {/* SSH warning */}
-          <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-2.5">
-            <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-300">
-              <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-              <div>
-                <span className="font-semibold">No SSH or mosh over LoRa.</span> SSH handshake alone is 2–4 KB
-                (3–8s at SF7, 60s+ at SF12). Each keystroke round-trip is 50ms–1.8s. LoRa is a telegraph, not a
-                telephone — sensor data only. For remote shell access to a far Pi, use cellular (SIM7600 4G HAT,
-                ~$30) or WiFi mesh (Ubiquiti NanoStation, ~$50/pair) if line-of-sight is available.
-              </div>
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      {/* Solar Power Kit */}
-      <h2 className="text-xs font-bold text-stone-400 dark:text-stone-500 uppercase tracking-wider mb-2 mt-6">
-        Solar Power Kit
-      </h2>
-
-      <Card className="mb-4">
-        <div className="flex items-start justify-between mb-3">
-          <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 flex items-center gap-2">
-            <Sun size={16} className="text-honey-600 dark:text-honey-400" />
-            Off-Grid Power for Remote Pi
-          </h3>
-          <StatusBadge status="planned" label="Planned / Optional" />
-        </div>
-        <p className="text-xs text-stone-500 dark:text-stone-400 mb-3">
-          For a solar-powered LoRa relay at a far apiary. Pi Zero W + LoRa HAT draws ~1W total.
-          A 20W panel + UPS HAT with 18650 batteries provides indefinite off-grid runtime with 2+ days
-          of battery reserve for cloudy weather. All components Prime-eligible.
-        </p>
-
-        {/* Power budget */}
-        <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3 mb-4">
-          <h4 className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase mb-2">
-            Power Budget
-          </h4>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <Spec label="Pi Zero W idle" value="0.4W" />
-            <Spec label="BLE scanning" value="0.6W" />
-            <Spec label="LoRa HAT TX" value="0.3W" />
-            <Spec label="Total load" value="~1W" />
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
-            <Spec label="Daily usage" value="~12 Wh" />
-            <Spec label="20W panel" value="~80 Wh/day*" />
-            <Spec label="3× 18650" value="~33 Wh" />
-            <Spec label="Reserve" value="~2.7 days" />
-          </div>
-          <p className="text-[9px] text-stone-400 dark:text-stone-500 mt-2">
-            *At 4 hrs full sun equivalent. Georgia avg ~4.5 peak sun hours/day.
-          </p>
-        </div>
-
-        {/* Solar Panel */}
-        <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3 mb-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Sun size={14} className="text-honey-600 dark:text-honey-400 shrink-0" />
-            <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">Solar Panel</span>
-          </div>
-          <div className="space-y-2">
-            <ProductLink
-              name="FlexSolar 20W USB Solar Panel"
-              desc="5V USB-A + USB-C · IP67 waterproof · foldable · 20W headroom for charging + load"
-              price="$31.99"
-              url="https://www.amazon.com/dp/B0D7BTJJ2D"
-              tag="Top pick · Prime"
-            />
-            <ProductLink
-              name="BLAVOR 10W Portable Solar Charger"
-              desc="5V/2A USB-A + USB-C · IPX4 · foldable · budget option, adequate for ~1W load"
-              price="$26.99"
-              url="https://www.amazon.com/dp/B0BJDBQXQ3"
-              tag="Prime"
-            />
-          </div>
-        </div>
-
-        {/* Battery / UPS */}
-        <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3 mb-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Battery size={14} className="text-honey-600 dark:text-honey-400 shrink-0" />
-            <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">Battery / UPS (Pass-Through Charging)</span>
-          </div>
-          <div className="space-y-2">
-            <ProductLink
-              name="UPS HAT for Pi Zero (Solar 5V–24V Input)"
-              desc="Accepts solar directly · I2C battery monitoring · 5V stable output · uses 18650 cells · pass-through by design"
-              price="$27.90"
-              url="https://www.amazon.com/dp/B0F8MZM43C"
-              tag="Top pick · Prime"
-            />
-            <ProductLink
-              name="Waveshare Solar Power Management Module"
-              desc="MPPT charge controller · 6V–24V solar input · USB output to Pi · works with any Pi model"
-              price="$13.60"
-              url="https://www.amazon.com/dp/B07PBRK8KG"
-              tag="Prime"
-            />
-            <ProductLink
-              name="Waveshare Solar Power Mgmt Module (D)"
-              desc="MPPT · 6V–24V solar + Type-C input · newer variant with USB-C charging option"
-              price="$19.19"
-              url="https://www.amazon.com/dp/B0CT83WN6N"
-              tag="Prime"
-            />
-          </div>
-          <p className="text-[10px] text-stone-400 dark:text-stone-500 mt-2">
-            The UPS HAT handles solar input, battery charging, and 5V output to the Pi in one board —
-            no separate charge controller needed. Uses standard 18650 cells (not included).
-          </p>
-        </div>
-
-        {/* Waterproof Case */}
-        <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Shield size={14} className="text-honey-600 dark:text-honey-400 shrink-0" />
-            <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">Waterproof Enclosure (RF-Transparent)</span>
-          </div>
-          <div className="space-y-2">
-            <ProductLink
-              name="Zulkit IP65 Clear Box w/ Cable Glands"
-              desc="5.9 × 3.9 × 2.8 in · hinged clear cover · 2 cable glands · ABS (RF-transparent) · fits Pi Zero + HAT + battery"
-              price="$9.99"
-              url="https://www.amazon.com/dp/B08KY7VK8W"
-              tag="Top pick · Prime"
-            />
-            <ProductLink
-              name="LeMotech IP67 Clear Waterproof Box"
-              desc="11.8 × 7.7 × 5.2 in · IP67 (better sealing) · clear hinged cover · cable glands + mounting plate · room for battery"
-              price="$39.99"
-              url="https://www.amazon.com/dp/B0BP7DZCJG"
-              tag="Prime"
-            />
-            <ProductLink
-              name="Sixfab IP65 Pi Enclosure"
-              desc="4.9 × 8.3 × 2.3 in · purpose-built for Raspberry Pi · dustproof/water-resistant · IoT-rated"
-              price="$75.00"
-              url="https://www.amazon.com/dp/B09TRZ5BTB"
-              tag="Prime"
-            />
-          </div>
-          <p className="text-[10px] text-stone-400 dark:text-stone-500 mt-2">
-            All options are ABS plastic — critical for LoRa antenna signal penetration.
-            Metal enclosures block RF. Cable glands feed the solar panel cable and antenna through the case wall.
-          </p>
-        </div>
-
-        {/* Shopping list summary */}
-        <div className="mt-4 pt-3 border-t border-stone-100 dark:border-stone-800">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">Complete Solar Kit Total</span>
-            <span className="text-lg font-bold text-honey-600 dark:text-honey-400">~$69.88</span>
-          </div>
-          <p className="text-[10px] text-stone-400 dark:text-stone-500 mt-1">
-            FlexSolar 20W ($31.99) + UPS HAT ($27.90) + Zulkit case ($9.99) + 18650 cells (not included).
-            Add LoRa HAT ($34.55) for a complete remote relay node: ~$104.43.
-          </p>
-        </div>
-      </Card>
-
-      {/* Low-Power Alternatives */}
-      <h2 className="text-xs font-bold text-stone-400 dark:text-stone-500 uppercase tracking-wider mb-2 mt-6">
-        Low-Power Alternatives
-      </h2>
-
-      <Card className="mb-4">
-        <div className="flex items-start justify-between mb-3">
-          <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 flex items-center gap-2">
-            <CpuIcon2 size={16} className="text-honey-600 dark:text-honey-400" />
-            Microcontroller vs Pi Zero W
-          </h3>
-          <StatusBadge status="planned" label="Alternative" />
-        </div>
-        <p className="text-xs text-stone-500 dark:text-stone-400 mb-3">
-          The Pi Zero W is a full Linux computer — great for flexibility, terrible for battery life.
-          It draws 0.4W even at idle and can't truly deep sleep. For a solar or battery-powered
-          remote relay, a microcontroller with built-in BLE + LoRa can run for weeks on AA batteries.
-        </p>
-
-        {/* Sleep comparison */}
-        <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3 mb-4">
-          <h4 className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase mb-2 flex items-center gap-1.5">
-            <Moon size={12} /> Pi Zero W Sleep: Why It's Bad
-          </h4>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-[10px] text-stone-400 dark:text-stone-500 uppercase border-b border-stone-100 dark:border-stone-800">
-                  <th className="text-left py-1.5 pr-3">Method</th>
-                  <th className="text-left py-1.5 pr-3">Power</th>
-                  <th className="text-left py-1.5 pr-3">Wake Time</th>
-                  <th className="text-left py-1.5 pr-3">AA Li Runtime</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-50 dark:divide-stone-800">
-                <tr>
-                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">Always on (current)</td>
-                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">0.4W</td>
-                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">—</td>
-                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">~1.5 days</td>
-                </tr>
-                <tr>
-                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">Suspend-to-RAM</td>
-                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">0.15W</td>
-                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">10–15s (WiFi/BLE re-init)</td>
-                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">~5 days</td>
-                </tr>
-                <tr>
-                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">Shutdown + RTC wake</td>
-                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">0.01W</td>
-                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">30–60s (full boot)</td>
-                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">~75 days*</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p className="text-[9px] text-stone-400 dark:text-stone-500 mt-2">
-            *But every boot cycle wears the SD card and takes 30–60s. Suspend keeps RAM powered (0.15W floor).
-            The BCM2835 SoC has no deep sleep mode — 0.15W is the hardware floor.
-          </p>
-        </div>
-
-        {/* Microcontroller comparison */}
-        <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3 mb-4">
-          <h4 className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase mb-2 flex items-center gap-1.5">
-            <CpuIcon2 size={12} /> Microcontroller Alternatives
-          </h4>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-[10px] text-stone-400 dark:text-stone-500 uppercase border-b border-stone-100 dark:border-stone-800">
-                  <th className="text-left py-1.5 pr-3">Platform</th>
-                  <th className="text-left py-1.5 pr-3">BLE</th>
-                  <th className="text-left py-1.5 pr-3">LoRa</th>
-                  <th className="text-left py-1.5 pr-3">Python</th>
-                  <th className="text-left py-1.5 pr-3">Sleep</th>
-                  <th className="text-left py-1.5 pr-3">AA Li</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-50 dark:divide-stone-800">
-                <tr className="bg-honey-50/50 dark:bg-honey-950/20">
-                  <td className="py-1.5 pr-3 font-medium text-honey-700 dark:text-honey-300">LilyGO T-Echo</td>
-                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400">✓ nRF52840</td>
-                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400">✓ SX1262</td>
-                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">CircuitPython</td>
-                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400 font-medium">0.01W</td>
-                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400 font-medium">~2 weeks</td>
-                </tr>
-                <tr>
-                  <td className="py-1.5 pr-3 font-medium text-stone-700 dark:text-stone-200">Heltec LoRa 32 V3</td>
-                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400">✓ ESP32-S3</td>
-                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400">✓ SX1262</td>
-                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">MicroPython</td>
-                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">0.02W</td>
-                  <td className="py-1.5 pr-3 text-stone-500 dark:text-stone-400">~1 week</td>
-                </tr>
-                <tr>
-                  <td className="py-1.5 pr-3 font-medium text-stone-700 dark:text-stone-200">Seeed XIAO nRF52840</td>
-                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400">✓ nRF52840</td>
-                  <td className="py-1.5 pr-3 text-amber-600 dark:text-amber-400">+ RFM95 wing</td>
-                  <td className="py-1.5 pr-3 text-stone-600 dark:text-stone-300">CircuitPython</td>
-                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400">0.01W</td>
-                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400">~2 weeks</td>
-                </tr>
-                <tr>
-                  <td className="py-1.5 pr-3 font-medium text-stone-700 dark:text-stone-200">Pi Zero W + HAT</td>
-                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400">✓ built-in</td>
-                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400">✓ HAT</td>
-                  <td className="py-1.5 pr-3 text-green-600 dark:text-green-400">CPython</td>
-                  <td className="py-1.5 pr-3 text-red-500 dark:text-red-400">0.15W best</td>
-                  <td className="py-1.5 pr-3 text-red-500 dark:text-red-400">~5 days</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p className="text-[10px] text-stone-400 dark:text-stone-500 mt-2">
-            All run a scan → send → deepsleep loop. No Linux boot, no SD card, no SSH.
-            BLE scan starts in milliseconds, not seconds. Runtime estimates use 20s scan / 5min sleep duty cycle.
-          </p>
-        </div>
-
-        {/* Product links */}
-        <div className="space-y-3">
-          {/* T-Echo */}
+        {/* Architecture details */}
+        <div className="mt-4 pt-3 border-t border-stone-100 dark:border-stone-800 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3">
             <div className="flex items-center gap-2 mb-2">
               <CpuIcon2 size={14} className="text-honey-600 dark:text-honey-400 shrink-0" />
-              <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">Best: LilyGO T-Echo (all-in-one)</span>
+              <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">Apiary Node (T-Echo)</span>
             </div>
-            <div className="space-y-2">
-              <ProductLink
-                name="LilyGO T-Echo (915MHz, nRF52840 + SX1262, BME280)"
-                desc="BLE + LoRa + GPS + e-ink display · CircuitPython · 0.01W sleep · built-in battery charging · Amazon's Choice"
-                price="$68.00"
-                url="https://www.amazon.com/dp/B0B658DZ9Z"
-                tag="Top pick"
-              />
-              <ProductLink
-                name="LilyGO T-Echo (915MHz, no BME280)"
-                desc="Same board without BME280 temp/humidity sensor · cheaper variant"
-                price="$62.00"
-                url="https://www.amazon.com/dp/B0B659536P"
-              />
-              <ProductLink
-                name="LilyGO T-Echo (older revision)"
-                desc="Original T-Echo · SoftRF lineage · $13 delivery fee · cheapest but slower shipping"
-                price="$48.00"
-                url="https://www.amazon.com/dp/B097T5TC3P"
-              />
+            <div className="space-y-1 text-[11px] text-stone-500 dark:text-stone-400">
+              <div>• Scans BroodMinder BLE every 5 min (20s scan window)</div>
+              <div>• Decodes 21-byte protocol (company ID 0x028D)</div>
+              <div>• Packs ~200 bytes, TX via SX1262 LoRa</div>
+              <div>• Deep sleeps at 0.01W between scans</div>
+              <div>• BME280 sensor logs ambient temp/humidity</div>
+              <div>• E-ink display shows last readings (zero power)</div>
+              <div>• Runs on 4× AA lithium ≈ 2 weeks</div>
             </div>
           </div>
-
-          {/* Heltec */}
           <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3">
             <div className="flex items-center gap-2 mb-2">
               <Radio size={14} className="text-honey-600 dark:text-honey-400 shrink-0" />
-              <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">Budget: Heltec WiFi LoRa 32 V3</span>
+              <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">Mac Mini Receiver (USB)</span>
             </div>
-            <div className="space-y-2">
-              <ProductLink
-                name="Heltec LoRa 32 V3 (915MHz, ESP32-S3 + SX1262)"
-                desc="BLE + LoRa + OLED display · MicroPython · 0.02W sleep · cheapest option with display"
-                price="$22.99"
-                url="https://www.amazon.com/dp/B076MSLFC9"
-                tag="Budget"
-              />
-              <ProductLink
-                name="Heltec LoRa 32 V3 (2-pack + cases + batteries)"
-                desc="2× boards + 1100mAh batteries + protective cases · both ends of the link"
-                price="$63.99"
-                url="https://www.amazon.com/dp/B0F1CXG94J"
-              />
-            </div>
-          </div>
-
-          {/* XIAO nRF52840 */}
-          <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <Cpu size={14} className="text-honey-600 dark:text-honey-400 shrink-0" />
-              <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">Modular: Seeed XIAO nRF52840 + LoRa Wing</span>
-            </div>
-            <div className="space-y-2">
-              <ProductLink
-                name="Seeed XIAO nRF52840 (CircuitPython, BLE 5.0)"
-                desc="Tiny nRF52840 board · CircuitPython · 0.01W sleep · needs separate LoRa module"
-                price="$16.99"
-                url="https://www.amazon.com/dp/B09T9VVQG7"
-              />
-              <ProductLink
-                name="RFM95W 915MHz LoRa Transceiver Module"
-                desc="SX1276 LoRa module · wire to XIAO via SPI · 915MHz · 2-pack available"
-                price="$11.64"
-                url="https://www.amazon.com/dp/B08BCGR7SK"
-              />
-            </div>
-          </div>
-
-          {/* Batteries */}
-          <div className="bg-stone-50 dark:bg-stone-950 rounded-xl p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <Battery size={14} className="text-honey-600 dark:text-honey-400 shrink-0" />
-              <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">Batteries (Lithium AA)</span>
-            </div>
-            <div className="space-y-2">
-              <ProductLink
-                name="Energizer Ultimate Lithium AA (8-pack)"
-                desc="1.5V lithium · ~4.5Wh per cell · 8 cells = ~36Wh · Amazon's Choice"
-                price="$16.99"
-                url="https://www.amazon.com/dp/B00EAKP8S0"
-                tag="Prime"
-              />
-              <ProductLink
-                name="4× AA Battery Holder with USB Port (2-pack)"
-                desc="4 AA → 6V USB output · on/off switch · fits T-Echo and Heltec USB input"
-                price="$5.99"
-                url="https://www.amazon.com/dp/B0DDT2JGKZ"
-              />
+            <div className="space-y-1 text-[11px] text-stone-500 dark:text-stone-400">
+              <div>• Waveshare USB LoRa dongle (SX1262, 915MHz)</div>
+              <div>• Appears as /dev/cu.usbmodem* — no drivers</div>
+              <div>• Python script reads serial, forwards to HA</div>
+              <div>• Powered by Mac Mini USB — no battery</div>
+              <div>• Same SX1262 chip as T-Echo for compatibility</div>
             </div>
           </div>
         </div>
 
-        {/* Trade-off note */}
-        <div className="mt-4 pt-3 border-t border-stone-100 dark:border-stone-800">
-          <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-2.5">
-            <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-300">
-              <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-              <div>
-                <span className="font-semibold">Trade-off:</span> Microcontrollers run CircuitPython/MicroPython,
-                not full CPython. The <code className="font-mono text-[10px]">bleak</code> scanner library is
-                CPython-only, but BroodMinder's 21-byte BLE protocol decodes in ~10 lines of MicroPython using
-                <code className="font-mono text-[10px]"> ubluetooth.lescan()</code>. No SSH, no Linux, no SD card —
-                just flash a <code className="font-mono text-[10px]">.py</code> file over USB. The Pi Zero W stays
-                the best choice for the garage (mains power, full Linux, bleak, HA REST API); microcontrollers
-                are better for the solar remote node.
-              </div>
+        {/* Power budget */}
+        <div className="mt-3 bg-stone-50 dark:bg-stone-950 rounded-xl p-3">
+          <h4 className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase mb-2 flex items-center gap-1.5">
+            <Battery size={12} /> Power Budget (Apiary T-Echo)
+          </h4>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <Spec label="Active scan" value="0.05W" />
+            <Spec label="LoRa TX" value="0.3W" />
+            <Spec label="Deep sleep" value="0.01W" />
+            <Spec label="Avg (5min cycle)" value="~0.02W" />
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+            <Spec label="4× AA lithium" value="~18 Wh" />
+            <Spec label="Runtime" value="~2 weeks" />
+            <Spec label="No solar needed" value="✓" />
+          </div>
+          <p className="text-[9px] text-stone-400 dark:text-stone-500 mt-2">
+            20s active scan / 5min sleep = 6.7% duty cycle. Energizer Ultimate Lithium AA: 4.5Wh/cell × 4 = 18Wh.
+            At 0.02W avg, runtime ≈ 18Wh / 0.02W = 900h ≈ 37 days theoretical (real-world ~2 weeks with overhead).
+          </p>
+        </div>
+
+        {/* Bandwidth */}
+        <div className="mt-3 bg-stone-50 dark:bg-stone-950 rounded-xl p-3">
+          <h4 className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase mb-2 flex items-center gap-1.5">
+            <Gauge size={12} /> Bandwidth &amp; Limitations
+          </h4>
+          <div className="space-y-1.5 text-[11px] text-stone-500 dark:text-stone-400">
+            <div className="flex items-start gap-2">
+              <CheckCircle2 size={12} className="text-green-500 shrink-0 mt-0.5" />
+              <span><strong className="text-green-700 dark:text-green-300">Telemetry fits easily.</strong> 6 sensors × 21 bytes = 126 bytes per batch. At SF7 (~11,000 bps) that's ~0.1s of airtime every 5 minutes.</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <AlertTriangle size={12} className="text-amber-500 shrink-0 mt-0.5" />
+              <span><strong className="text-amber-700 dark:text-amber-300">No SSH over LoRa.</strong> LoRa is for sensor data only (66 B/s at SF12, 1,375 B/s at SF7). For remote access to the apiary, use a phone hotspot or cellular.</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <AlertTriangle size={12} className="text-amber-500 shrink-0 mt-0.5" />
+              <span><strong className="text-amber-700 dark:text-amber-300">CircuitPython, not CPython.</strong> BroodMinder's 21-byte BLE protocol decodes in ~10 lines using <code className="font-mono text-[10px]">ubluetooth.lescan()</code>. No <code className="font-mono text-[10px]">bleak</code>, no Linux, no SD card — flash a <code className="font-mono text-[10px]">.py</code> file over USB.</span>
             </div>
           </div>
+        </div>
+
+        {/* Shopping List */}
+        <div className="mt-4 pt-3 border-t border-stone-100 dark:border-stone-800">
+          <h4 className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase mb-3">
+            Shopping List
+          </h4>
+          <div className="space-y-2">
+            <ProductLink
+              name="LilyGO T-Echo (915MHz, nRF52840 + SX1262 + BME280)"
+              desc="BLE scanner + LoRa TX · CircuitPython · e-ink display · GPS · Amazon's Choice"
+              price="$68.00"
+              url="https://www.amazon.com/dp/B0B658DZ9Z"
+              tag="Apiary node"
+            />
+            <ProductLink
+              name="Waveshare USB to LoRa Module (SX1262)"
+              desc="USB-A · CDC serial on macOS (/dev/cu.usbmodem*) · Prime · XTAL"
+              price="$25.99"
+              url="https://www.amazon.com/dp/B0C24735XX"
+              tag="Mac Mini receiver · Prime"
+            />
+            <ProductLink
+              name="Energizer Ultimate Lithium AA (8-pack)"
+              desc="1.5V lithium · ~4.5Wh/cell · 4 for T-Echo + 4 spare · Amazon's Choice"
+              price="$16.99"
+              url="https://www.amazon.com/dp/B00EAKP8S0"
+              tag="Prime"
+            />
+            <ProductLink
+              name="4× AA Battery Holder with USB Port (2-pack)"
+              desc="4 AA → 6V USB output · on/off switch · powers T-Echo via USB-C"
+              price="$5.99"
+              url="https://www.amazon.com/dp/B0DDT2JGKZ"
+            />
+            <ProductLink
+              name="Zulkit IP65 Clear Box w/ Cable Glands"
+              desc="5.9 × 3.9 × 2.8 in · hinged clear cover · 2 cable glands · ABS (RF-transparent) · weatherproof"
+              price="$9.99"
+              url="https://www.amazon.com/dp/B08KY7VK8W"
+              tag="Prime"
+            />
+          </div>
+          <div className="mt-3 flex items-center justify-between">
+            <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">Total (with Prime items)</span>
+            <span className="text-lg font-bold text-honey-600 dark:text-honey-400">~$120.97</span>
+          </div>
+          <p className="text-[10px] text-stone-400 dark:text-stone-500 mt-1">
+            T-Echo ($68) + USB LoRa dongle ($25.99) + AA lithium 8-pack ($16.99) + battery holder ($5.99) + waterproof case ($9.99).
+            The Mac Mini dongle and house T-Echo cable are powered by the Mac Mini — no batteries needed there.
+          </p>
         </div>
       </Card>
 
