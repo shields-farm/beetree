@@ -64,14 +64,14 @@ export function useAnomalies(): AnomalySummary {
     const significantOutliers = allOutliers.filter((o) => o.severity === 'significant');
     const moderateOutliers = allOutliers.filter((o) => o.severity === 'moderate');
 
-    const items: AnomalyItem[] = [
-      { count: highTemp.length, label: 'High temp (>99°F)', detail: highTemp.map((s) => s.name).join(', '), severity: 'high' },
-      { count: lowTemp.length, label: 'Low temp (<88°F)', detail: lowTemp.map((s) => s.name).join(', '), severity: 'high' },
-      { count: lowBattery.length, label: 'Low battery (<2.5V)', detail: lowBattery.map((s) => s.name).join(', '), severity: 'moderate' },
-      { count: staleSensors.length, label: 'Stale (>6h)', detail: staleSensors.map((s) => s.name).join(', '), severity: 'low' },
-      { count: significantOutliers.length, label: 'Significant outliers', detail: significantOutliers.map((o) => o.hiveName).join(', '), severity: 'high' },
-      { count: moderateOutliers.length, label: 'Moderate outliers', detail: moderateOutliers.map((o) => o.hiveName).join(', '), severity: 'moderate' },
-    ].filter((s) => s.count > 0);
+    const items: AnomalyItem[] = ([
+      { count: highTemp.length, label: 'High temp (>99°F)', detail: highTemp.map((s) => s.name).join(', '), severity: 'high' as const },
+      { count: lowTemp.length, label: 'Low temp (<88°F)', detail: lowTemp.map((s) => s.name).join(', '), severity: 'high' as const },
+      { count: lowBattery.length, label: 'Low battery (<2.5V)', detail: lowBattery.map((s) => s.name).join(', '), severity: 'moderate' as const },
+      { count: staleSensors.length, label: 'Stale (>6h)', detail: staleSensors.map((s) => s.name).join(', '), severity: 'low' as const },
+      { count: significantOutliers.length, label: 'Significant outliers', detail: significantOutliers.map((o) => o.hiveName).join(', '), severity: 'high' as const },
+      { count: moderateOutliers.length, label: 'Moderate outliers', detail: moderateOutliers.map((o) => o.hiveName).join(', '), severity: 'moderate' as const },
+    ] as AnomalyItem[]).filter((s) => s.count > 0);
 
     const total = items.reduce((sum, s) => sum + s.count, 0);
 

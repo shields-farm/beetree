@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import {
-  Cpu, Server, Radio, Thermometer, Activity, Cloud, Database,
+  Cpu, Server, Radio, Thermometer, Activity, Cloud,
   Zap, Wifi, HardDrive, Brain, Mic, ArrowDownRight, CheckCircle2,
-  Circle, Satellite, ExternalLink, Gauge, AlertTriangle, Sun, Battery, Shield,
-  Moon, Cpu as CpuIcon2,
+  Circle, Satellite, Gauge, AlertTriangle, Sun,
+  Cpu as CpuIcon2,
 } from 'lucide-react';
 import { PageHeader } from '../components/Layout';
 import { Card } from '../components/Card';
@@ -599,33 +599,4 @@ function TechItem({ name }: { name: string }) {
   );
 }
 
-function ProductLink({ name, desc, price, url, tag }: { name: string; desc: string; price: string; url: string; tag?: string }) {
-  return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="block group"
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-medium text-stone-700 dark:text-stone-200 group-hover:text-honey-600 dark:group-hover:text-honey-400">
-              {name}
-            </span>
-            {tag && (
-              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-honey-100 dark:bg-honey-950 text-honey-700 dark:text-honey-300 shrink-0">
-                {tag}
-              </span>
-            )}
-          </div>
-          <p className="text-[10px] text-stone-400 dark:text-stone-500 mt-0.5 leading-tight">{desc}</p>
-        </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-xs font-semibold text-stone-600 dark:text-stone-300">{price}</span>
-          <ExternalLink size={12} className="text-stone-300 dark:text-stone-600 group-hover:text-honey-500" />
-        </div>
-      </div>
-    </a>
-  );
-}
+// (ProductLink component removed — BeeTree pages don't show product links per project convention)
