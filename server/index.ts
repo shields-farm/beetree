@@ -37,7 +37,6 @@ import {
   type FrameSlotRow,
   type InspectionRow,
 } from './db.js';
-import { seedDatabase } from './seed.js';
 
 initSchema();
 
@@ -79,6 +78,7 @@ function authMiddleware(req: express.Request, res: express.Response, next: expre
 // ============================================================================
 const ALLOWED_ORIGINS = [
   'https://beetree-host.tailnet-id.ts.net',
+  'https://beetree-host.tailnet-id.ts.net:8443',
   'https://localhost:5173',
   'https://127.0.0.1:5173',
   'http://localhost:5173',
@@ -1252,8 +1252,8 @@ app.get('/api/vision/analyses', (_req, res) => {
 // ============================================================================
 // /api/vision/varroa — Varroa sticky board AI counter
 // ============================================================================
-import { analyzeStickyBoard, type VarroaCount } from './varroa.js';
-import { calculateSwarmRisk, calculateSwarmRiskAll, type SwarmRiskAssessment } from './swarm.js';
+import { analyzeStickyBoard } from './varroa.js';
+import { calculateSwarmRisk, calculateSwarmRiskAll } from './swarm.js';
 
 app.post('/api/vision/varroa', async (req, res) => {
   try {
@@ -1754,7 +1754,7 @@ app.post('/api/queen/record', (req, res) => {
 // ============================================================================
 // /api/outlier — Apiary outlier detection
 // ============================================================================
-import { getOutlierReport, getAllOutlierReports, type OutlierReport } from './outlier.js';
+import { getOutlierReport, getAllOutlierReports } from './outlier.js';
 
 app.get('/api/outlier', (_req, res) => {
   try {
@@ -1779,7 +1779,7 @@ app.get('/api/outlier/:apiaryId', (req, res) => {
 // ============================================================================
 // /api/vision/reconstruct — Multi-photo colony reconstruction
 // ============================================================================
-import { reconstructColony, type FrameReconstruction } from './reconstruction.js';
+import { reconstructColony } from './reconstruction.js';
 
 app.post('/api/vision/reconstruct', async (req, res) => {
   try {
