@@ -1,10 +1,12 @@
 import { HashRouter, Routes, Route } from 'react-router-dom';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
 import { StoreProvider } from './store/useStore';
 import { ChatProvider } from './components/ChatContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { Dashboard } from './pages/Dashboard';
+import { SetupWizard } from './components/SetupWizard';
+import { hasApiKey, API_BASE, getApiKey } from './lib/apiBase';
 
 // Lazy-load all non-dashboard pages for code-splitting
 const HivesHub = lazy(() => import('./pages/HivesHub').then(m => ({ default: m.HivesHub })));
@@ -44,6 +46,49 @@ function PageLoader() {
 }
 
 export default function App() {
+  const [showWizard, setShowWizard] = useState(false);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    // No key in localStorage → show wizard
+    if (!hasApiKey()) {
+      setShowWizard(true);
+      setChecking(false);
+      return;
+    }
+    // Key exists — check if DB has data
+    fetch(API_BASE + '/api/setup/status', {
+      headers: { 'Authorization': 'Bearer ' + (getApiKey() || '') },
+    })
+      .then((r) => r.ok ? r.json() : null)
+      .then((status) => {
+        if (status && !status.hasData) {
+          setShowWizard(true);
+        }
+        setChecking(false);
+      })
+      .catch(() => {
+        // Server not reachable — let the app try normally
+        setChecking(false);
+      });
+  }, []);
+
+  if (showWizard) {
+    return (
+      <ThemeProvider>
+        <SetupWizard />
+      </ThemeProvider>
+    );
+  }
+
+  if (checking) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="w-6 h-6 border-2 border-honey-400 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <StoreProvider>
       <ThemeProvider>
