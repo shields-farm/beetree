@@ -37,7 +37,7 @@ export function HivesHub() {
     try { localStorage.setItem(APIARY_STORAGE_KEY, id); } catch { /* ignore */ }
   };
 
-  const selectedApiary = apiaries.find((a) => a.id === selectedApiaryId);
+  // selectedApiaryId is used for filtering; selectedApiary lookup removed (unused)
 
   return (
     <div className="animate-fade-in">
