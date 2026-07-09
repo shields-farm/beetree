@@ -62,13 +62,16 @@ export default function App() {
     })
       .then((r) => r.ok ? r.json() : null)
       .then((status) => {
-        if (status && !status.hasData) {
+        // Only show wizard if server confirms DB is empty.
+        // If fetch fails or returns unexpected data, skip wizard —
+        // the app will handle empty state gracefully.
+        if (status && status.hasData === false) {
           setShowWizard(true);
         }
         setChecking(false);
       })
       .catch(() => {
-        // Server not reachable — let the app try normally
+        // Server not reachable or CORS — skip wizard, let app try normally
         setChecking(false);
       });
   }, []);

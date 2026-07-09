@@ -38,6 +38,25 @@ export function InspectionDetail({ id }: { id: string }) {
   // Use store inspection first, fallback to fetched one
   const active = insp ?? fallbackInsp;
 
+  const hive = active ? hives.find((h) => h.id === active.hiveId) : undefined;
+
+  // Page-specific quick questions about this inspection
+  // (must be before any conditional return to satisfy rules-of-hooks)
+  useEffect(() => {
+    if (!active) return;
+    const hiveName = hive?.name ?? 'this hive';
+    const qs: string[] = [];
+    // Three-pillar focused questions
+    if (!active.queenPresent) qs.push(`${hiveName} has no queen — what are my options?`);
+    if (active.queenCells) qs.push(`${hiveName} has queen cells — is it swarming or supersedure?`);
+    if (active.honeyStores === 'none' || active.honeyStores === 'low') qs.push(`${hiveName} has low honey stores — should I feed?`);
+    if (active.concerns.length > 0) qs.push(`Analyze the pest/disease concerns from this inspection`);
+    if (qs.length === 0) qs.push(`What does this inspection tell me about ${hiveName}?`);
+    qs.push(`What should I do next for ${hiveName}?`);
+    setQuickQuestions(qs);
+    return () => setQuickQuestions([]);
+  }, [active, hive, setQuickQuestions]);
+
   if (!active) {
     // Show loading spinner while fetching, or if we haven't tried yet
     if (fetchState !== 'done') {
@@ -57,7 +76,6 @@ export function InspectionDetail({ id }: { id: string }) {
     );
   }
 
-  const hive = hives.find((h) => h.id === active.hiveId);
   const meta = HEALTH_META[active.healthStatus];
 
   // Categorize concerns into the three pillars + swarm + other
@@ -81,21 +99,6 @@ export function InspectionDetail({ id }: { id: string }) {
   const swarmConcerns = active.concerns.filter((c) => categorize(c.type) === 'swarm');
   const pestDiseaseConcerns = active.concerns.filter((c) => categorize(c.type) === 'pest');
   const otherConcerns = active.concerns.filter((c) => categorize(c.type) === 'other');
-
-  // Page-specific quick questions about this inspection
-  useEffect(() => {
-    const hiveName = hive?.name ?? 'this hive';
-    const qs: string[] = [];
-    // Three-pillar focused questions
-    if (!active.queenPresent) qs.push(`${hiveName} has no queen — what are my options?`);
-    if (active.queenCells) qs.push(`${hiveName} has queen cells — is it swarming or supersedure?`);
-    if (active.honeyStores === 'none' || active.honeyStores === 'low') qs.push(`${hiveName} has low honey stores — should I feed?`);
-    if (active.concerns.length > 0) qs.push(`Analyze the pest/disease concerns from this inspection`);
-    if (qs.length === 0) qs.push(`What does this inspection tell me about ${hiveName}?`);
-    qs.push(`What should I do next for ${hiveName}?`);
-    setQuickQuestions(qs);
-    return () => setQuickQuestions([]);
-  }, [active, hive, setQuickQuestions]);
 
   const Field = ({ label, value }: { label: string; value: string | boolean }) => (
     <div className="flex items-center justify-between py-1.5">
