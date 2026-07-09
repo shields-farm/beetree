@@ -133,7 +133,7 @@ export function MediaCapture({ media, onAdd, onRemove }: MediaCaptureProps) {
       recordTimerRef.current = setInterval(() => {
         setRecordSeconds((s) => s + 1);
       }, 1000);
-    } catch (err) {
+    } catch {
       setError('Microphone permission denied. Enable mic access in your browser settings.');
       setRecording(null);
     }

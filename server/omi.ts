@@ -92,7 +92,7 @@ Return ONLY the JSON, no markdown, no explanation.`;
   let parsed: ParsedInspection;
   try {
     parsed = JSON.parse(jsonStr) as ParsedInspection;
-  } catch (e) {
+  } catch {
     throw new Error(`Buzz returned non-JSON: ${content.slice(0, 300)}`);
   }
 
@@ -166,7 +166,7 @@ export async function parseFreeTextToInspection(
   let parsed: ParsedInspection;
   try {
     parsed = JSON.parse(jsonStr) as ParsedInspection;
-  } catch (e) {
+  } catch {
     throw new Error('Buzz returned non-JSON: ' + content.slice(0, 300));
   }
 
