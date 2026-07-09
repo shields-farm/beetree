@@ -16,11 +16,17 @@ A mobile-first React web app for tracking apiaries, hives, inspections, and Broo
 
 ## Tech Stack
 
-- **Frontend:** Vite + React 18 + TypeScript + Tailwind CSS v3
+- **Frontend:** Vite 8 + React 19 + TypeScript 6 + Tailwind CSS v3
 - **Charts:** Recharts
 - **Icons:** Lucide React
-- **Routing:** React Router v6
-- **Storage:** localStorage (frontend) → SQLite + InfluxDB (backend, planned)
+- **Routing:** React Router v7
+- **Backend:** Express + SQLite (better-sqlite3) with copy-on-write versioning
+- **Migrations:** Versioned SQL files in `server/migrations/`
+- **Testing:** Vitest (10 tests, 3 suites)
+- **Pre-commit:** pre-commit CLI (typecheck + lint + tests)
+- **Linting:** oxlint
+- **Serving:** Tailscale Serve (HTTPS over tailnet)
+- **Auto-start:** launchd (macOS)
 - **Sensor Data:** BroodMinder BLE → Home Assistant → InfluxDB
 
 ## Getting Started
@@ -32,14 +38,34 @@ npm run build    # Production build to dist/
 npm run preview # Preview production build at http://localhost:4173
 ```
 
-## Architecture (Target)
+## Architecture
 
-```
-BeeLog app (React)
-  ├── SQLite (Express API)     → apiaries, hives, inspections, tasks
-  └── InfluxDB (existing)       → sensor time-series (temp, humidity, battery)
-                                   ↓
-                                 Grafana dashboards
+```mermaid
+graph TD
+    subgraph Frontend
+        APP[BeeTree App — React + Vite + Tailwind]
+    end
+    subgraph Backend
+        API[Express API — port 3001]
+        DB[(SQLite — entity versioning)]
+    end
+    subgraph External
+        SENSORS[BroodMinder BLE Sensors]
+        HA[Home Assistant]
+        INFLUX[(InfluxDB — sensor time-series)]
+        GRAF[Grafana dashboards]
+    end
+    subgraph Access
+        TS[Tailscale Serve — HTTPS :8443]
+    end
+
+    APP -->|REST API + Bearer auth| API
+    API --> DB
+    SENSORS -->|BLE| HA
+    HA --> INFLUX
+    INFLUX --> GRAF
+    TS -->|proxy| API
+    APP -->|HTTPS over tailnet| TS
 ```
 
 ## License
