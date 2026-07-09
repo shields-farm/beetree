@@ -16,21 +16,44 @@ db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
 // ---------------------------------------------------------------------------
-// Schema
+// Schema — copy-on-write versioning
 // ---------------------------------------------------------------------------
+// Every table has:
+//   id            TEXT — per-version unique row id (genId)
+//   entity_id     TEXT — stable logical id (same across all versions)
+//   version       INTEGER DEFAULT 1 — incrementing version number
+//   superseded_by TEXT — NULL for current version; set to new row's id on supersede
+//   superseded_at TEXT — timestamp when superseded
+//
+// Current version = WHERE entity_id = ? AND superseded_by IS NULL
+// History        = WHERE entity_id = ? ORDER BY version DESC
+// The `id` returned to the frontend is `entity_id` (stable).
+// Foreign keys reference entity_id, not per-version row id.
+// ---------------------------------------------------------------------------
+
 export function initSchema(): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS apiaries (
       id            TEXT PRIMARY KEY,
+      entity_id     TEXT NOT NULL,
+      version       INTEGER NOT NULL DEFAULT 1,
+      superseded_by TEXT,
+      superseded_at TEXT,
       name          TEXT NOT NULL,
       location_lat  REAL,
       location_lng  REAL,
       address       TEXT,
       notes         TEXT
     );
+    CREATE INDEX IF NOT EXISTS idx_apiaries_entity ON apiaries(entity_id);
+    CREATE INDEX IF NOT EXISTS idx_apiaries_current ON apiaries(entity_id) WHERE superseded_by IS NULL;
 
     CREATE TABLE IF NOT EXISTS hives (
       id                TEXT PRIMARY KEY,
+      entity_id         TEXT NOT NULL,
+      version           INTEGER NOT NULL DEFAULT 1,
+      superseded_by     TEXT,
+      superseded_at     TEXT,
       apiaryId          TEXT NOT NULL,
       name              TEXT NOT NULL,
       type              TEXT NOT NULL,
@@ -42,42 +65,64 @@ export function initSchema(): void {
       location_accuracy REAL,
       location_pinnedAt TEXT,
       location_label    TEXT,
-      sensorIds         TEXT DEFAULT '[]',
-      FOREIGN KEY (apiaryId) REFERENCES apiaries(id) ON DELETE CASCADE
+      sensorIds         TEXT DEFAULT '[]'
     );
+    CREATE INDEX IF NOT EXISTS idx_hives_entity ON hives(entity_id);
+    CREATE INDEX IF NOT EXISTS idx_hives_current ON hives(entity_id) WHERE superseded_by IS NULL;
+    CREATE INDEX IF NOT EXISTS idx_hives_apiary ON hives(apiaryId) WHERE superseded_by IS NULL;
 
     CREATE TABLE IF NOT EXISTS boxes (
-      id      TEXT PRIMARY KEY,
-      hiveId  TEXT NOT NULL,
-      type    TEXT NOT NULL,
-      "index" INTEGER NOT NULL,
-      sensorIds TEXT DEFAULT '[]',
-      FOREIGN KEY (hiveId) REFERENCES hives(id) ON DELETE CASCADE
+      id        TEXT PRIMARY KEY,
+      entity_id TEXT NOT NULL,
+      version   INTEGER NOT NULL DEFAULT 1,
+      superseded_by TEXT,
+      superseded_at TEXT,
+      hiveId    TEXT NOT NULL,
+      type      TEXT NOT NULL,
+      "index"   INTEGER NOT NULL,
+      sensorIds TEXT DEFAULT '[]'
     );
+    CREATE INDEX IF NOT EXISTS idx_boxes_entity ON boxes(entity_id);
+    CREATE INDEX IF NOT EXISTS idx_boxes_current ON boxes(entity_id) WHERE superseded_by IS NULL;
+    CREATE INDEX IF NOT EXISTS idx_boxes_hive ON boxes(hiveId) WHERE superseded_by IS NULL;
 
     CREATE TABLE IF NOT EXISTS frame_slots (
-      id      TEXT PRIMARY KEY,
-      boxId   TEXT NOT NULL,
-      position INTEGER NOT NULL,
-      content TEXT NOT NULL,
-      FOREIGN KEY (boxId) REFERENCES boxes(id) ON DELETE CASCADE
+      id        TEXT PRIMARY KEY,
+      entity_id TEXT NOT NULL,
+      version   INTEGER NOT NULL DEFAULT 1,
+      superseded_by TEXT,
+      superseded_at TEXT,
+      boxId     TEXT NOT NULL,
+      position  INTEGER NOT NULL,
+      content   TEXT NOT NULL
     );
+    CREATE INDEX IF NOT EXISTS idx_fs_entity ON frame_slots(entity_id);
+    CREATE INDEX IF NOT EXISTS idx_fs_current ON frame_slots(entity_id) WHERE superseded_by IS NULL;
+    CREATE INDEX IF NOT EXISTS idx_fs_box ON frame_slots(boxId) WHERE superseded_by IS NULL;
 
     CREATE TABLE IF NOT EXISTS sensors (
       id        TEXT PRIMARY KEY,
+      entity_id TEXT NOT NULL,
+      version   INTEGER NOT NULL DEFAULT 1,
+      superseded_by TEXT,
+      superseded_at TEXT,
       deviceId  TEXT NOT NULL,
       name      TEXT NOT NULL,
       model     TEXT NOT NULL,
       hiveId    TEXT,
       boxId     TEXT,
       position  TEXT,
-      latestReading TEXT,
-      FOREIGN KEY (hiveId) REFERENCES hives(id) ON DELETE SET NULL,
-      FOREIGN KEY (boxId)  REFERENCES boxes(id)  ON DELETE SET NULL
+      latestReading TEXT
     );
+    CREATE INDEX IF NOT EXISTS idx_sensors_entity ON sensors(entity_id);
+    CREATE INDEX IF NOT EXISTS idx_sensors_current ON sensors(entity_id) WHERE superseded_by IS NULL;
 
     CREATE TABLE IF NOT EXISTS inspections (
       id                   TEXT PRIMARY KEY,
+      entity_id            TEXT NOT NULL,
+      version              INTEGER NOT NULL DEFAULT 1,
+      superseded_by        TEXT,
+      superseded_at        TEXT,
       hiveId               TEXT NOT NULL,
       date                 TEXT NOT NULL,
       queenPresent         INTEGER NOT NULL,
@@ -95,44 +140,62 @@ export function initSchema(): void {
       healthAutoCalculated INTEGER NOT NULL,
       colonyDead           INTEGER NOT NULL,
       notes                TEXT NOT NULL,
-      photoUrls            TEXT DEFAULT '[]',
-      FOREIGN KEY (hiveId) REFERENCES hives(id) ON DELETE CASCADE
+      photoUrls            TEXT DEFAULT '[]'
     );
+    CREATE INDEX IF NOT EXISTS idx_insp_entity ON inspections(entity_id);
+    CREATE INDEX IF NOT EXISTS idx_insp_current ON inspections(entity_id) WHERE superseded_by IS NULL;
+    CREATE INDEX IF NOT EXISTS idx_insp_hive ON inspections(hiveId) WHERE superseded_by IS NULL;
 
     CREATE TABLE IF NOT EXISTS concerns (
-      id            TEXT PRIMARY KEY,
-      inspectionId  TEXT NOT NULL,
-      type          TEXT NOT NULL,
-      count         INTEGER,
-      note          TEXT,
-      FOREIGN KEY (inspectionId) REFERENCES inspections(id) ON DELETE CASCADE
+      id           TEXT PRIMARY KEY,
+      entity_id    TEXT NOT NULL,
+      version      INTEGER NOT NULL DEFAULT 1,
+      superseded_by TEXT,
+      superseded_at TEXT,
+      inspectionId TEXT NOT NULL,
+      type         TEXT NOT NULL,
+      count        INTEGER,
+      note         TEXT
     );
+    CREATE INDEX IF NOT EXISTS idx_concerns_entity ON concerns(entity_id);
+    CREATE INDEX IF NOT EXISTS idx_concerns_current ON concerns(entity_id) WHERE superseded_by IS NULL;
+    CREATE INDEX IF NOT EXISTS idx_concerns_insp ON concerns(inspectionId) WHERE superseded_by IS NULL;
 
     CREATE TABLE IF NOT EXISTS media_items (
       id            TEXT PRIMARY KEY,
+      entity_id     TEXT NOT NULL,
+      version       INTEGER NOT NULL DEFAULT 1,
+      superseded_by TEXT,
+      superseded_at TEXT,
       inspectionId  TEXT,
       hiveId        TEXT,
       type          TEXT NOT NULL,
       dataUrl       TEXT NOT NULL,
       timestamp     TEXT NOT NULL,
       label         TEXT,
-      duration      REAL,
-      FOREIGN KEY (inspectionId) REFERENCES inspections(id) ON DELETE CASCADE,
-      FOREIGN KEY (hiveId)        REFERENCES hives(id)        ON DELETE CASCADE
+      duration      REAL
     );
+    CREATE INDEX IF NOT EXISTS idx_media_entity ON media_items(entity_id);
+    CREATE INDEX IF NOT EXISTS idx_media_current ON media_items(entity_id) WHERE superseded_by IS NULL;
+    CREATE INDEX IF NOT EXISTS idx_media_insp ON media_items(inspectionId) WHERE superseded_by IS NULL;
+    CREATE INDEX IF NOT EXISTS idx_media_hive ON media_items(hiveId) WHERE superseded_by IS NULL;
 
     CREATE TABLE IF NOT EXISTS tasks (
-      id          TEXT PRIMARY KEY,
-      hiveId      TEXT,
-      apiaryId    TEXT,
-      title       TEXT NOT NULL,
-      description TEXT,
-      dueDate     TEXT,
-      completed   INTEGER NOT NULL DEFAULT 0,
-      priority    TEXT NOT NULL,
-      FOREIGN KEY (hiveId)   REFERENCES hives(id)   ON DELETE CASCADE,
-      FOREIGN KEY (apiaryId) REFERENCES apiaries(id) ON DELETE CASCADE
+      id            TEXT PRIMARY KEY,
+      entity_id     TEXT NOT NULL,
+      version       INTEGER NOT NULL DEFAULT 1,
+      superseded_by TEXT,
+      superseded_at TEXT,
+      hiveId        TEXT,
+      apiaryId      TEXT,
+      title         TEXT NOT NULL,
+      description   TEXT,
+      dueDate       TEXT,
+      completed     INTEGER NOT NULL DEFAULT 0,
+      priority      TEXT NOT NULL
     );
+    CREATE INDEX IF NOT EXISTS idx_tasks_entity ON tasks(entity_id);
+    CREATE INDEX IF NOT EXISTS idx_tasks_current ON tasks(entity_id) WHERE superseded_by IS NULL;
   `);
 }
 
@@ -146,13 +209,16 @@ function bool(v: unknown): boolean {
 }
 
 export interface ApiaryRow {
-  id: string; name: string; location_lat: number | null; location_lng: number | null;
+  id: string; entity_id: string; version: number; superseded_by: string | null; superseded_at: string | null;
+  name: string; location_lat: number | null; location_lng: number | null;
   address: string | null; notes: string | null;
 }
 
 export function mapApiary(r: ApiaryRow) {
   return {
-    id: r.id,
+    id: r.entity_id,
+    version: r.version,
+    entityId: r.entity_id,
     name: r.name,
     location: r.location_lat != null && r.location_lng != null
       ? { lat: r.location_lat, lng: r.location_lng } : undefined,
@@ -162,7 +228,8 @@ export function mapApiary(r: ApiaryRow) {
 }
 
 export interface HiveRow {
-  id: string; apiaryId: string; name: string; type: string; healthStatus: string;
+  id: string; entity_id: string; version: number; superseded_by: string | null; superseded_at: string | null;
+  apiaryId: string; name: string; type: string; healthStatus: string;
   notes: string | null; createdAt: string;
   location_lat: number | null; location_lng: number | null; location_accuracy: number | null;
   location_pinnedAt: string | null; location_label: string | null;
@@ -170,11 +237,13 @@ export interface HiveRow {
 }
 
 export interface BoxRow {
-  id: string; hiveId: string; type: string; index: number; sensorIds: string;
+  id: string; entity_id: string; version: number; superseded_by: string | null; superseded_at: string | null;
+  hiveId: string; type: string; index: number; sensorIds: string;
 }
 
 export interface FrameSlotRow {
-  id: string; boxId: string; position: number; content: string;
+  id: string; entity_id: string; version: number; superseded_by: string | null; superseded_at: string | null;
+  boxId: string; position: number; content: string;
 }
 
 export function mapHive(
@@ -182,8 +251,11 @@ export function mapHive(
   boxes: BoxRow[],
   frameSlots: FrameSlotRow[],
 ): any {
+  const hiveEntityId = r.entity_id;
   return {
-    id: r.id,
+    id: hiveEntityId,
+    version: r.version,
+    entityId: hiveEntityId,
     apiaryId: r.apiaryId,
     name: r.name,
     type: r.type,
@@ -201,15 +273,15 @@ export function mapHive(
         }
       : undefined,
     boxes: boxes
-      .filter((b) => b.hiveId === r.id)
+      .filter((b) => b.hiveId === hiveEntityId && !b.superseded_by)
       .sort((a, b) => a.index - b.index)
       .map((b) => ({
-        id: b.id,
+        id: b.entity_id,
         type: b.type,
         index: b.index,
         sensorIds: JSON.parse(b.sensorIds || '[]'),
         frames: frameSlots
-          .filter((f) => f.boxId === b.id)
+          .filter((f) => f.boxId === b.entity_id && !f.superseded_by)
           .sort((a, b) => a.position - b.position)
           .map((f) => ({ position: f.position, content: f.content })),
       })),
@@ -217,7 +289,8 @@ export function mapHive(
 }
 
 export interface InspectionRow {
-  id: string; hiveId: string; date: string;
+  id: string; entity_id: string; version: number; superseded_by: string | null; superseded_at: string | null;
+  hiveId: string; date: string;
   queenPresent: number; queenCells: number; queenLayingPattern: string;
   eggsPresent: number; larvaePresent: number; cappedBrood: number;
   temperament: string; honeyStores: string; pollenStores: string;
@@ -227,7 +300,9 @@ export interface InspectionRow {
 
 export function mapInspection(r: InspectionRow, concerns: any[]) {
   return {
-    id: r.id,
+    id: r.entity_id,
+    version: r.version,
+    entityId: r.entity_id,
     hiveId: r.hiveId,
     date: r.date,
     queenPresent: bool(r.queenPresent),
@@ -247,7 +322,7 @@ export function mapInspection(r: InspectionRow, concerns: any[]) {
     notes: r.notes,
     photoUrls: JSON.parse(r.photoUrls || '[]'),
     concerns: concerns.map((c: any) => ({
-      id: c.id,
+      id: c.entity_id ?? c.id,
       type: c.type,
       count: c.count != null ? c.count : undefined,
       note: c.note ?? undefined,
@@ -258,7 +333,9 @@ export function mapInspection(r: InspectionRow, concerns: any[]) {
 
 export function mapSensor(r: any) {
   return {
-    id: r.id,
+    id: r.entity_id,
+    version: r.version,
+    entityId: r.entity_id,
     deviceId: r.deviceId,
     name: r.name,
     model: r.model,
@@ -271,7 +348,9 @@ export function mapSensor(r: any) {
 
 export function mapTask(r: any) {
   return {
-    id: r.id,
+    id: r.entity_id,
+    version: r.version,
+    entityId: r.entity_id,
     hiveId: r.hiveId ?? undefined,
     apiaryId: r.apiaryId ?? undefined,
     title: r.title,
@@ -284,7 +363,9 @@ export function mapTask(r: any) {
 
 export function mapMedia(r: any) {
   return {
-    id: r.id,
+    id: r.entity_id,
+    version: r.version,
+    entityId: r.entity_id,
     inspectionId: r.inspectionId ?? undefined,
     hiveId: r.hiveId ?? undefined,
     type: r.type,
@@ -298,6 +379,51 @@ export function mapMedia(r: any) {
 // ---------------------------------------------------------------------------
 // Generic helpers
 // ---------------------------------------------------------------------------
+
+/** Generate a unique row id (per-version) */
 export function genId(prefix = 'id'): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}${Date.now().toString(36).slice(-4)}`;
+}
+
+/** Current ISO timestamp */
+export function now(): string {
+  return new Date().toISOString();
+}
+
+/**
+ * Copy-on-write: supersede the current version of an entity and insert a new version.
+ * Returns the new row id.
+ *
+ * Usage: const newRowId = cowSupersede('apiaries', entityId, (oldRow) => {
+ *   return { name: 'new name', ...otherFields };
+ * });
+ */
+export function cowSupersede(
+  table: string,
+  entityId: string,
+  buildNewRow: (oldRow: Record<string, any>) => Record<string, any>,
+): string {
+  const oldRow = db.prepare(
+    `SELECT * FROM ${table} WHERE entity_id = ? AND superseded_by IS NULL`,
+  ).get(entityId) as Record<string, any> | undefined;
+
+  if (!oldRow) throw new Error(`Entity not found: ${table}/${entityId}`);
+
+  const newRowId = genId('cow');
+  const newVersion = (oldRow.version || 1) + 1;
+  const ts = now();
+
+  const newRowData = buildNewRow(oldRow);
+  const insertCols = ['id', 'entity_id', 'version', 'superseded_by', 'superseded_at', ...Object.keys(newRowData)];
+  const insertVals = [newRowId, entityId, newVersion, null, null, ...Object.values(newRowData)];
+
+  const placeholders = insertCols.map(() => '?').join(', ');
+  const colNames = insertCols.map((c) => `"${c}"`).join(', ');
+  db.prepare(`INSERT INTO ${table} (${colNames}) VALUES (${placeholders})`).run(...insertVals);
+
+  db.prepare(
+    `UPDATE ${table} SET superseded_by = ?, superseded_at = ? WHERE id = ?`,
+  ).run(newRowId, ts, oldRow.id);
+
+  return newRowId;
 }

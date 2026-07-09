@@ -9,7 +9,7 @@ import path from 'path';
 try {
   const envPath = path.join(import.meta.dirname, '.env');
   if (fs.existsSync(envPath)) {
-    for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
+    for (const line of fs.readFileSync(envPath, 'utf-8').split('\n')) {
       const m = line.match(/^\s*([A-Z_]+)\s*=\s*(.+)\s*$/);
       if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim();
     }
@@ -29,6 +29,8 @@ import {
   mapTask,
   mapMedia,
   genId,
+  now,
+  cowSupersede,
   type ApiaryRow,
   type HiveRow,
   type BoxRow,
@@ -39,14 +41,7 @@ import { seedDatabase } from './seed.js';
 
 initSchema();
 
-// Auto-seed if empty
-{
-  const c = db.prepare('SELECT COUNT(*) as c FROM apiaries').get() as { c: number };
-  if (c.c === 0) {
-    console.log('[boot] DB is empty — seeding...');
-    seedDatabase();
-  }
-}
+// No auto-seed — fresh installs start empty. Setup wizard handles initial data.
 
 // ============================================================================
 // Security: Bearer token authentication
@@ -70,7 +65,7 @@ function authMiddleware(req: express.Request, res: express.Response, next: expre
   if (AUTH_DISABLED) return next();
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Authentication required. Send Authorization: Bearer <token> header.' });
+    return res.status(401).json({ error: 'Authentication required. Send Authorization: Bearer *** header.' });
   }
   const token = auth.slice(7).trim();
   if (!token || !safeCompare(token, API_KEY)) {
@@ -119,11 +114,11 @@ app.use((req, _res, next) => {
   if (req.path === '/api/health') return next();
 
   const ip = req.ip || req.socket.remoteAddress || 'unknown';
-  const now = Date.now();
+  const nowTs = Date.now();
   const entry = rateMap.get(ip);
 
-  if (!entry || now > entry.resetAt) {
-    rateMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW });
+  if (!entry || nowTs > entry.resetAt) {
+    rateMap.set(ip, { count: 1, resetAt: nowTs + RATE_WINDOW });
   } else {
     entry.count++;
     if (entry.count > RATE_LIMIT) {
@@ -134,9 +129,10 @@ app.use((req, _res, next) => {
   next();
 });
 
-// Apply auth to all /api routes except health and key (local-only)
+// Apply auth to all /api routes except health, key (local-only), and setup/status
 app.use('/api', (req, res, next) => {
   if (req.path === '/health') return next();
+  if (req.path === '/setup/status') return next();
   if (req.path === '/key') {
     // Only allow from localhost
     const ip = req.ip || req.socket.remoteAddress || '';
@@ -191,15 +187,13 @@ interface SensorRow {
   hiveId: string | null;
   latestReading: string | null;
 }
-interface HiveNameRow { id: string; name: string; }
+interface HiveNameRow { entity_id: string; name: string; }
 
 function updateGaugesFromDB(): void {
-  // ObservableGauge callbacks fire automatically on each metric export (every 10s).
-  // This periodic function is a place to trigger any side effects or logging.
   try {
-    const hiveCount = (db.prepare('SELECT COUNT(*) as c FROM hives').get() as { c: number }).c;
-    const inspCount = (db.prepare('SELECT COUNT(*) as c FROM inspections').get() as { c: number }).c;
-    const sensorCount = (db.prepare('SELECT COUNT(*) as c FROM sensors').get() as { c: number }).c;
+    const hiveCount = (db.prepare('SELECT COUNT(*) as c FROM hives WHERE superseded_by IS NULL').get() as { c: number }).c;
+    const inspCount = (db.prepare('SELECT COUNT(*) as c FROM inspections WHERE superseded_by IS NULL').get() as { c: number }).c;
+    const sensorCount = (db.prepare('SELECT COUNT(*) as c FROM sensors WHERE superseded_by IS NULL').get() as { c: number }).c;
     console.log(`[telemetry] gauge refresh — hives: ${hiveCount}, inspections: ${inspCount}, sensors: ${sensorCount}`);
   } catch (e) {
     console.error('[telemetry] gauge refresh error:', e);
@@ -209,23 +203,23 @@ function updateGaugesFromDB(): void {
 // Register observable callbacks that read from DB when metrics are scraped/exported.
 hiveCountGauge.addCallback((result) => {
   try {
-    const c = (db.prepare('SELECT COUNT(*) as c FROM hives').get() as { c: number }).c;
+    const c = (db.prepare('SELECT COUNT(*) as c FROM hives WHERE superseded_by IS NULL').get() as { c: number }).c;
     result.observe(c);
   } catch { /* DB not ready */ }
 });
 
 inspectionCountGauge.addCallback((result) => {
   try {
-    const c = (db.prepare('SELECT COUNT(*) as c FROM inspections').get() as { c: number }).c;
+    const c = (db.prepare('SELECT COUNT(*) as c FROM inspections WHERE superseded_by IS NULL').get() as { c: number }).c;
     result.observe(c);
   } catch { /* DB not ready */ }
 });
 
 sensorTemperatureGauge.addCallback((result) => {
   try {
-    const sensors = db.prepare('SELECT id, deviceId, name, hiveId, latestReading FROM sensors').all() as SensorRow[];
-    const hives = db.prepare('SELECT id, name FROM hives').all() as HiveNameRow[];
-    const hiveNameMap = new Map(hives.map((h) => [h.id, h.name]));
+    const sensors = db.prepare('SELECT id, deviceId, name, hiveId, latestReading FROM sensors WHERE superseded_by IS NULL').all() as SensorRow[];
+    const hives = db.prepare('SELECT entity_id, name FROM hives WHERE superseded_by IS NULL').all() as HiveNameRow[];
+    const hiveNameMap = new Map(hives.map((h) => [h.entity_id, h.name]));
     for (const s of sensors) {
       if (!s.latestReading) continue;
       const r = JSON.parse(s.latestReading) as { temperature?: number };
@@ -244,9 +238,9 @@ sensorTemperatureGauge.addCallback((result) => {
 
 sensorHumidityGauge.addCallback((result) => {
   try {
-    const sensors = db.prepare('SELECT id, deviceId, name, hiveId, latestReading FROM sensors').all() as SensorRow[];
-    const hives = db.prepare('SELECT id, name FROM hives').all() as HiveNameRow[];
-    const hiveNameMap = new Map(hives.map((h) => [h.id, h.name]));
+    const sensors = db.prepare('SELECT id, deviceId, name, hiveId, latestReading FROM sensors WHERE superseded_by IS NULL').all() as SensorRow[];
+    const hives = db.prepare('SELECT entity_id, name FROM hives WHERE superseded_by IS NULL').all() as HiveNameRow[];
+    const hiveNameMap = new Map(hives.map((h) => [h.entity_id, h.name]));
     for (const s of sensors) {
       if (!s.latestReading) continue;
       const r = JSON.parse(s.latestReading) as { humidity?: number };
@@ -265,9 +259,9 @@ sensorHumidityGauge.addCallback((result) => {
 
 sensorBatteryGauge.addCallback((result) => {
   try {
-    const sensors = db.prepare('SELECT id, deviceId, name, hiveId, latestReading FROM sensors').all() as SensorRow[];
-    const hives = db.prepare('SELECT id, name FROM hives').all() as HiveNameRow[];
-    const hiveNameMap = new Map(hives.map((h) => [h.id, h.name]));
+    const sensors = db.prepare('SELECT id, deviceId, name, hiveId, latestReading FROM sensors WHERE superseded_by IS NULL').all() as SensorRow[];
+    const hives = db.prepare('SELECT entity_id, name FROM hives WHERE superseded_by IS NULL').all() as HiveNameRow[];
+    const hiveNameMap = new Map(hives.map((h) => [h.entity_id, h.name]));
     for (const s of sensors) {
       if (!s.latestReading) continue;
       const r = JSON.parse(s.latestReading) as { batteryVoltage?: number };
@@ -285,82 +279,127 @@ sensorBatteryGauge.addCallback((result) => {
 });
 
 // Periodic refresh (every 30s) — gauges are callback-based, so this just logs.
-// The callbacks fire on each metric export (every 10s). This interval ensures
-// we log gauge refresh activity and could trigger any side effects.
 setInterval(() => {
   updateGaugesFromDB();
 }, 30_000);
 
 // ============================================================================
+// Helper: get hive name by entity_id
+// ============================================================================
+function getHiveNameByEntityId(entityId: string): string | undefined {
+  const row = db.prepare('SELECT name FROM hives WHERE entity_id = ? AND superseded_by IS NULL').get(entityId) as { name: string } | undefined;
+  return row?.name;
+}
+
+// ============================================================================
 // /api/apiaries
 // ============================================================================
 app.get('/api/apiaries', (_req, res) => {
-  const rows = db.prepare('SELECT * FROM apiaries').all() as ApiaryRow[];
+  const rows = db.prepare('SELECT * FROM apiaries WHERE superseded_by IS NULL').all() as ApiaryRow[];
   res.json(rows.map(mapApiary));
 });
 
 app.get('/api/apiaries/:id', (req, res) => {
-  const row = db.prepare('SELECT * FROM apiaries WHERE id = ?').get(req.params.id) as ApiaryRow | undefined;
+  const row = db.prepare('SELECT * FROM apiaries WHERE entity_id = ? AND superseded_by IS NULL').get(req.params.id) as ApiaryRow | undefined;
   if (!row) return res.status(404).json({ error: 'not found' });
   res.json(mapApiary(row));
 });
 
 app.post('/api/apiaries', (req, res) => {
   const b = req.body || {};
-  const id = b.id || genId('apiary');
-  db.prepare(`INSERT INTO apiaries (id, name, location_lat, location_lng, address, notes) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(id, b.name ?? '', b.location?.lat ?? null, b.location?.lng ?? null, b.address ?? null, b.notes ?? null);
-  const row = db.prepare('SELECT * FROM apiaries WHERE id = ?').get(id) as ApiaryRow;
+  const entityId = b.id || genId('apiary');
+  const rowId = genId('apiary');
+  db.prepare(`INSERT INTO apiaries (id, entity_id, version, superseded_by, superseded_at, name, location_lat, location_lng, address, notes) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?, ?)`)
+    .run(rowId, entityId, b.name ?? '', b.location?.lat ?? null, b.location?.lng ?? null, b.address ?? null, b.notes ?? null);
+  const row = db.prepare('SELECT * FROM apiaries WHERE id = ?').get(rowId) as ApiaryRow;
   res.status(201).json(mapApiary(row));
 });
 
 app.put('/api/apiaries/:id', (req, res) => {
   const b = req.body || {};
-  const exists = db.prepare('SELECT 1 FROM apiaries WHERE id = ?').get(req.params.id);
+  const entityId = req.params.id;
+  const exists = db.prepare('SELECT 1 FROM apiaries WHERE entity_id = ? AND superseded_by IS NULL').get(entityId);
   if (!exists) return res.status(404).json({ error: 'not found' });
-  db.prepare(`UPDATE apiaries SET name = ?, location_lat = ?, location_lng = ?, address = ?, notes = ? WHERE id = ?`)
-    .run(b.name ?? '', b.location?.lat ?? null, b.location?.lng ?? null, b.address ?? null, b.notes ?? null, req.params.id);
-  const row = db.prepare('SELECT * FROM apiaries WHERE id = ?').get(req.params.id) as ApiaryRow;
+
+  const newRowId = cowSupersede('apiaries', entityId, (old) => ({
+    name: b.name ?? '',
+    location_lat: b.location?.lat ?? null,
+    location_lng: b.location?.lng ?? null,
+    address: b.address ?? null,
+    notes: b.notes ?? null,
+  }));
+
+  const row = db.prepare('SELECT * FROM apiaries WHERE id = ?').get(newRowId) as ApiaryRow;
   res.json(mapApiary(row));
 });
 
 app.delete('/api/apiaries/:id', (req, res) => {
-  db.prepare('DELETE FROM apiaries WHERE id = ?').run(req.params.id);
+  // Delete all versions of this entity
+  db.prepare('DELETE FROM apiaries WHERE entity_id = ?').run(req.params.id);
   res.json({ ok: true });
+});
+
+// History & revert
+app.get('/api/apiaries/:id/history', (req, res) => {
+  const rows = db.prepare('SELECT * FROM apiaries WHERE entity_id = ? ORDER BY version DESC').all(req.params.id) as ApiaryRow[];
+  if (rows.length === 0) return res.status(404).json({ error: 'not found' });
+  res.json(rows.map((r) => ({ ...mapApiary(r), supersededBy: r.superseded_by, supersededAt: r.superseded_at })));
+});
+
+app.post('/api/apiaries/:id/revert', (req, res) => {
+  const entityId = req.params.id;
+  const targetVersion = Number(req.query.version);
+  if (!targetVersion) return res.status(400).json({ error: 'version query param required' });
+
+  const target = db.prepare('SELECT * FROM apiaries WHERE entity_id = ? AND version = ?').get(entityId, targetVersion) as ApiaryRow | undefined;
+  if (!target) return res.status(404).json({ error: `version ${targetVersion} not found` });
+
+  const newRowId = cowSupersede('apiaries', entityId, () => ({
+    name: target.name,
+    location_lat: target.location_lat,
+    location_lng: target.location_lng,
+    address: target.address,
+    notes: target.notes,
+  }));
+
+  const row = db.prepare('SELECT * FROM apiaries WHERE id = ?').get(newRowId) as ApiaryRow;
+  res.json(mapApiary(row));
 });
 
 // ============================================================================
 // /api/hives  (includes boxes + frame_slots)
 // ============================================================================
-function getHiveBoxes(hiveId: string): BoxRow[] {
-  return db.prepare('SELECT * FROM boxes WHERE hiveId = ?').all(hiveId) as BoxRow[];
+function getHiveBoxes(hiveEntityId: string): BoxRow[] {
+  return db.prepare('SELECT * FROM boxes WHERE hiveId = ? AND superseded_by IS NULL').all(hiveEntityId) as BoxRow[];
 }
 function getAllFrameSlots(): FrameSlotRow[] {
-  return db.prepare('SELECT * FROM frame_slots').all() as FrameSlotRow[];
+  return db.prepare('SELECT * FROM frame_slots WHERE superseded_by IS NULL').all() as FrameSlotRow[];
 }
 
 app.get('/api/hives', (_req, res) => {
-  const rows = db.prepare('SELECT * FROM hives').all() as HiveRow[];
-  const boxes = db.prepare('SELECT * FROM boxes').all() as BoxRow[];
+  const rows = db.prepare('SELECT * FROM hives WHERE superseded_by IS NULL').all() as HiveRow[];
+  const boxes = db.prepare('SELECT * FROM boxes WHERE superseded_by IS NULL').all() as BoxRow[];
   const slots = getAllFrameSlots();
   res.json(rows.map((r) => mapHive(r, boxes, slots)));
 });
 
 app.get('/api/hives/:id', (req, res) => {
-  const row = db.prepare('SELECT * FROM hives WHERE id = ?').get(req.params.id) as HiveRow | undefined;
+  const row = db.prepare('SELECT * FROM hives WHERE entity_id = ? AND superseded_by IS NULL').get(req.params.id) as HiveRow | undefined;
   if (!row) return res.status(404).json({ error: 'not found' });
-  const boxes = getHiveBoxes(row.id);
-  const slots = db.prepare('SELECT * FROM frame_slots WHERE boxId IN (SELECT id FROM boxes WHERE hiveId = ?)').all(row.id) as FrameSlotRow[];
+  const boxes = getHiveBoxes(row.entity_id);
+  const slots = db.prepare('SELECT * FROM frame_slots WHERE superseded_by IS NULL AND boxId IN (SELECT entity_id FROM boxes WHERE hiveId = ? AND superseded_by IS NULL)').all(row.entity_id) as FrameSlotRow[];
   res.json(mapHive(row, boxes, slots));
 });
 
 app.post('/api/hives', (req, res) => {
   const b = req.body || {};
-  const id = b.id || genId('hive');
+  const entityId = b.id || genId('hive');
+  const rowId = genId('hive');
   const loc = b.location || {};
-  db.prepare(`INSERT INTO hives (id, apiaryId, name, type, healthStatus, notes, createdAt, location_lat, location_lng, location_accuracy, location_pinnedAt, location_label, sensorIds) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+  db.prepare(`INSERT INTO hives (id, entity_id, version, superseded_by, superseded_at, apiaryId, name, type, healthStatus, notes, createdAt, location_lat, location_lng, location_accuracy, location_pinnedAt, location_label, sensorIds) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(
-      id,
+      rowId,
+      entityId,
       b.apiaryId,
       b.name ?? '',
       b.type ?? 'langstroth-10',
@@ -376,111 +415,166 @@ app.post('/api/hives', (req, res) => {
     );
 
   // Insert boxes + frame_slots
-  const insBox = db.prepare(`INSERT INTO boxes (id, hiveId, type, "index", sensorIds) VALUES (?, ?, ?, ?, ?)`);
-  const insSlot = db.prepare(`INSERT INTO frame_slots (id, boxId, position, content) VALUES (?, ?, ?, ?)`);
+  const insBox = db.prepare(`INSERT INTO boxes (id, entity_id, version, superseded_by, superseded_at, hiveId, type, "index", sensorIds) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?)`);
+  const insSlot = db.prepare(`INSERT INTO frame_slots (id, entity_id, version, superseded_by, superseded_at, boxId, position, content) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?)`);
   const boxes = b.boxes || [];
   for (let i = 0; i < boxes.length; i++) {
     const box = boxes[i];
-    const boxId = box.id || `${id}-box-${i}`;
-    insBox.run(boxId, id, box.type, i, JSON.stringify(box.sensorIds || []));
+    const boxEntityId = box.id || `${entityId}-box-${i}`;
+    const boxRowId = genId('box');
+    insBox.run(boxRowId, boxEntityId, entityId, box.type, i, JSON.stringify(box.sensorIds || []));
     const frames = box.frames || [];
     for (const f of frames) {
-      insSlot.run(genId('fs'), boxId, f.position, f.content || 'empty');
+      insSlot.run(genId('fs'), genId('fs'), boxEntityId, f.position, f.content || 'empty');
     }
   }
 
-  const row = db.prepare('SELECT * FROM hives WHERE id = ?').get(id) as HiveRow;
-  const hBoxes = getHiveBoxes(id);
-  const slots = db.prepare('SELECT * FROM frame_slots WHERE boxId IN (SELECT id FROM boxes WHERE hiveId = ?)').all(id) as FrameSlotRow[];
+  const row = db.prepare('SELECT * FROM hives WHERE id = ?').get(rowId) as HiveRow;
+  const hBoxes = getHiveBoxes(entityId);
+  const slots = db.prepare('SELECT * FROM frame_slots WHERE superseded_by IS NULL AND boxId IN (SELECT entity_id FROM boxes WHERE hiveId = ? AND superseded_by IS NULL)').all(entityId) as FrameSlotRow[];
   res.status(201).json(mapHive(row, hBoxes, slots));
 });
 
 app.put('/api/hives/:id', (req, res) => {
   const b = req.body || {};
-  const exists = db.prepare('SELECT 1 FROM hives WHERE id = ?').get(req.params.id);
+  const entityId = req.params.id;
+  const exists = db.prepare('SELECT 1 FROM hives WHERE entity_id = ? AND superseded_by IS NULL').get(entityId);
   if (!exists) return res.status(404).json({ error: 'not found' });
   const loc = b.location || {};
-  db.prepare(`UPDATE hives SET apiaryId = ?, name = ?, type = ?, healthStatus = ?, notes = ?, location_lat = ?, location_lng = ?, location_accuracy = ?, location_pinnedAt = ?, location_label = ?, sensorIds = ? WHERE id = ?`)
-    .run(
-      b.apiaryId,
-      b.name ?? '',
-      b.type ?? 'langstroth-10',
-      b.healthStatus ?? 'good',
-      b.notes ?? null,
-      loc.lat ?? null,
-      loc.lng ?? null,
-      loc.accuracy ?? null,
-      loc.pinnedAt ?? null,
-      loc.label ?? null,
-      JSON.stringify(b.sensorIds || []),
-      req.params.id,
-    );
+
+  const newRowId = cowSupersede('hives', entityId, () => ({
+    apiaryId: b.apiaryId,
+    name: b.name ?? '',
+    type: b.type ?? 'langstroth-10',
+    healthStatus: b.healthStatus ?? 'good',
+    notes: b.notes ?? null,
+    createdAt: b.createdAt ?? new Date().toISOString(),
+    location_lat: loc.lat ?? null,
+    location_lng: loc.lng ?? null,
+    location_accuracy: loc.accuracy ?? null,
+    location_pinnedAt: loc.pinnedAt ?? null,
+    location_label: loc.label ?? null,
+    sensorIds: JSON.stringify(b.sensorIds || []),
+  }));
 
   // Replace boxes + frame_slots if provided
   if (Array.isArray(b.boxes)) {
-    db.prepare('DELETE FROM frame_slots WHERE boxId IN (SELECT id FROM boxes WHERE hiveId = ?)').run(req.params.id);
-    db.prepare('DELETE FROM boxes WHERE hiveId = ?').run(req.params.id);
-    const insBox = db.prepare(`INSERT INTO boxes (id, hiveId, type, "index", sensorIds) VALUES (?, ?, ?, ?, ?)`);
-    const insSlot = db.prepare(`INSERT INTO frame_slots (id, boxId, position, content) VALUES (?, ?, ?, ?)`);
+    // Supersede existing boxes + frame_slots
+    const oldBoxes = db.prepare('SELECT entity_id FROM boxes WHERE hiveId = ? AND superseded_by IS NULL').all(entityId) as { entity_id: string }[];
+    for (const ob of oldBoxes) {
+      // Supersede frame slots of this box
+      const oldSlots = db.prepare('SELECT id, entity_id FROM frame_slots WHERE boxId = ? AND superseded_by IS NULL').all(ob.entity_id) as { id: string; entity_id: string }[];
+      for (const os of oldSlots) {
+        const ts = now();
+        db.prepare('UPDATE frame_slots SET superseded_by = ?, superseded_at = ? WHERE id = ?').run(genId('fs'), ts, os.id);
+      }
+      const ts = now();
+      db.prepare('UPDATE boxes SET superseded_by = ?, superseded_at = ? WHERE entity_id = ? AND superseded_by IS NULL').run(genId('box'), ts, ob.entity_id);
+    }
+    // Insert new boxes + frame_slots
+    const insBox = db.prepare(`INSERT INTO boxes (id, entity_id, version, superseded_by, superseded_at, hiveId, type, "index", sensorIds) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?)`);
+    const insSlot = db.prepare(`INSERT INTO frame_slots (id, entity_id, version, superseded_by, superseded_at, boxId, position, content) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?)`);
     for (let i = 0; i < b.boxes.length; i++) {
       const box = b.boxes[i];
-      const boxId = box.id || `${req.params.id}-box-${i}`;
-      insBox.run(boxId, req.params.id, box.type, i, JSON.stringify(box.sensorIds || []));
+      const boxEntityId = box.id || `${entityId}-box-${i}`;
+      const boxRowId = genId('box');
+      insBox.run(boxRowId, boxEntityId, entityId, box.type, i, JSON.stringify(box.sensorIds || []));
       const frames = box.frames || [];
       for (const f of frames) {
-        insSlot.run(genId('fs'), boxId, f.position, f.content || 'empty');
+        insSlot.run(genId('fs'), genId('fs'), boxEntityId, f.position, f.content || 'empty');
       }
     }
   }
 
-  const row = db.prepare('SELECT * FROM hives WHERE id = ?').get(req.params.id) as HiveRow;
-  const hBoxes = getHiveBoxes(req.params.id);
-  const slots = db.prepare('SELECT * FROM frame_slots WHERE boxId IN (SELECT id FROM boxes WHERE hiveId = ?)').all(req.params.id) as FrameSlotRow[];
+  const row = db.prepare('SELECT * FROM hives WHERE id = ?').get(newRowId) as HiveRow;
+  const hBoxes = getHiveBoxes(entityId);
+  const slots = db.prepare('SELECT * FROM frame_slots WHERE superseded_by IS NULL AND boxId IN (SELECT entity_id FROM boxes WHERE hiveId = ? AND superseded_by IS NULL)').all(entityId) as FrameSlotRow[];
   res.json(mapHive(row, hBoxes, slots));
 });
 
 app.delete('/api/hives/:id', (req, res) => {
-  db.prepare('DELETE FROM hives WHERE id = ?').run(req.params.id);
+  // Delete all versions of this hive + associated boxes/frame_slots
+  db.prepare('DELETE FROM frame_slots WHERE boxId IN (SELECT entity_id FROM boxes WHERE hiveId = ?)').run(req.params.id);
+  db.prepare('DELETE FROM boxes WHERE hiveId = ?').run(req.params.id);
+  db.prepare('DELETE FROM hives WHERE entity_id = ?').run(req.params.id);
   res.json({ ok: true });
+});
+
+// History & revert
+app.get('/api/hives/:id/history', (req, res) => {
+  const rows = db.prepare('SELECT * FROM hives WHERE entity_id = ? ORDER BY version DESC').all(req.params.id) as HiveRow[];
+  if (rows.length === 0) return res.status(404).json({ error: 'not found' });
+  res.json(rows.map((r) => ({ ...mapHive(r, [], []), supersededBy: r.superseded_by, supersededAt: r.superseded_at })));
+});
+
+app.post('/api/hives/:id/revert', (req, res) => {
+  const entityId = req.params.id;
+  const targetVersion = Number(req.query.version);
+  if (!targetVersion) return res.status(400).json({ error: 'version query param required' });
+
+  const target = db.prepare('SELECT * FROM hives WHERE entity_id = ? AND version = ?').get(entityId, targetVersion) as HiveRow | undefined;
+  if (!target) return res.status(404).json({ error: `version ${targetVersion} not found` });
+
+  const newRowId = cowSupersede('hives', entityId, () => ({
+    apiaryId: target.apiaryId,
+    name: target.name,
+    type: target.type,
+    healthStatus: target.healthStatus,
+    notes: target.notes,
+    createdAt: target.createdAt,
+    location_lat: target.location_lat,
+    location_lng: target.location_lng,
+    location_accuracy: target.location_accuracy,
+    location_pinnedAt: target.location_pinnedAt,
+    location_label: target.location_label,
+    sensorIds: target.sensorIds,
+  }));
+
+  const row = db.prepare('SELECT * FROM hives WHERE id = ?').get(newRowId) as HiveRow;
+  const hBoxes = getHiveBoxes(entityId);
+  const slots = db.prepare('SELECT * FROM frame_slots WHERE superseded_by IS NULL AND boxId IN (SELECT entity_id FROM boxes WHERE hiveId = ? AND superseded_by IS NULL)').all(entityId) as FrameSlotRow[];
+  res.json(mapHive(row, hBoxes, slots));
 });
 
 // ============================================================================
 // /api/inspections  (includes concerns)
 // ============================================================================
 function getConcernsFor(inspectionId: string) {
-  return db.prepare('SELECT * FROM concerns WHERE inspectionId = ?').all(inspectionId) as any[];
+  return db.prepare('SELECT * FROM concerns WHERE inspectionId = ? AND superseded_by IS NULL').all(inspectionId) as any[];
 }
 
 app.get('/api/inspections', (_req, res) => {
-  const rows = db.prepare('SELECT * FROM inspections').all() as InspectionRow[];
+  const rows = db.prepare('SELECT * FROM inspections WHERE superseded_by IS NULL').all() as InspectionRow[];
   res.json(rows.map((r) => {
-    const insp = mapInspection(r, getConcernsFor(r.id));
-    const media = db.prepare('SELECT * FROM media_items WHERE inspectionId = ? ORDER BY timestamp DESC').all(r.id) as any[];
+    const insp = mapInspection(r, getConcernsFor(r.entity_id));
+    const media = db.prepare('SELECT * FROM media_items WHERE inspectionId = ? AND superseded_by IS NULL ORDER BY timestamp DESC').all(r.entity_id) as any[];
     insp.media = media.map(mapMedia);
     return insp;
   }));
 });
 
 app.get('/api/inspections/:id', (req, res) => {
-  const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(req.params.id) as InspectionRow | undefined;
+  const row = db.prepare('SELECT * FROM inspections WHERE entity_id = ? AND superseded_by IS NULL').get(req.params.id) as InspectionRow | undefined;
   if (!row) return res.status(404).json({ error: 'not found' });
-  const insp = mapInspection(row, getConcernsFor(row.id));
-  const media = db.prepare('SELECT * FROM media_items WHERE inspectionId = ? ORDER BY timestamp DESC').all(row.id) as any[];
+  const insp = mapInspection(row, getConcernsFor(row.entity_id));
+  const media = db.prepare('SELECT * FROM media_items WHERE inspectionId = ? AND superseded_by IS NULL ORDER BY timestamp DESC').all(row.entity_id) as any[];
   insp.media = media.map(mapMedia);
   res.json(insp);
 });
 
 app.get('/api/hives/:hiveId/inspections', (req, res) => {
-  const rows = db.prepare('SELECT * FROM inspections WHERE hiveId = ? ORDER BY date DESC').all(req.params.hiveId) as InspectionRow[];
-  res.json(rows.map((r) => mapInspection(r, getConcernsFor(r.id))));
+  const rows = db.prepare('SELECT * FROM inspections WHERE hiveId = ? AND superseded_by IS NULL ORDER BY date DESC').all(req.params.hiveId) as InspectionRow[];
+  res.json(rows.map((r) => mapInspection(r, getConcernsFor(r.entity_id))));
 });
 
 app.post('/api/inspections', (req, res) => {
   const b = req.body || {};
-  const id = b.id || genId('insp');
-  db.prepare(`INSERT INTO inspections (id, hiveId, date, queenPresent, queenCells, queenLayingPattern, eggsPresent, larvaePresent, cappedBrood, temperament, honeyStores, pollenStores, populationSize, hiveWeight, healthStatus, healthAutoCalculated, colonyDead, notes, photoUrls) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+  const entityId = b.id || genId('insp');
+  const rowId = genId('insp');
+  db.prepare(`INSERT INTO inspections (id, entity_id, version, superseded_by, superseded_at, hiveId, date, queenPresent, queenCells, queenLayingPattern, eggsPresent, larvaePresent, cappedBrood, temperament, honeyStores, pollenStores, populationSize, hiveWeight, healthStatus, healthAutoCalculated, colonyDead, notes, photoUrls) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(
-      id,
+      rowId,
+      entityId,
       b.hiveId,
       b.date ?? new Date().toISOString(),
       b.queenPresent ? 1 : 0,
@@ -503,135 +597,265 @@ app.post('/api/inspections', (req, res) => {
 
   // Concerns
   if (Array.isArray(b.concerns)) {
-    const insConcern = db.prepare(`INSERT INTO concerns (id, inspectionId, type, count, note) VALUES (?, ?, ?, ?, ?)`);
+    const insConcern = db.prepare(`INSERT INTO concerns (id, entity_id, version, superseded_by, superseded_at, inspectionId, type, count, note) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?)`);
     for (const c of b.concerns) {
-      insConcern.run(c.id || genId('c'), id, c.type, c.count ?? null, c.note ?? null);
+      const concernEntityId = c.id || genId('c');
+      insConcern.run(genId('c'), concernEntityId, entityId, c.type, c.count ?? null, c.note ?? null);
     }
   }
 
-  const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(id) as InspectionRow;
-  res.status(201).json(mapInspection(row, getConcernsFor(id)));
+  const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(rowId) as InspectionRow;
+  res.status(201).json(mapInspection(row, getConcernsFor(entityId)));
 });
 
 app.put('/api/inspections/:id', (req, res) => {
   const b = req.body || {};
-  const exists = db.prepare('SELECT 1 FROM inspections WHERE id = ?').get(req.params.id);
+  const entityId = req.params.id;
+  const exists = db.prepare('SELECT 1 FROM inspections WHERE entity_id = ? AND superseded_by IS NULL').get(entityId);
   if (!exists) return res.status(404).json({ error: 'not found' });
-  db.prepare(`UPDATE inspections SET hiveId = ?, date = ?, queenPresent = ?, queenCells = ?, queenLayingPattern = ?, eggsPresent = ?, larvaePresent = ?, cappedBrood = ?, temperament = ?, honeyStores = ?, pollenStores = ?, populationSize = ?, hiveWeight = ?, healthStatus = ?, healthAutoCalculated = ?, colonyDead = ?, notes = ?, photoUrls = ? WHERE id = ?`)
-    .run(
-      b.hiveId,
-      b.date ?? new Date().toISOString(),
-      b.queenPresent ? 1 : 0,
-      b.queenCells ? 1 : 0,
-      b.queenLayingPattern ?? 'none',
-      b.eggsPresent ? 1 : 0,
-      b.larvaePresent ? 1 : 0,
-      b.cappedBrood ? 1 : 0,
-      b.temperament ?? 'normal',
-      b.honeyStores ?? 'none',
-      b.pollenStores ?? 'none',
-      b.populationSize ?? 'none',
-      b.hiveWeight ?? 0,
-      b.healthStatus ?? 'good',
-      b.healthAutoCalculated ? 1 : 0,
-      b.colonyDead ? 1 : 0,
-      b.notes ?? '',
-      JSON.stringify(b.photoUrls || []),
-      req.params.id,
-    );
+
+  const newRowId = cowSupersede('inspections', entityId, () => ({
+    hiveId: b.hiveId,
+    date: b.date ?? new Date().toISOString(),
+    queenPresent: b.queenPresent ? 1 : 0,
+    queenCells: b.queenCells ? 1 : 0,
+    queenLayingPattern: b.queenLayingPattern ?? 'none',
+    eggsPresent: b.eggsPresent ? 1 : 0,
+    larvaePresent: b.larvaePresent ? 1 : 0,
+    cappedBrood: b.cappedBrood ? 1 : 0,
+    temperament: b.temperament ?? 'normal',
+    honeyStores: b.honeyStores ?? 'none',
+    pollenStores: b.pollenStores ?? 'none',
+    populationSize: b.populationSize ?? 'none',
+    hiveWeight: b.hiveWeight ?? 0,
+    healthStatus: b.healthStatus ?? 'good',
+    healthAutoCalculated: b.healthAutoCalculated ? 1 : 0,
+    colonyDead: b.colonyDead ? 1 : 0,
+    notes: b.notes ?? '',
+    photoUrls: JSON.stringify(b.photoUrls || []),
+  }));
 
   // Replace concerns if provided
   if (Array.isArray(b.concerns)) {
-    db.prepare('DELETE FROM concerns WHERE inspectionId = ?').run(req.params.id);
-    const insConcern = db.prepare(`INSERT INTO concerns (id, inspectionId, type, count, note) VALUES (?, ?, ?, ?, ?)`);
+    // Supersede old concerns
+    const oldConcerns = db.prepare('SELECT id FROM concerns WHERE inspectionId = ? AND superseded_by IS NULL').all(entityId) as { id: string }[];
+    const ts = now();
+    for (const oc of oldConcerns) {
+      db.prepare('UPDATE concerns SET superseded_by = ?, superseded_at = ? WHERE id = ?').run(genId('c'), ts, oc.id);
+    }
+    const insConcern = db.prepare(`INSERT INTO concerns (id, entity_id, version, superseded_by, superseded_at, inspectionId, type, count, note) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?)`);
     for (const c of b.concerns) {
-      insConcern.run(c.id || genId('c'), req.params.id, c.type, c.count ?? null, c.note ?? null);
+      const concernEntityId = c.id || genId('c');
+      insConcern.run(genId('c'), concernEntityId, entityId, c.type, c.count ?? null, c.note ?? null);
     }
   }
 
-  const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(req.params.id) as InspectionRow;
-  res.json(mapInspection(row, getConcernsFor(req.params.id)));
+  const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(newRowId) as InspectionRow;
+  res.json(mapInspection(row, getConcernsFor(entityId)));
 });
 
 app.delete('/api/inspections/:id', (req, res) => {
-  db.prepare('DELETE FROM inspections WHERE id = ?').run(req.params.id);
+  // Delete all versions + concerns
+  db.prepare('DELETE FROM concerns WHERE inspectionId = ?').run(req.params.id);
+  db.prepare('DELETE FROM media_items WHERE inspectionId = ?').run(req.params.id);
+  db.prepare('DELETE FROM inspections WHERE entity_id = ?').run(req.params.id);
   res.json({ ok: true });
+});
+
+// History & revert
+app.get('/api/inspections/:id/history', (req, res) => {
+  const rows = db.prepare('SELECT * FROM inspections WHERE entity_id = ? ORDER BY version DESC').all(req.params.id) as InspectionRow[];
+  if (rows.length === 0) return res.status(404).json({ error: 'not found' });
+  res.json(rows.map((r) => ({ ...mapInspection(r, getConcernsFor(r.entity_id)), supersededBy: r.superseded_by, supersededAt: r.superseded_at })));
+});
+
+app.post('/api/inspections/:id/revert', (req, res) => {
+  const entityId = req.params.id;
+  const targetVersion = Number(req.query.version);
+  if (!targetVersion) return res.status(400).json({ error: 'version query param required' });
+
+  const target = db.prepare('SELECT * FROM inspections WHERE entity_id = ? AND version = ?').get(entityId, targetVersion) as InspectionRow | undefined;
+  if (!target) return res.status(404).json({ error: `version ${targetVersion} not found` });
+
+  const newRowId = cowSupersede('inspections', entityId, () => ({
+    hiveId: target.hiveId,
+    date: target.date,
+    queenPresent: target.queenPresent,
+    queenCells: target.queenCells,
+    queenLayingPattern: target.queenLayingPattern,
+    eggsPresent: target.eggsPresent,
+    larvaePresent: target.larvaePresent,
+    cappedBrood: target.cappedBrood,
+    temperament: target.temperament,
+    honeyStores: target.honeyStores,
+    pollenStores: target.pollenStores,
+    populationSize: target.populationSize,
+    hiveWeight: target.hiveWeight,
+    healthStatus: target.healthStatus,
+    healthAutoCalculated: target.healthAutoCalculated,
+    colonyDead: target.colonyDead,
+    notes: target.notes,
+    photoUrls: target.photoUrls,
+  }));
+
+  const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(newRowId) as InspectionRow;
+  res.json(mapInspection(row, getConcernsFor(entityId)));
 });
 
 // ============================================================================
 // /api/sensors
 // ============================================================================
 app.get('/api/sensors', (_req, res) => {
-  const rows = db.prepare('SELECT * FROM sensors').all() as any[];
+  const rows = db.prepare('SELECT * FROM sensors WHERE superseded_by IS NULL').all() as any[];
   res.json(rows.map(mapSensor));
 });
 
 app.get('/api/sensors/:id', (req, res) => {
-  const row = db.prepare('SELECT * FROM sensors WHERE id = ?').get(req.params.id) as any | undefined;
+  const row = db.prepare('SELECT * FROM sensors WHERE entity_id = ? AND superseded_by IS NULL').get(req.params.id) as any | undefined;
   if (!row) return res.status(404).json({ error: 'not found' });
   res.json(mapSensor(row));
 });
 
 app.post('/api/sensors', (req, res) => {
   const b = req.body || {};
-  const id = b.id || genId('s');
-  db.prepare(`INSERT INTO sensors (id, deviceId, name, model, hiveId, boxId, position, latestReading) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(id, b.deviceId ?? '', b.name ?? '', b.model ?? '', b.hiveId ?? null, b.boxId ?? null, b.position ?? null, b.latestReading ? JSON.stringify(b.latestReading) : null);
-  const row = db.prepare('SELECT * FROM sensors WHERE id = ?').get(id) as any;
+  const entityId = b.id || genId('s');
+  const rowId = genId('s');
+  db.prepare(`INSERT INTO sensors (id, entity_id, version, superseded_by, superseded_at, deviceId, name, model, hiveId, boxId, position, latestReading) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(rowId, entityId, b.deviceId ?? '', b.name ?? '', b.model ?? '', b.hiveId ?? null, b.boxId ?? null, b.position ?? null, b.latestReading ? JSON.stringify(b.latestReading) : null);
+  const row = db.prepare('SELECT * FROM sensors WHERE id = ?').get(rowId) as any;
   res.status(201).json(mapSensor(row));
 });
 
 app.put('/api/sensors/:id', (req, res) => {
   const b = req.body || {};
-  const exists = db.prepare('SELECT 1 FROM sensors WHERE id = ?').get(req.params.id);
+  const entityId = req.params.id;
+  const exists = db.prepare('SELECT 1 FROM sensors WHERE entity_id = ? AND superseded_by IS NULL').get(entityId);
   if (!exists) return res.status(404).json({ error: 'not found' });
-  db.prepare(`UPDATE sensors SET deviceId = ?, name = ?, model = ?, hiveId = ?, boxId = ?, position = ?, latestReading = ? WHERE id = ?`)
-    .run(b.deviceId ?? '', b.name ?? '', b.model ?? '', b.hiveId ?? null, b.boxId ?? null, b.position ?? null, b.latestReading ? JSON.stringify(b.latestReading) : null, req.params.id);
-  const row = db.prepare('SELECT * FROM sensors WHERE id = ?').get(req.params.id) as any;
+
+  const newRowId = cowSupersede('sensors', entityId, () => ({
+    deviceId: b.deviceId ?? '',
+    name: b.name ?? '',
+    model: b.model ?? '',
+    hiveId: b.hiveId ?? null,
+    boxId: b.boxId ?? null,
+    position: b.position ?? null,
+    latestReading: b.latestReading ? JSON.stringify(b.latestReading) : null,
+  }));
+
+  const row = db.prepare('SELECT * FROM sensors WHERE id = ?').get(newRowId) as any;
   res.json(mapSensor(row));
 });
 
 app.delete('/api/sensors/:id', (req, res) => {
-  db.prepare('DELETE FROM sensors WHERE id = ?').run(req.params.id);
+  db.prepare('DELETE FROM sensors WHERE entity_id = ?').run(req.params.id);
   res.json({ ok: true });
+});
+
+// History & revert
+app.get('/api/sensors/:id/history', (req, res) => {
+  const rows = db.prepare('SELECT * FROM sensors WHERE entity_id = ? ORDER BY version DESC').all(req.params.id) as any[];
+  if (rows.length === 0) return res.status(404).json({ error: 'not found' });
+  res.json(rows.map((r) => ({ ...mapSensor(r), supersededBy: r.superseded_by, supersededAt: r.superseded_at })));
+});
+
+app.post('/api/sensors/:id/revert', (req, res) => {
+  const entityId = req.params.id;
+  const targetVersion = Number(req.query.version);
+  if (!targetVersion) return res.status(400).json({ error: 'version query param required' });
+
+  const target = db.prepare('SELECT * FROM sensors WHERE entity_id = ? AND version = ?').get(entityId, targetVersion) as any | undefined;
+  if (!target) return res.status(404).json({ error: `version ${targetVersion} not found` });
+
+  const newRowId = cowSupersede('sensors', entityId, () => ({
+    deviceId: target.deviceId,
+    name: target.name,
+    model: target.model,
+    hiveId: target.hiveId,
+    boxId: target.boxId,
+    position: target.position,
+    latestReading: target.latestReading,
+  }));
+
+  const row = db.prepare('SELECT * FROM sensors WHERE id = ?').get(newRowId) as any;
+  res.json(mapSensor(row));
 });
 
 // ============================================================================
 // /api/tasks
 // ============================================================================
 app.get('/api/tasks', (_req, res) => {
-  const rows = db.prepare('SELECT * FROM tasks').all() as any[];
+  const rows = db.prepare('SELECT * FROM tasks WHERE superseded_by IS NULL').all() as any[];
   res.json(rows.map(mapTask));
 });
 
 app.get('/api/tasks/:id', (req, res) => {
-  const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id) as any | undefined;
+  const row = db.prepare('SELECT * FROM tasks WHERE entity_id = ? AND superseded_by IS NULL').get(req.params.id) as any | undefined;
   if (!row) return res.status(404).json({ error: 'not found' });
   res.json(mapTask(row));
 });
 
 app.post('/api/tasks', (req, res) => {
   const b = req.body || {};
-  const id = b.id || genId('task');
-  db.prepare(`INSERT INTO tasks (id, hiveId, apiaryId, title, description, dueDate, completed, priority) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(id, b.hiveId ?? null, b.apiaryId ?? null, b.title ?? '', b.description ?? null, b.dueDate ?? null, b.completed ? 1 : 0, b.priority ?? 'medium');
-  const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as any;
+  const entityId = b.id || genId('task');
+  const rowId = genId('task');
+  db.prepare(`INSERT INTO tasks (id, entity_id, version, superseded_by, superseded_at, hiveId, apiaryId, title, description, dueDate, completed, priority) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(rowId, entityId, b.hiveId ?? null, b.apiaryId ?? null, b.title ?? '', b.description ?? null, b.dueDate ?? null, b.completed ? 1 : 0, b.priority ?? 'medium');
+  const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(rowId) as any;
   res.status(201).json(mapTask(row));
 });
 
 app.put('/api/tasks/:id', (req, res) => {
   const b = req.body || {};
-  const exists = db.prepare('SELECT 1 FROM tasks WHERE id = ?').get(req.params.id);
+  const entityId = req.params.id;
+  const exists = db.prepare('SELECT 1 FROM tasks WHERE entity_id = ? AND superseded_by IS NULL').get(entityId);
   if (!exists) return res.status(404).json({ error: 'not found' });
-  db.prepare(`UPDATE tasks SET hiveId = ?, apiaryId = ?, title = ?, description = ?, dueDate = ?, completed = ?, priority = ? WHERE id = ?`)
-    .run(b.hiveId ?? null, b.apiaryId ?? null, b.title ?? '', b.description ?? null, b.dueDate ?? null, b.completed ? 1 : 0, b.priority ?? 'medium', req.params.id);
-  const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id) as any;
+
+  const newRowId = cowSupersede('tasks', entityId, () => ({
+    hiveId: b.hiveId ?? null,
+    apiaryId: b.apiaryId ?? null,
+    title: b.title ?? '',
+    description: b.description ?? null,
+    dueDate: b.dueDate ?? null,
+    completed: b.completed ? 1 : 0,
+    priority: b.priority ?? 'medium',
+  }));
+
+  const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(newRowId) as any;
   res.json(mapTask(row));
 });
 
 app.delete('/api/tasks/:id', (req, res) => {
-  db.prepare('DELETE FROM tasks WHERE id = ?').run(req.params.id);
+  db.prepare('DELETE FROM tasks WHERE entity_id = ?').run(req.params.id);
   res.json({ ok: true });
+});
+
+// History & revert
+app.get('/api/tasks/:id/history', (req, res) => {
+  const rows = db.prepare('SELECT * FROM tasks WHERE entity_id = ? ORDER BY version DESC').all(req.params.id) as any[];
+  if (rows.length === 0) return res.status(404).json({ error: 'not found' });
+  res.json(rows.map((r) => ({ ...mapTask(r), supersededBy: r.superseded_by, supersededAt: r.superseded_at })));
+});
+
+app.post('/api/tasks/:id/revert', (req, res) => {
+  const entityId = req.params.id;
+  const targetVersion = Number(req.query.version);
+  if (!targetVersion) return res.status(400).json({ error: 'version query param required' });
+
+  const target = db.prepare('SELECT * FROM tasks WHERE entity_id = ? AND version = ?').get(entityId, targetVersion) as any | undefined;
+  if (!target) return res.status(404).json({ error: `version ${targetVersion} not found` });
+
+  const newRowId = cowSupersede('tasks', entityId, () => ({
+    hiveId: target.hiveId,
+    apiaryId: target.apiaryId,
+    title: target.title,
+    description: target.description,
+    dueDate: target.dueDate,
+    completed: target.completed,
+    priority: target.priority,
+  }));
+
+  const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(newRowId) as any;
+  res.json(mapTask(row));
 });
 
 // ============================================================================
@@ -640,42 +864,53 @@ app.delete('/api/tasks/:id', (req, res) => {
 app.get('/api/media', (req, res) => {
   let rows: any[];
   if (req.query.inspectionId) {
-    rows = db.prepare('SELECT * FROM media_items WHERE inspectionId = ? ORDER BY timestamp DESC').all(req.query.inspectionId) as any[];
+    rows = db.prepare('SELECT * FROM media_items WHERE inspectionId = ? AND superseded_by IS NULL ORDER BY timestamp DESC').all(req.query.inspectionId) as any[];
   } else if (req.query.hiveId) {
-    rows = db.prepare('SELECT * FROM media_items WHERE hiveId = ? ORDER BY timestamp DESC').all(req.query.hiveId) as any[];
+    rows = db.prepare('SELECT * FROM media_items WHERE hiveId = ? AND superseded_by IS NULL ORDER BY timestamp DESC').all(req.query.hiveId) as any[];
   } else {
-    rows = db.prepare('SELECT * FROM media_items ORDER BY timestamp DESC').all() as any[];
+    rows = db.prepare('SELECT * FROM media_items WHERE superseded_by IS NULL ORDER BY timestamp DESC').all() as any[];
   }
   res.json(rows.map(mapMedia));
 });
 
 app.get('/api/media/:id', (req, res) => {
-  const row = db.prepare('SELECT * FROM media_items WHERE id = ?').get(req.params.id) as any | undefined;
+  const row = db.prepare('SELECT * FROM media_items WHERE entity_id = ? AND superseded_by IS NULL').get(req.params.id) as any | undefined;
   if (!row) return res.status(404).json({ error: 'not found' });
   res.json(mapMedia(row));
 });
 
 app.post('/api/media', (req, res) => {
   const b = req.body || {};
-  const id = b.id || genId('media');
-  db.prepare(`INSERT INTO media_items (id, inspectionId, hiveId, type, dataUrl, timestamp, label, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(id, b.inspectionId ?? null, b.hiveId ?? null, b.type ?? 'photo', b.dataUrl ?? '', b.timestamp ?? new Date().toISOString(), b.label ?? null, b.duration ?? null);
-  const row = db.prepare('SELECT * FROM media_items WHERE id = ?').get(id) as any;
+  const entityId = b.id || genId('media');
+  const rowId = genId('media');
+  db.prepare(`INSERT INTO media_items (id, entity_id, version, superseded_by, superseded_at, inspectionId, hiveId, type, dataUrl, timestamp, label, duration) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(rowId, entityId, b.inspectionId ?? null, b.hiveId ?? null, b.type ?? 'photo', b.dataUrl ?? '', b.timestamp ?? new Date().toISOString(), b.label ?? null, b.duration ?? null);
+  const row = db.prepare('SELECT * FROM media_items WHERE id = ?').get(rowId) as any;
   res.status(201).json(mapMedia(row));
 });
 
 app.put('/api/media/:id', (req, res) => {
   const b = req.body || {};
-  const exists = db.prepare('SELECT 1 FROM media_items WHERE id = ?').get(req.params.id);
+  const entityId = req.params.id;
+  const exists = db.prepare('SELECT 1 FROM media_items WHERE entity_id = ? AND superseded_by IS NULL').get(entityId);
   if (!exists) return res.status(404).json({ error: 'not found' });
-  db.prepare(`UPDATE media_items SET inspectionId = ?, hiveId = ?, type = ?, dataUrl = ?, timestamp = ?, label = ?, duration = ? WHERE id = ?`)
-    .run(b.inspectionId ?? null, b.hiveId ?? null, b.type ?? 'photo', b.dataUrl ?? '', b.timestamp ?? new Date().toISOString(), b.label ?? null, b.duration ?? null, req.params.id);
-  const row = db.prepare('SELECT * FROM media_items WHERE id = ?').get(req.params.id) as any;
+
+  const newRowId = cowSupersede('media_items', entityId, () => ({
+    inspectionId: b.inspectionId ?? null,
+    hiveId: b.hiveId ?? null,
+    type: b.type ?? 'photo',
+    dataUrl: b.dataUrl ?? '',
+    timestamp: b.timestamp ?? new Date().toISOString(),
+    label: b.label ?? null,
+    duration: b.duration ?? null,
+  }));
+
+  const row = db.prepare('SELECT * FROM media_items WHERE id = ?').get(newRowId) as any;
   res.json(mapMedia(row));
 });
 
 app.delete('/api/media/:id', (req, res) => {
-  db.prepare('DELETE FROM media_items WHERE id = ?').run(req.params.id);
+  db.prepare('DELETE FROM media_items WHERE entity_id = ?').run(req.params.id);
   res.json({ ok: true });
 });
 
@@ -697,7 +932,7 @@ app.post('/api/omi/transcript', async (req, res) => {
     if (typeof transcript !== 'string' || !transcript.trim()) {
       return res.status(400).json({ error: 'transcript (string) is required' });
     }
-    const hiveRows = db.prepare('SELECT id, name FROM hives').all() as { id: string; name: string }[];
+    const hiveRows = db.prepare('SELECT entity_id as id, name FROM hives WHERE superseded_by IS NULL').all() as { id: string; name: string }[];
     const parsed = await parseTranscriptToInspection(transcript, hiveRows);
     res.json({ parsed, raw: transcript });
   } catch (e) {
@@ -710,7 +945,7 @@ app.post('/api/omi/confirm', (req, res) => {
   try {
     const { parsed, hiveId } = req.body || {};
     if (!hiveId) return res.status(400).json({ error: 'hiveId is required' });
-    const exists = db.prepare('SELECT 1 FROM hives WHERE id = ?').get(hiveId);
+    const exists = db.prepare('SELECT 1 FROM hives WHERE entity_id = ? AND superseded_by IS NULL').get(hiveId);
     if (!exists) return res.status(404).json({ error: 'hive not found' });
 
     const p: ParsedInspection = parsed || {};
@@ -729,11 +964,13 @@ app.post('/api/omi/confirm', (req, res) => {
       colonyDead: false,
     });
 
-    const id = genId('insp');
+    const entityId = genId('insp');
+    const rowId = genId('insp');
     db.prepare(
-      `INSERT INTO inspections (id, hiveId, date, queenPresent, queenCells, queenLayingPattern, eggsPresent, larvaePresent, cappedBrood, temperament, honeyStores, pollenStores, populationSize, hiveWeight, healthStatus, healthAutoCalculated, colonyDead, notes, photoUrls) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO inspections (id, entity_id, version, superseded_by, superseded_at, hiveId, date, queenPresent, queenCells, queenLayingPattern, eggsPresent, larvaePresent, cappedBrood, temperament, honeyStores, pollenStores, populationSize, hiveWeight, healthStatus, healthAutoCalculated, colonyDead, notes, photoUrls) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
-      id,
+      rowId,
+      entityId,
       hiveId,
       new Date().toISOString(),
       p.queenPresent ? 1 : 0,
@@ -757,18 +994,19 @@ app.post('/api/omi/confirm', (req, res) => {
     // Insert concerns
     if (Array.isArray(p.concerns)) {
       const insConcern = db.prepare(
-        `INSERT INTO concerns (id, inspectionId, type, count, note) VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO concerns (id, entity_id, version, superseded_by, superseded_at, inspectionId, type, count, note) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?)`,
       );
       for (const c of p.concerns) {
         if (!c.type) continue;
-        insConcern.run(genId('c'), id, c.type, c.count ?? null, c.note ?? null);
+        const concernEntityId = genId('c');
+        insConcern.run(genId('c'), concernEntityId, entityId, c.type, c.count ?? null, c.note ?? null);
       }
     }
 
-    const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(id) as InspectionRow;
-    // Update hive health status to match latest inspection
-    db.prepare('UPDATE hives SET healthStatus = ? WHERE id = ?').run(health, hiveId);
-    res.status(201).json(mapInspection(row, getConcernsFor(id)));
+    const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(rowId) as InspectionRow;
+    // Update hive health status to match latest inspection (copy-on-write)
+    cowSupersede('hives', hiveId, (oldHive) => ({ ...oldHive, healthStatus: health }));
+    res.status(201).json(mapInspection(row, getConcernsFor(entityId)));
   } catch (e) {
     console.error('[omi/confirm] error:', e);
     res.status(500).json({ error: e instanceof Error ? e.message : 'confirm failed' });
@@ -808,7 +1046,6 @@ const recentVisionAnalyses: VisionAnalysisRecord[] = [];
 const MAX_RECENT_ANALYSES = 50;
 
 function normalizeImage(image: string): string {
-  // Accept either a data URL or raw base64; pass through to vision module.
   return image;
 }
 
@@ -819,11 +1056,9 @@ app.post('/api/vision/analyze', async (req, res) => {
       return res.status(400).json({ error: 'image (string, base64 data URL or raw base64) is required' });
     }
 
-    // Look up hive name for better prompt context
     let hiveName: string | undefined;
     if (hiveId) {
-      const hiveRow = db.prepare('SELECT name FROM hives WHERE id = ?').get(hiveId) as { name: string } | undefined;
-      if (hiveRow) hiveName = hiveRow.name;
+      hiveName = getHiveNameByEntityId(hiveId);
     }
 
     const analysis = await analyzeFramePhoto(normalizeImage(image), hiveName);
@@ -855,13 +1090,13 @@ app.post('/api/vision/analyze-and-create', async (req, res) => {
     if (!hiveId) {
       return res.status(400).json({ error: 'hiveId is required' });
     }
-    const hiveExists = db.prepare('SELECT 1 FROM hives WHERE id = ?').get(hiveId);
+    const hiveExists = db.prepare('SELECT 1 FROM hives WHERE entity_id = ? AND superseded_by IS NULL').get(hiveId);
     if (!hiveExists) {
       return res.status(404).json({ error: 'hive not found' });
     }
 
-    const hiveRow = db.prepare('SELECT name FROM hives WHERE id = ?').get(hiveId) as { name: string };
-    const analysis = await analyzeFramePhoto(normalizeImage(image), hiveRow.name);
+    const hiveName = getHiveNameByEntityId(hiveId);
+    const analysis = await analyzeFramePhoto(normalizeImage(image), hiveName);
 
     // Map analysis → inspection fields
     const layingMap: Record<string, 'excellent' | 'good' | 'fair' | 'poor' | 'none'> = {
@@ -873,7 +1108,6 @@ app.post('/api/vision/analyze-and-create', async (req, res) => {
     };
     const queenLayingPattern = layingMap[analysis.broodPattern] ?? 'none';
 
-    // Derive honey/pollen store levels from ratios
     function ratioToStore(r: number): 'none' | 'low' | 'medium' | 'high' {
       if (r >= 0.5) return 'high';
       if (r >= 0.25) return 'medium';
@@ -883,7 +1117,6 @@ app.post('/api/vision/analyze-and-create', async (req, res) => {
     const honeyStores = ratioToStore(analysis.honeyRatio);
     const pollenStores = ratioToStore(analysis.pollenRatio);
 
-    // Build concerns from diseases + pests + analysis concerns
     const concerns: { type: string; count?: number; note?: string }[] = [];
     for (const d of analysis.diseases) {
       concerns.push({
@@ -902,7 +1135,6 @@ app.post('/api/vision/analyze-and-create', async (req, res) => {
       concerns.push({ type: c.type, note: c.note });
     }
 
-    // Build notes: overall assessment + optional user notes
     const notesParts: string[] = [];
     if (notes && typeof notes === 'string' && notes.trim()) {
       notesParts.push(notes.trim());
@@ -916,7 +1148,6 @@ app.post('/api/vision/analyze-and-create', async (req, res) => {
     }
     const inspectionNotes = notesParts.join('\n\n');
 
-    // Calculate health
     const health = calculateHealth({
       queenPresent: analysis.queenSpotted,
       queenCells: false,
@@ -927,33 +1158,35 @@ app.post('/api/vision/analyze-and-create', async (req, res) => {
       temperament: 'normal',
       honeyStores,
       pollenStores,
-      populationSize: 'none', // not determinable from a single frame photo
+      populationSize: 'none',
       concerns,
       colonyDead: false,
     });
 
     // Insert inspection
-    const id = genId('insp');
+    const entityId = genId('insp');
+    const rowId = genId('insp');
     db.prepare(
-      'INSERT INTO inspections (id, hiveId, date, queenPresent, queenCells, queenLayingPattern, eggsPresent, larvaePresent, cappedBrood, temperament, honeyStores, pollenStores, populationSize, hiveWeight, healthStatus, healthAutoCalculated, colonyDead, notes, photoUrls) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO inspections (id, entity_id, version, superseded_by, superseded_at, hiveId, date, queenPresent, queenCells, queenLayingPattern, eggsPresent, larvaePresent, cappedBrood, temperament, honeyStores, pollenStores, populationSize, hiveWeight, healthStatus, healthAutoCalculated, colonyDead, notes, photoUrls) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     ).run(
-      id,
+      rowId,
+      entityId,
       hiveId,
       new Date().toISOString(),
       analysis.queenSpotted ? 1 : 0,
-      analysis.queenCellsVisible ? 1 : 0, // queen cells detected by vision model
+      analysis.queenCellsVisible ? 1 : 0,
       queenLayingPattern,
       analysis.eggsVisible ? 1 : 0,
       analysis.larvaeVisible ? 1 : 0,
       analysis.cappedBroodPresent ? 1 : 0,
-      'normal', // temperament not determinable from photo
+      'normal',
       honeyStores,
       pollenStores,
-      'none', // population not determinable from single frame
+      'none',
       0,
       health,
-      1, // auto-calculated
-      0, // not dead
+      1,
+      0,
       inspectionNotes,
       JSON.stringify([]),
     );
@@ -961,39 +1194,39 @@ app.post('/api/vision/analyze-and-create', async (req, res) => {
     // Insert concerns
     if (concerns.length > 0) {
       const insConcern = db.prepare(
-        'INSERT INTO concerns (id, inspectionId, type, count, note) VALUES (?, ?, ?, ?, ?)',
+        'INSERT INTO concerns (id, entity_id, version, superseded_by, superseded_at, inspectionId, type, count, note) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?)',
       );
       for (const c of concerns) {
         if (!c.type) continue;
-        insConcern.run(genId('c'), id, c.type, c.count ?? null, c.note ?? null);
+        const concernEntityId = genId('c');
+        insConcern.run(genId('c'), concernEntityId, entityId, c.type, c.count ?? null, c.note ?? null);
       }
     }
 
-    // Save the original frame photo to media_items so it's viewable from the inspection
+    // Save the original frame photo to media_items
     try {
-      const photoId = genId('media');
+      const mediaEntityId = genId('media');
+      const mediaRowId = genId('media');
       db.prepare(
-        'INSERT INTO media_items (id, inspectionId, hiveId, type, dataUrl, timestamp, label, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      ).run(photoId, id, hiveId, 'photo', normalizeImage(image), new Date().toISOString(), 'AI Frame Analysis Photo', null);
+        'INSERT INTO media_items (id, entity_id, version, superseded_by, superseded_at, inspectionId, hiveId, type, dataUrl, timestamp, label, duration) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?, ?, ?, ?)',
+      ).run(mediaRowId, mediaEntityId, entityId, hiveId, 'photo', normalizeImage(image), new Date().toISOString(), 'AI Frame Analysis Photo', null);
       // Also link it via photoUrls on the inspection for quick access
       db.prepare('UPDATE inspections SET photoUrls = ? WHERE id = ?').run(
-        JSON.stringify([photoId]),
-        id,
+        JSON.stringify([mediaEntityId]),
+        rowId,
       );
     } catch (mediaErr) {
       console.error('[vision/analyze-and-create] media save error:', mediaErr);
     }
 
-    // Update hive health status
-    db.prepare('UPDATE hives SET healthStatus = ? WHERE id = ?').run(health, hiveId);
+    // Update hive health status (copy-on-write)
+    cowSupersede('hives', hiveId, (oldHive) => ({ ...oldHive, healthStatus: health }));
 
-    const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(id) as InspectionRow;
-    const inspection = mapInspection(row, getConcernsFor(id));
-    // Attach media
-    const mediaRows = db.prepare('SELECT * FROM media_items WHERE inspectionId = ? ORDER BY timestamp DESC').all(id) as any[];
+    const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(rowId) as InspectionRow;
+    const inspection = mapInspection(row, getConcernsFor(entityId));
+    const mediaRows = db.prepare('SELECT * FROM media_items WHERE inspectionId = ? AND superseded_by IS NULL ORDER BY timestamp DESC').all(entityId) as any[];
     inspection.media = mediaRows.map(mapMedia);
 
-    // Store in recent analyses
     const record: VisionAnalysisRecord = {
       id: genId('va'),
       hiveId,
@@ -1044,20 +1277,22 @@ app.post('/api/vision/varroa/save', (req, res) => {
     const { image, hiveId, miteCount, date } = req.body || {};
     if (!hiveId) return res.status(400).json({ error: 'hiveId is required' });
     if (typeof miteCount !== 'number') return res.status(400).json({ error: 'miteCount (number) is required' });
-    const exists = db.prepare('SELECT 1 FROM hives WHERE id = ?').get(hiveId);
+    const exists = db.prepare('SELECT 1 FROM hives WHERE entity_id = ? AND superseded_by IS NULL').get(hiveId);
     if (!exists) return res.status(404).json({ error: 'hive not found' });
 
-    const inspId = genId('insp');
+    const entityId = genId('insp');
+    const rowId = genId('insp');
     const inspDate = date ?? new Date().toISOString();
     const concernNote = 'Varroa sticky board count: ' + miteCount + ' mites.';
 
     db.prepare(
-      'INSERT INTO inspections (id, hiveId, date, queenPresent, queenCells, queenLayingPattern, eggsPresent, larvaePresent, cappedBrood, temperament, honeyStores, pollenStores, populationSize, hiveWeight, healthStatus, healthAutoCalculated, colonyDead, notes, photoUrls) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO inspections (id, entity_id, version, superseded_by, superseded_at, hiveId, date, queenPresent, queenCells, queenLayingPattern, eggsPresent, larvaePresent, cappedBrood, temperament, honeyStores, pollenStores, populationSize, hiveWeight, healthStatus, healthAutoCalculated, colonyDead, notes, photoUrls) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     ).run(
-      inspId,
+      rowId,
+      entityId,
       hiveId,
       inspDate,
-      0, // queenPresent (unknown)
+      0,
       0,
       'none',
       0,
@@ -1068,20 +1303,21 @@ app.post('/api/vision/varroa/save', (req, res) => {
       'none',
       'none',
       0,
-      'fair', // placeholder health
-      1, // auto-calculated
+      'fair',
+      1,
       0,
       concernNote,
       image ? JSON.stringify([image]) : JSON.stringify([]),
     );
 
     // Insert a varroa concern with the mite count
+    const concernEntityId = genId('c');
     db.prepare(
-      'INSERT INTO concerns (id, inspectionId, type, count, note) VALUES (?, ?, ?, ?, ?)',
-    ).run(genId('c'), inspId, 'varroa', miteCount, concernNote);
+      'INSERT INTO concerns (id, entity_id, version, superseded_by, superseded_at, inspectionId, type, count, note) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?)',
+    ).run(genId('c'), concernEntityId, entityId, 'varroa', miteCount, concernNote);
 
-    const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(inspId) as InspectionRow;
-    res.status(201).json(mapInspection(row, getConcernsFor(inspId)));
+    const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(rowId) as InspectionRow;
+    res.status(201).json(mapInspection(row, getConcernsFor(entityId)));
   } catch (e) {
     console.error('[vision/varroa/save] error:', e);
     res.status(500).json({ error: e instanceof Error ? e.message : 'save failed' });
@@ -1091,15 +1327,15 @@ app.post('/api/vision/varroa/save', (req, res) => {
 app.get('/api/varroa/history/:hiveId', (req, res) => {
   try {
     const rows = db
-      .prepare('SELECT * FROM inspections WHERE hiveId = ? ORDER BY date DESC')
+      .prepare('SELECT * FROM inspections WHERE hiveId = ? AND superseded_by IS NULL ORDER BY date DESC')
       .all(req.params.hiveId) as InspectionRow[];
     const history: any[] = [];
     for (const r of rows) {
-      const concerns = getConcernsFor(r.id) as ConcernRowX[];
+      const concerns = getConcernsFor(r.entity_id) as ConcernRowX[];
       const varroa = concerns.find((c) => c.type.toLowerCase() === 'varroa');
       if (varroa) {
         history.push({
-          inspectionId: r.id,
+          inspectionId: r.entity_id,
           hiveId: r.hiveId,
           date: r.date,
           miteCount: varroa.count ?? 0,
@@ -1117,6 +1353,7 @@ app.get('/api/varroa/history/:hiveId', (req, res) => {
 
 interface ConcernRowX {
   id: string;
+  entity_id: string;
   inspectionId: string;
   type: string;
   count: number | null;
@@ -1128,7 +1365,7 @@ interface ConcernRowX {
 // ============================================================================
 app.get('/api/swarm/risk/:hiveId', async (req, res) => {
   try {
-    const exists = db.prepare('SELECT 1 FROM hives WHERE id = ?').get(req.params.hiveId);
+    const exists = db.prepare('SELECT 1 FROM hives WHERE entity_id = ? AND superseded_by IS NULL').get(req.params.hiveId);
     if (!exists) return res.status(404).json({ error: 'hive not found' });
     const assessment = await calculateSwarmRisk(req.params.hiveId);
     res.json(assessment);
@@ -1165,7 +1402,7 @@ app.get('/api/schedule', async (_req, res) => {
 
 app.get('/api/schedule/:hiveId', async (req, res) => {
   try {
-    const exists = db.prepare('SELECT 1 FROM hives WHERE id = ?').get(req.params.hiveId);
+    const exists = db.prepare('SELECT 1 FROM hives WHERE entity_id = ? AND superseded_by IS NULL').get(req.params.hiveId);
     if (!exists) return res.status(404).json({ error: 'hive not found' });
     const rec = await getHiveSchedule(req.params.hiveId);
     res.json(rec);
@@ -1184,7 +1421,7 @@ app.post('/api/inspect/parse', async (req, res) => {
     if (typeof text !== 'string' || !text.trim()) {
       return res.status(400).json({ error: 'text (string) is required' });
     }
-    const hiveRows = db.prepare('SELECT id, name FROM hives').all() as { id: string; name: string }[];
+    const hiveRows = db.prepare('SELECT entity_id as id, name FROM hives WHERE superseded_by IS NULL').all() as { id: string; name: string }[];
     const parsed = await parseFreeTextToInspection(text, hiveRows);
     res.json({ parsed, raw: text });
   } catch (e) {
@@ -1197,7 +1434,7 @@ app.post('/api/inspect/confirm', (req, res) => {
   try {
     const { parsed, hiveId } = req.body || {};
     if (!hiveId) return res.status(400).json({ error: 'hiveId is required' });
-    const exists = db.prepare('SELECT 1 FROM hives WHERE id = ?').get(hiveId);
+    const exists = db.prepare('SELECT 1 FROM hives WHERE entity_id = ? AND superseded_by IS NULL').get(hiveId);
     if (!exists) return res.status(404).json({ error: 'hive not found' });
 
     const p: ParsedInspection = parsed || {};
@@ -1216,11 +1453,13 @@ app.post('/api/inspect/confirm', (req, res) => {
       colonyDead: false,
     });
 
-    const id = genId('insp');
+    const entityId = genId('insp');
+    const rowId = genId('insp');
     db.prepare(
-      `INSERT INTO inspections (id, hiveId, date, queenPresent, queenCells, queenLayingPattern, eggsPresent, larvaePresent, cappedBrood, temperament, honeyStores, pollenStores, populationSize, hiveWeight, healthStatus, healthAutoCalculated, colonyDead, notes, photoUrls) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO inspections (id, entity_id, version, superseded_by, superseded_at, hiveId, date, queenPresent, queenCells, queenLayingPattern, eggsPresent, larvaePresent, cappedBrood, temperament, honeyStores, pollenStores, populationSize, hiveWeight, healthStatus, healthAutoCalculated, colonyDead, notes, photoUrls) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
-      id,
+      rowId,
+      entityId,
       hiveId,
       new Date().toISOString(),
       p.queenPresent ? 1 : 0,
@@ -1235,8 +1474,8 @@ app.post('/api/inspect/confirm', (req, res) => {
       p.populationSize ?? 'none',
       0,
       health,
-      1, // auto-calculated
-      0, // not dead
+      1,
+      0,
       p.notes ?? '',
       JSON.stringify([]),
     );
@@ -1244,18 +1483,19 @@ app.post('/api/inspect/confirm', (req, res) => {
     // Insert concerns
     if (Array.isArray(p.concerns)) {
       const insConcern = db.prepare(
-        `INSERT INTO concerns (id, inspectionId, type, count, note) VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO concerns (id, entity_id, version, superseded_by, superseded_at, inspectionId, type, count, note) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?)`,
       );
       for (const c of p.concerns) {
         if (!c.type) continue;
-        insConcern.run(genId('c'), id, c.type, c.count ?? null, c.note ?? null);
+        const concernEntityId = genId('c');
+        insConcern.run(genId('c'), concernEntityId, entityId, c.type, c.count ?? null, c.note ?? null);
       }
     }
 
-    const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(id) as InspectionRow;
-    // Update hive health status to match latest inspection
-    db.prepare('UPDATE hives SET healthStatus = ? WHERE id = ?').run(health, hiveId);
-    res.status(201).json(mapInspection(row, getConcernsFor(id)));
+    const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(rowId) as InspectionRow;
+    // Update hive health status (copy-on-write)
+    cowSupersede('hives', hiveId, (oldHive) => ({ ...oldHive, healthStatus: health }));
+    res.status(201).json(mapInspection(row, getConcernsFor(entityId)));
   } catch (e) {
     console.error('[inspect/confirm] error:', e);
     res.status(500).json({ error: e instanceof Error ? e.message : 'confirm failed' });
@@ -1269,7 +1509,7 @@ import { getHealthTrend, getAllHealthTrends } from './trending.js';
 
 app.get('/api/trending/:hiveId', (req, res) => {
   try {
-    const exists = db.prepare('SELECT 1 FROM hives WHERE id = ?').get(req.params.hiveId);
+    const exists = db.prepare('SELECT 1 FROM hives WHERE entity_id = ? AND superseded_by IS NULL').get(req.params.hiveId);
     if (!exists) return res.status(404).json({ error: 'hive not found' });
     const trend = getHealthTrend(req.params.hiveId);
     res.json(trend);
@@ -1296,7 +1536,7 @@ import { getTreatmentRecommendation, getAllTreatmentRecommendations } from './tr
 
 app.get('/api/treatment/:hiveId', (req, res) => {
   try {
-    const exists = db.prepare('SELECT 1 FROM hives WHERE id = ?').get(req.params.hiveId);
+    const exists = db.prepare('SELECT 1 FROM hives WHERE entity_id = ? AND superseded_by IS NULL').get(req.params.hiveId);
     if (!exists) return res.status(404).json({ error: 'hive not found' });
     const rec = getTreatmentRecommendation(req.params.hiveId);
     res.json(rec);
@@ -1345,7 +1585,6 @@ app.get('/api/forage/:month', (req, res) => {
   }
 });
 
-// /api/forage/species — All forage species with bloom windows (for map overlay)
 app.get('/api/forage/species/all', (_req, res) => {
   try {
     res.json(getAllForageSpecies());
@@ -1363,7 +1602,7 @@ app.post('/api/acoustics/analyze', async (req, res) => {
   try {
     const { audio, duration, hiveId, description } = req.body || {};
     if (!hiveId) return res.status(400).json({ error: 'hiveId is required' });
-    const exists = db.prepare('SELECT 1 FROM hives WHERE id = ?').get(hiveId);
+    const exists = db.prepare('SELECT 1 FROM hives WHERE entity_id = ? AND superseded_by IS NULL').get(hiveId);
     if (!exists) return res.status(404).json({ error: 'hive not found' });
 
     const analysis = await analyzeAcoustics({ hiveId, audio, duration, description });
@@ -1379,11 +1618,12 @@ app.post('/api/acoustics/save', (req, res) => {
     const { hiveId, analysis, notes } = req.body || {};
     if (!hiveId) return res.status(400).json({ error: 'hiveId is required' });
     if (!analysis) return res.status(400).json({ error: 'analysis is required' });
-    const exists = db.prepare('SELECT 1 FROM hives WHERE id = ?').get(hiveId);
+    const exists = db.prepare('SELECT 1 FROM hives WHERE entity_id = ? AND superseded_by IS NULL').get(hiveId);
     if (!exists) return res.status(404).json({ error: 'hive not found' });
 
     const a: AcousticAnalysis = analysis;
-    const inspId = genId('insp');
+    const entityId = genId('insp');
+    const rowId = genId('insp');
     const concernNote = 'Acoustic analysis: ' + a.interpretation + ' (confidence: ' + a.confidence + '). ' + a.notes;
     const inspectionNotes = (notes ? notes + '\n\n' : '') + '[Acoustic Analysis]\n' +
       'Interpretation: ' + a.interpretation + '\n' +
@@ -1393,9 +1633,10 @@ app.post('/api/acoustics/save', (req, res) => {
       'Recommendations: ' + (a.recommendations || []).join('; ');
 
     db.prepare(
-      'INSERT INTO inspections (id, hiveId, date, queenPresent, queenCells, queenLayingPattern, eggsPresent, larvaePresent, cappedBrood, temperament, honeyStores, pollenStores, populationSize, hiveWeight, healthStatus, healthAutoCalculated, colonyDead, notes, photoUrls) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO inspections (id, entity_id, version, superseded_by, superseded_at, hiveId, date, queenPresent, queenCells, queenLayingPattern, eggsPresent, larvaePresent, cappedBrood, temperament, honeyStores, pollenStores, populationSize, hiveWeight, healthStatus, healthAutoCalculated, colonyDead, notes, photoUrls) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     ).run(
-      inspId,
+      rowId,
+      entityId,
       hiveId,
       new Date().toISOString(),
       0,
@@ -1417,12 +1658,13 @@ app.post('/api/acoustics/save', (req, res) => {
     );
 
     // Insert an acoustic concern
+    const concernEntityId = genId('c');
     db.prepare(
-      'INSERT INTO concerns (id, inspectionId, type, count, note) VALUES (?, ?, ?, ?, ?)',
-    ).run(genId('c'), inspId, 'acoustic', null, concernNote);
+      'INSERT INTO concerns (id, entity_id, version, superseded_by, superseded_at, inspectionId, type, count, note) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?)',
+    ).run(genId('c'), concernEntityId, entityId, 'acoustic', null, concernNote);
 
-    const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(inspId) as InspectionRow;
-    res.status(201).json(mapInspection(row, getConcernsFor(inspId)));
+    const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(rowId) as InspectionRow;
+    res.status(201).json(mapInspection(row, getConcernsFor(entityId)));
   } catch (e) {
     console.error('[acoustics/save] error:', e);
     res.status(500).json({ error: e instanceof Error ? e.message : 'save failed' });
@@ -1432,15 +1674,15 @@ app.post('/api/acoustics/save', (req, res) => {
 app.get('/api/acoustics/history/:hiveId', (req, res) => {
   try {
     const rows = db
-      .prepare('SELECT * FROM inspections WHERE hiveId = ? ORDER BY date DESC')
+      .prepare('SELECT * FROM inspections WHERE hiveId = ? AND superseded_by IS NULL ORDER BY date DESC')
       .all(req.params.hiveId) as InspectionRow[];
     const history: any[] = [];
     for (const r of rows) {
-      const concerns = getConcernsFor(r.id) as ConcernRowX[];
+      const concerns = getConcernsFor(r.entity_id) as ConcernRowX[];
       const acoustic = concerns.find((c) => c.type.toLowerCase() === 'acoustic');
       if (acoustic) {
         history.push({
-          inspectionId: r.id,
+          inspectionId: r.entity_id,
           hiveId: r.hiveId,
           date: r.date,
           note: acoustic.note ?? '',
@@ -1498,7 +1740,7 @@ app.post('/api/queen/record', (req, res) => {
     if (!hiveId) return res.status(400).json({ error: 'hiveId is required' });
     if (!queenColor) return res.status(400).json({ error: 'queenColor is required' });
     if (typeof queenYear !== 'number') return res.status(400).json({ error: 'queenYear (number) is required' });
-    const exists = db.prepare('SELECT 1 FROM hives WHERE id = ?').get(hiveId);
+    const exists = db.prepare('SELECT 1 FROM hives WHERE entity_id = ? AND superseded_by IS NULL').get(hiveId);
     if (!exists) return res.status(404).json({ error: 'hive not found' });
 
     const record = recordQueen({ hiveId, queenColor, queenYear, imageUrls, notes, source });
@@ -1546,7 +1788,7 @@ app.post('/api/vision/reconstruct', async (req, res) => {
     if (!Array.isArray(images) || images.length === 0) {
       return res.status(400).json({ error: 'images (string[]) is required' });
     }
-    const exists = db.prepare('SELECT 1 FROM hives WHERE id = ?').get(hiveId);
+    const exists = db.prepare('SELECT 1 FROM hives WHERE entity_id = ? AND superseded_by IS NULL').get(hiveId);
     if (!exists) return res.status(404).json({ error: 'hive not found' });
 
     const result = await reconstructColony(images, hiveId);
@@ -1611,15 +1853,42 @@ app.post('/api/chat', async (req, res) => {
 });
 
 // ============================================================================
-// /api/health check & 404
+// /api/health check
 // ============================================================================
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
 
-// Local-only endpoint to retrieve the API key (for easy device pairing).
-// The auth middleware above already restricts this to localhost.
 app.get('/api/key', (_req, res) => {
   res.json({ key: API_KEY });
 });
+
+// ============================================================================
+// Setup status — returns whether DB has any data (for wizard gating)
+// ============================================================================
+app.get('/api/setup/status', (_req, res) => {
+  const apiaries = (db.prepare('SELECT COUNT(*) as c FROM apiaries WHERE superseded_by IS NULL').get() as { c: number }).c;
+  const hives = (db.prepare('SELECT COUNT(*) as c FROM hives WHERE superseded_by IS NULL').get() as { c: number }).c;
+  const sensors = (db.prepare('SELECT COUNT(*) as c FROM sensors WHERE superseded_by IS NULL').get() as { c: number }).c;
+  res.json({
+    hasData: apiaries > 0,
+    apiaryCount: apiaries,
+    hiveCount: hives,
+    sensorCount: sensors,
+  });
+});
+
+// ============================================================================
+// Serve built frontend (production mode)
+// ============================================================================
+const distPath = path.resolve(import.meta.dirname, '..', 'dist');
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+  app.get(/^(?!\/api\/).*/, (_req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+  console.log(`📦 Serving frontend from ${distPath}`);
+} else {
+  console.log('⚠️  No dist/ directory — frontend will not be served (run npm run build)');
+}
 
 app.use((_req, res) => res.status(404).json({ error: 'not found' }));
 
@@ -1627,9 +1896,9 @@ app.use((_req, res) => res.status(404).json({ error: 'not found' }));
 // Start
 // ============================================================================
 const PORT = Number(process.env.PORT || 3001);
-const HOST = '127.0.0.1'; // localhost only — Tailscale Funnel proxy reaches it locally
+const HOST = '0.0.0.0';
 app.listen(PORT, HOST, () => {
-  console.log(`🐝 BeeTree API listening on http://${HOST}:${PORT}`);
+  console.log(`🐝 BeeTree listening on http://${HOST}:${PORT}`);
   if (AUTH_DISABLED) {
     console.log('⚠️  AUTH DISABLED (BEETREE_DISABLE_AUTH=1) — NOT secure for internet exposure!');
   } else if (!process.env.BEETREE_API_KEY) {
