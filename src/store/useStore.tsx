@@ -1,9 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Apiary, AppState, Hive, Inspection, Sensor, Task } from '../types';
-import { SEED_APIARIES, SEED_HIVES, SEED_INSPECTIONS, SEED_SENSORS, SEED_TASKS, makeMockReading } from '../lib/seedData';
 import { API_BASE, apiFetch } from '../lib/apiBase';
 
-const STORAGE_KEY = 'beelog-state-v1';
+const STORAGE_KEY = 'beetree-state-v2'; // v2 — cleared seed data, server-only
 
 function loadState(): AppState {
   try {
@@ -16,32 +15,11 @@ function loadState(): AppState {
     /* ignore */
   }
   return {
-    apiaries: SEED_APIARIES,
-    hives: SEED_HIVES,
-    inspections: SEED_INSPECTIONS,
-    sensors: SEED_SENSORS,
-    tasks: SEED_TASKS,
-  };
-}
-
-/**
- * Merge server data into local state, preferring server records when IDs collide.
- * This keeps the store in sync with the SQLite backend without losing locally-created
- * records that haven't been pushed to the server yet.
- */
-function mergeState(local: AppState, remote: Partial<AppState>): AppState {
-  const mergeArrays = <T extends { id: string }>(a: T[], b: T[] | undefined): T[] => {
-    if (!b) return a;
-    const map = new Map(a.map((x) => [x.id, x]));
-    for (const item of b) map.set(item.id, item); // remote wins on collision
-    return Array.from(map.values());
-  };
-  return {
-    apiaries: mergeArrays(local.apiaries, remote.apiaries),
-    hives: mergeArrays(local.hives, remote.hives),
-    inspections: mergeArrays(local.inspections, remote.inspections),
-    sensors: mergeArrays(local.sensors, remote.sensors),
-    tasks: mergeArrays(local.tasks, remote.tasks),
+    apiaries: [],
+    hives: [],
+    inspections: [],
+    sensors: [],
+    tasks: [],
   };
 }
 
@@ -116,8 +94,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           apiFetch(API_BASE + '/api/tasks').then((r) => r.ok ? r.json() : []).catch(() => []),
         ]);
         if (cancelled) return;
-        const remote = { apiaries, hives, inspections, sensors, tasks } as Partial<AppState>;
-        setState((local) => mergeState(local, remote));
+        // Replace local state entirely with server data
+        setState({ apiaries, hives, inspections, sensors, tasks });
       } catch {
         // Server not running — keep local state
       }
@@ -273,17 +251,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         })),
 
       refreshSensorReadings: () =>
-        update((s) => ({
-          ...s,
-          sensors: s.sensors.map((sn) => ({
-            ...sn,
-            latestReading: makeMockReading(
-              88 + Math.random() * 10,
-              50 + Math.random() * 15,
-              Math.floor(Math.random() * 5) + 1,
-            ),
-          })),
-        })),
+        // No-op — real sensor readings come from the server via syncFromServer
+        update((s) => s),
 
       addInspection: (i) => {
         const insp: Inspection = { ...i, id: uid('insp') };
@@ -308,11 +277,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
       resetToSeed: () =>
         update(() => ({
-          apiaries: SEED_APIARIES,
-          hives: SEED_HIVES,
-          inspections: SEED_INSPECTIONS,
-          sensors: SEED_SENSORS,
-          tasks: SEED_TASKS,
+          apiaries: [],
+          hives: [],
+          inspections: [],
+          sensors: [],
+          tasks: [],
         })),
       clearAll: () => update(() => ({ apiaries: [], hives: [], inspections: [], sensors: [], tasks: [] })),
 
@@ -325,8 +294,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             apiFetch(API_BASE + '/api/sensors').then((r) => r.ok ? r.json() : []).catch(() => []),
             apiFetch(API_BASE + '/api/tasks').then((r) => r.ok ? r.json() : []).catch(() => []),
           ]);
-          const remote = { apiaries, hives, inspections, sensors, tasks } as Partial<AppState>;
-          setState((local) => mergeState(local, remote));
+          // Replace local state entirely with server data
+          update(() => ({ apiaries, hives, inspections, sensors, tasks }));
         } catch {
           // server not running — keep local state
         }
