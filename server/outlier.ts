@@ -1,7 +1,6 @@
 // server/outlier.ts — Apiary outlier detection: flag hives falling behind
 
 import { db } from './db.js';
-import { calculateHealth } from './omi.js';
 
 export interface HiveStat {
   hiveId: string;

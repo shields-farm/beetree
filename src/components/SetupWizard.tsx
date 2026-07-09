@@ -89,7 +89,7 @@ export function SetupWizard() {
       } else {
         setError('Server returned ' + resp.status + '. Try again.');
       }
-    } catch (e) {
+    } catch {
       setError('Cannot reach BeeTree server. Make sure it is running.');
     } finally {
       setLoading(false);
