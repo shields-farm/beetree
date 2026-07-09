@@ -5,17 +5,17 @@ repos:
         name: 🔍 typecheck (tsc)
         entry: npm run typecheck
         language: system
-        types: [ts, tsx]
         pass_filenames: false
+        always_run: true
       - id: lint
         name: 🧹 lint (oxlint)
         entry: npx oxlint
         language: system
-        types: [ts, tsx]
         pass_filenames: false
+        always_run: true
       - id: test
         name: 🧪 tests (vitest)
         entry: npx vitest run
         language: system
-        types: [ts, tsx]
         pass_filenames: false
+        always_run: true
