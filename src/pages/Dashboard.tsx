@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Clock, ChevronRight, Thermometer, TrendingUp, TrendingDown, Minus,
-  Flower2, Crown, Bug, AlertTriangle, CheckCircle2, Activity, Battery,
+  Flower2, Crown, Bug, AlertTriangle, CheckCircle2,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useChat, AskAIButton } from '../components/ChatContext';
