@@ -163,7 +163,7 @@ async function buildRecommendation(hive: HiveRow): Promise<InspectionRecommendat
       bump('soon');
       reasons.push('Moderate swarm risk (' + swarm.riskScore + ')');
     }
-  } catch (e) {
+  } catch {
     // Swarm risk is best-effort — don't fail the whole recommendation.
     factors.push({ factor: 'Swarm risk', detail: 'Unable to calculate swarm risk.' });
   }

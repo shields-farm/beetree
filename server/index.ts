@@ -321,7 +321,7 @@ app.put('/api/apiaries/:id', (req, res) => {
   const exists = db.prepare('SELECT 1 FROM apiaries WHERE entity_id = ? AND superseded_by IS NULL').get(entityId);
   if (!exists) return res.status(404).json({ error: 'not found' });
 
-  const newRowId = cowSupersede('apiaries', entityId, (old) => ({
+  const newRowId = cowSupersede('apiaries', entityId, (_old) => ({
     name: b.name ?? '',
     location_lat: b.location?.lat ?? null,
     location_lng: b.location?.lng ?? null,
@@ -1588,7 +1588,7 @@ app.get('/api/forage/:month', (req, res) => {
 app.get('/api/forage/species/all', (_req, res) => {
   try {
     res.json(getAllForageSpecies());
-  } catch (e) {
+  } catch {
     res.status(500).json({ error: 'failed to get forage species' });
   }
 });
