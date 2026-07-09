@@ -1877,6 +1877,14 @@ app.get('/api/setup/status', (_req, res) => {
 });
 
 // ============================================================================
+// Migration status — shows applied and pending migrations
+// ============================================================================
+app.get('/api/migrations', async (_req, res) => {
+  const { listMigrations } = await import('./migrate.js');
+  res.json(listMigrations());
+});
+
+// ============================================================================
 // Serve built frontend (production mode)
 // ============================================================================
 const distPath = path.resolve(import.meta.dirname, '..', 'dist');
