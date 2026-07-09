@@ -12,12 +12,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc -b",
-    "precommit": "npm run typecheck && npm run lint && npm run test",
-    "prepare": "husky"
-  },
-  "lint-staged": {
-    "*.{ts,tsx}": ["oxlint --fix", "vitest related --run"],
-    "*.css": ["oxlint"]
+    "precommit": "npm run typecheck && npm run lint && npm run test"
   },
   "dependencies": {
     "@vitejs/plugin-basic-ssl": "^2.3.0",
@@ -36,8 +31,6 @@
     "@vitejs/plugin-react": "^6.0.3",
     "@vitest/coverage-v8": "^4.1.10",
     "autoprefixer": "^10.5.2",
-    "husky": "^9.1.7",
-    "lint-staged": "^17.0.8",
     "oxlint": "^1.71.0",
     "postcss": "^8.5.16",
     "tailwindcss": "^3.4.19",

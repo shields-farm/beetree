@@ -77,11 +77,6 @@ export function wmoDescription(code: number): string {
   return map[code] ?? 'Unknown (' + code + ')';
 }
 
-/** Convert °C to °F */
-function cToF(c: number): number {
-  return c * 9 / 5 + 32;
-}
-
 /**
  * Fetch weather for a given lat/lng from Open-Meteo.
  * Returns current conditions + 48h hourly + 7-day daily forecast.
