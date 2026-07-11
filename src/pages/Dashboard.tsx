@@ -9,6 +9,7 @@ import { useChat, AskAIButton } from '../components/ChatContext';
 import { generateAlerts, ALERT_META, type Alert } from '../lib/alerts';
 import { HEALTH_META } from '../lib/health';
 import { API_BASE, apiFetch } from '../lib/apiBase';
+import { DashboardSensorChart } from '../components/DashboardSensorChart';
 import { getPestPrefs, filterTreatments } from '../lib/pestPrefs';
 import { useAnomalies } from '../lib/useAnomalies';
 
@@ -394,7 +395,7 @@ export function Dashboard() {
             </div>
 
             <div className="mt-4 pt-3 border-t border-stone-50">
-              <Sparkline sensors={sensorsWithReadings} />
+              <DashboardSensorChart />
             </div>
 
             {avgTemp && (
@@ -556,44 +557,6 @@ function BigAlertCard({ alert }: { alert: Alert }) {
           <ChevronRight size={16} />
         </Link>
       )}
-    </div>
-  );
-}
-
-// ─── 48h temperature sparkline ───
-function Sparkline({ sensors }: { sensors: ReturnType<typeof useStore>['sensors'] }) {
-  const colors = ['#f97316', '#f59e0b', '#eab308', '#84cc16'];
-  const w = 320;
-  const h = 60;
-
-  const paths = sensors.slice(0, 4).map((sensor, idx) => {
-    const base = 88 + (sensor.deviceId.charCodeAt(0) % 6);
-    const points: { x: number; y: number }[] = [];
-    for (let i = 0; i <= 48; i++) {
-      const t = new Date(Date.now() - (48 - i) * 3600 * 1000);
-      const cycle = Math.sin((t.getHours() / 24) * Math.PI * 2 - Math.PI / 2);
-      const temp = base + cycle * 4;
-      const x = (i / 48) * w;
-      const y = h - ((temp - 80) / (105 - 80)) * h;
-      points.push({ x, y });
-    }
-    const path = points
-      .map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
-      .join(' ');
-    return { path, color: colors[idx % colors.length], name: sensor.name };
-  });
-
-  return (
-    <div className="w-full">
-      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-14" preserveAspectRatio="none">
-        {paths.map((p, i) => (
-          <path key={i} d={p.path} fill="none" stroke={p.color} strokeWidth="2" opacity="0.7" />
-        ))}
-      </svg>
-      <div className="flex justify-between text-[10px] text-stone-400 dark:text-stone-500 mt-0.5">
-        <span>48h ago</span>
-        <span>now</span>
-      </div>
     </div>
   );
 }
