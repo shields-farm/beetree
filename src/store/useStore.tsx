@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type R
 import type { Apiary, AppState, Hive, Inspection, Sensor, Task } from '../types';
 import { API_BASE, apiFetch } from '../lib/apiBase';
 
-const STORAGE_KEY = 'beetree-state-v2'; // v2 — cleared seed data, server-only
+const STORAGE_KEY = 'beetree-state-v3'; // v3 — bust stale localStorage from server crash period
 
 function loadState(): AppState {
   try {
@@ -112,32 +112,60 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       addApiary: (a) => {
         const apiary: Apiary = { ...a, id: uid('apiary') };
         update((s) => ({ ...s, apiaries: [...s.apiaries, apiary] }));
+        apiFetch(API_BASE + '/api/apiaries', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(apiary),
+        }).catch((e: any) => console.error('[addApiary] server sync failed:', e));
         return apiary;
       },
-      updateApiary: (id, patch) =>
-        update((s) => ({ ...s, apiaries: s.apiaries.map((x) => (x.id === id ? { ...x, ...patch } : x)) })),
-      deleteApiary: (id) =>
+      updateApiary: (id, patch) => {
+        update((s) => ({ ...s, apiaries: s.apiaries.map((x) => (x.id === id ? { ...x, ...patch } : x)) }));
+        apiFetch(API_BASE + '/api/apiaries/' + id, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+        }).catch((e: any) => console.error('[updateApiary] server sync failed:', e));
+      },
+      deleteApiary: (id) => {
         update((s) => ({
           ...s,
           apiaries: s.apiaries.filter((x) => x.id !== id),
           hives: s.hives.filter((h) => h.apiaryId !== id),
-        })),
+        }));
+        apiFetch(API_BASE + '/api/apiaries/' + id, { method: 'DELETE' })
+          .catch((e: any) => console.error('[deleteApiary] server sync failed:', e));
+      },
 
       addHive: (h) => {
         const hive: Hive = { ...h, id: uid('hive'), createdAt: new Date().toISOString() };
         update((s) => ({ ...s, hives: [...s.hives, hive] }));
+        apiFetch(API_BASE + '/api/hives', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(hive),
+        }).catch((e: any) => console.error('[addHive] server sync failed:', e));
         return hive;
       },
-      updateHive: (id, patch) =>
-        update((s) => ({ ...s, hives: s.hives.map((x) => (x.id === id ? { ...x, ...patch } : x)) })),
-      deleteHive: (id) =>
+      updateHive: (id, patch) => {
+        update((s) => ({ ...s, hives: s.hives.map((x) => (x.id === id ? { ...x, ...patch } : x)) }));
+        apiFetch(API_BASE + '/api/hives/' + id, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+        }).catch((e: any) => console.error('[updateHive] server sync failed:', e));
+      },
+      deleteHive: (id) => {
         update((s) => ({
           ...s,
           hives: s.hives.filter((x) => x.id !== id),
           inspections: s.inspections.filter((i) => i.hiveId !== id),
           tasks: s.tasks.map((t) => (t.hiveId === id ? { ...t, hiveId: undefined } : t)),
           sensors: s.sensors.map((sn) => (sn.hiveId === id ? { ...sn, hiveId: undefined, boxId: undefined } : sn)),
-        })),
+        }));
+        apiFetch(API_BASE + '/api/hives/' + id, { method: 'DELETE' })
+          .catch((e: any) => console.error('[deleteHive] server sync failed:', e));
+      },
 
       addBox: (hiveId, boxType) =>
         update((s) => ({
@@ -216,11 +244,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       addSensor: (sn) => {
         const sensor: Sensor = { ...sn, id: uid('sensor') };
         update((s) => ({ ...s, sensors: [...s.sensors, sensor] }));
+        // Persist to server
+        apiFetch(API_BASE + '/api/sensors', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...sn, id: sensor.id }),
+        }).catch((e) => console.error('[addSensor] server sync failed:', e));
         return sensor;
       },
-      updateSensor: (id, patch) =>
-        update((s) => ({ ...s, sensors: s.sensors.map((x) => (x.id === id ? { ...x, ...patch } : x)) })),
-      deleteSensor: (id) =>
+      updateSensor: (id, patch) => {
+        update((s) => ({ ...s, sensors: s.sensors.map((x) => (x.id === id ? { ...x, ...patch } : x)) }));
+        // Persist to server
+        apiFetch(API_BASE + '/api/sensors/' + id, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+        }).catch((e) => console.error('[updateSensor] server sync failed:', e));
+      },
+      deleteSensor: (id) => {
         update((s) => ({
           ...s,
           sensors: s.sensors.filter((x) => x.id !== id),
@@ -229,8 +270,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             boxes: h.boxes.map((b) => ({ ...b, sensorIds: b.sensorIds.filter((sid) => sid !== id) })),
             sensorIds: h.sensorIds?.filter((sid) => sid !== id),
           })),
-        })),
-      assignSensor: (sensorId, hiveId, boxId, position) =>
+        }));
+        // Persist to server
+        apiFetch(API_BASE + '/api/sensors/' + id, {
+          method: 'DELETE',
+        }).catch((e) => console.error('[deleteSensor] server sync failed:', e));
+      },
+      assignSensor: (sensorId, hiveId, boxId, position) => {
         update((s) => ({
           ...s,
           sensors: s.sensors.map((sn) => (sn.id === sensorId ? { ...sn, hiveId, boxId, position } : sn)),
@@ -248,7 +294,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             }
             return { ...h, sensorIds: Array.from(ids), boxes };
           }),
-        })),
+        }));
+        // Persist to server
+        apiFetch(API_BASE + '/api/sensors/' + sensorId, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ hiveId, boxId, position }),
+        }).catch((e) => console.error('[assignSensor] server sync failed:', e));
+      },
 
       refreshSensorReadings: () =>
         // No-op — real sensor readings come from the server via syncFromServer

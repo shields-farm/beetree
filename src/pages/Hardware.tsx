@@ -29,7 +29,8 @@ const ARCH_DIAGRAM = `graph TB
     INFLUX["InfluxDB<br/>Time-series store"]
     OLLAMA["Ollama :11434<br/>LLM Inference"]
     BEETREE["BeeTree Server<br/>Express + SQLite :3001"]
-    HERMES["Hermes Agent<br/>Automation + Omi"]
+    HERMES["Hermes Agent<br/>Automation + Omi + Buzz"]
+    BUZZ["Buzz Chat API<br/>Hermes profile :8642"]
   end
 
   subgraph Telemetry["📊 Docker Telemetry"]
@@ -51,6 +52,8 @@ const ARCH_DIAGRAM = `graph TB
   HA -->|"sensor data"| BEETREE
   BEETREE -->|"Ollama API"| OLLAMA
   HERMES --> OLLAMA
+  BEETREE -->|"Buzz chat"| BUZZ
+  BUZZ -->|"agent loop"| HERMES
   BEETREE -->|"OTLP"| OTEL
   OTEL --> PROM
   PROM --> GRAFANA
@@ -101,11 +104,16 @@ const AI_DIAGRAM = `graph TB
     ORNITH["ornith:9b · 5.6GB<br/>Local fallback"]
   end
 
+  subgraph HermesBox["Hermes Agent — :8642"]
+    HERMES2["beetree profile<br/>SOUL.md · memory · fallback"]
+  end
+
   CHAT --> GLM
   VISION --> KIMI
   VARROA --> KIMI
   ACOUSTIC --> KIMI
-  OMI --> GLM
+  OMI --> HERMES2
+  HERMES2 --> GLM
 `;
 
 const LORA_DIAGRAM = `graph LR
@@ -130,6 +138,7 @@ const LORA_DIAGRAM = `graph LR
 
 export function Hardware() {
   const [health, setHealth] = useState<{ status: string; uptime?: number } | null>(null);
+  const [tab, setTab] = useState<'overview' | 'hardware' | 'lora' | 'software'>('overview');
 
   useEffect(() => {
     apiFetch('/api/health')
@@ -145,19 +154,45 @@ export function Hardware() {
         subtitle="System architecture, devices, and software stack"
       />
 
+      {/* Tab bar */}
+      <div className="flex gap-1 mb-4 p-1 bg-stone-100 dark:bg-stone-900 rounded-xl">
+        {([
+          ['overview', 'Overview'],
+          ['hardware', 'Hardware'],
+          ['lora', 'LoRa Relay'],
+          ['software', 'Software & AI'],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+              tab === key
+                ? 'bg-white dark:bg-stone-800 text-honey-700 dark:text-honey-300 shadow-sm'
+                : 'text-stone-500 dark:text-stone-400 hover:text-stone-700 dark:hover:text-stone-200'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {/* Architecture Overview Diagram */}
-      <Card className="mb-4">
-        <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 mb-3 flex items-center gap-2">
-          <Activity size={16} className="text-honey-600 dark:text-honey-400" />
-          System Architecture
-        </h3>
-        <Mermaid chart={ARCH_DIAGRAM} />
-      </Card>
+      {tab === 'overview' && (
+        <Card className="mb-4">
+          <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 mb-3 flex items-center gap-2">
+            <Activity size={16} className="text-honey-600 dark:text-honey-400" />
+            System Architecture
+          </h3>
+          <Mermaid chart={ARCH_DIAGRAM} />
+        </Card>
+      )}
 
       {/* Hardware Components */}
-      <h2 className="text-xs font-bold text-stone-400 dark:text-stone-500 uppercase tracking-wider mb-2 mt-6">
-        Hardware
-      </h2>
+      {tab === 'hardware' && (
+        <>
+        <h2 className="text-xs font-bold text-stone-400 dark:text-stone-500 uppercase tracking-wider mb-2 mt-6">
+          Hardware
+        </h2>
 
       {/* Raspberry Pi Zero W */}
       <Card className="mb-4">
@@ -274,11 +309,15 @@ export function Hardware() {
           <Spec label="Parser" value="omi.ts → inspection" />
         </div>
       </Card>
+      </>
+      )}
 
       {/* LoRa Relay Section */}
-      <h2 className="text-xs font-bold text-stone-400 dark:text-stone-500 uppercase tracking-wider mb-2 mt-6">
-        LoRa Relay — WisMesh Repeater Mini
-      </h2>
+      {tab === 'lora' && (
+        <>
+        <h2 className="text-xs font-bold text-stone-400 dark:text-stone-500 uppercase tracking-wider mb-2 mt-6">
+          LoRa Relay — WisMesh Repeater Mini
+        </h2>
 
       <Card className="mb-4">
         <div className="flex items-start justify-between mb-3">
@@ -413,11 +452,15 @@ export function Hardware() {
           </p>
         </div>
       </Card>
+      </>
+      )}
 
       {/* Software Stack */}
-      <h2 className="text-xs font-bold text-stone-400 dark:text-stone-500 uppercase tracking-wider mb-2 mt-6">
-        Software & AI
-      </h2>
+      {tab === 'software' && (
+        <>
+        <h2 className="text-xs font-bold text-stone-400 dark:text-stone-500 uppercase tracking-wider mb-2 mt-6">
+          Software & AI
+        </h2>
 
       {/* AI / LLM Models */}
       <Card className="mb-4">
@@ -524,6 +567,8 @@ export function Hardware() {
           </div>
         </div>
       </Card>
+      </>
+      )}
     </div>
   );
 }

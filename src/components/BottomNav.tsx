@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Boxes, ClipboardList, Thermometer, CheckSquare, MoreHorizontal, X, Flower2, Bug, ShoppingBag, Settings as SettingsIcon, Cpu } from 'lucide-react';
+import { Boxes, ClipboardList, Thermometer, CheckSquare, MoreHorizontal, X, Flower2, Bug, ShoppingBag, Settings as SettingsIcon, Cpu, MessageCircle, Activity } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 /** Custom icon: a 10-frame deep hive box (side view with vertical frame lines) */
@@ -23,18 +23,20 @@ function HiveBoxIcon({ size = 22, strokeWidth = 2 }: { size?: number; strokeWidt
 // Primary nav — always visible in the bottom bar
 const PRIMARY_NAV = [
   { to: '/', label: 'Home', icon: HiveBoxIcon, end: true },
+  { to: '/chat', label: 'Buzz', icon: MessageCircle },
   { to: '/inspections', label: 'Inspect', icon: ClipboardList },
   { to: '/hives', label: 'Hives', icon: Boxes },
   { to: '/sensors', label: 'Sensors', icon: Thermometer },
-  { to: '/tasks', label: 'Tasks', icon: CheckSquare },
 ];
 
 // Secondary nav — accessible via the "More" button
 const SECONDARY_NAV = [
+  { to: '/tasks', label: 'Tasks', icon: CheckSquare },
   { to: '/pests', label: 'Pests', icon: Bug },
   { to: '/forage', label: 'Forage', icon: Flower2 },
   { to: '/equipment', label: 'Equipment', icon: ShoppingBag },
   { to: '/hardware', label: 'Hardware', icon: Cpu },
+  { to: '/activity', label: 'Activity', icon: Activity },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ];
 

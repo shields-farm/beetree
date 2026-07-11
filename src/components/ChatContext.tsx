@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 interface ChatContextValue {
   /** Open the chat panel */
@@ -69,12 +70,12 @@ export function useChat() {
   return ctx;
 }
 
-/** Inline "Ask AI" button — drops right into any page */
+/** Inline "Ask AI" button — navigates to full-screen chat with a pre-filled prompt */
 export function AskAIButton({ prompt, label, className }: { prompt: string; label?: string; className?: string }) {
-  const { askAI } = useChat();
+  const navigate = useNavigate();
   return (
     <button
-      onClick={() => askAI(prompt)}
+      onClick={() => navigate('/chat', { state: { initialPrompt: prompt } })}
       className={`inline-flex items-center gap-1.5 text-xs font-medium text-honey-700 bg-honey-50 border border-honey-200 px-2.5 py-1.5 rounded-full hover:bg-honey-100 transition-colors ${className ?? ''}`}
     >
       <span className="text-sm">🐝</span>
