@@ -27,6 +27,7 @@ export function HiveDetail({ id }: { id: string }) {
   const meta = hive ? HEALTH_META[hive.healthStatus] : undefined;
   const hiveInspections = hive ? inspections.filter((i) => i.hiveId === hive.id).sort((a, b) => b.date.localeCompare(a.date)) : [];
   const hiveSensors = hive ? sensors.filter((s) => s.hiveId === hive.id) : [];
+  const unassignedSensors = sensors.filter((s) => !s.hiveId);
 
   // Page-specific quick questions about this hive
   useEffect(() => {
@@ -159,40 +160,59 @@ export function HiveDetail({ id }: { id: string }) {
       )}
 
       {/* Sensor readings */}
-      {hiveSensors.length > 0 && (
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-2 px-1">
-            <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 flex items-center gap-1.5">
-              <Thermometer size={16} className="text-sky-600" /> Live Sensors
-            </h3>
-            <button
-              onClick={refreshSensorReadings}
-              className="text-xs text-sky-600 font-medium"
-            >
-              Refresh
-            </button>
-          </div>
-          <div className="grid sm:grid-cols-2 gap-3">
-            {hiveSensors.map((s) => (
-              <div key={s.id} className="relative group">
-                <SensorCard sensor={s} onClick={() => navigate(`/sensors/${s.id}`)} />
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (confirm(`Remove ${s.name} from ${hive?.name ?? 'this hive'}? The sensor will remain in your sensors list.`)) {
-                      assignSensor(s.id, undefined, undefined, undefined);
-                    }
-                  }}
-                  className="absolute top-2 right-2 p-1.5 rounded-lg bg-stone-100 dark:bg-stone-800 text-stone-400 dark:text-stone-500 hover:bg-amber-50 dark:hover:bg-amber-950 hover:text-amber-600 dark:hover:text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Remove from hive (sensor stays in sensors list)"
-                >
-                  <Plus size={14} className="rotate-45" />
-                </button>
-              </div>
-            ))}
-          </div>
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-2 px-1">
+          <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 flex items-center gap-1.5">
+            <Thermometer size={16} className="text-sky-600" /> Live Sensors
+          </h3>
+          <button
+            onClick={refreshSensorReadings}
+            className="text-xs text-sky-600 font-medium"
+          >
+            Refresh
+          </button>
         </div>
-      )}
+        {hiveSensors.length > 0 && (
+        <div className="grid sm:grid-cols-2 gap-3">
+          {hiveSensors.map((s) => (
+            <div key={s.id} className="relative group">
+              <SensorCard sensor={s} onClick={() => navigate(`/sensors/${s.id}`)} />
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (confirm(`Remove ${s.name} from ${hive?.name ?? 'this hive'}? The sensor will remain in your sensors list.`)) {
+                    assignSensor(s.id, undefined, undefined, undefined);
+                  }
+                }}
+                className="absolute top-2 right-2 p-1.5 rounded-lg bg-stone-100 dark:bg-stone-800 text-stone-400 dark:text-stone-500 hover:bg-amber-50 dark:hover:bg-amber-950 hover:text-amber-600 dark:hover:text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Remove from hive (sensor stays in sensors list)"
+              >
+                <Plus size={14} className="rotate-45" />
+              </button>
+            </div>
+          ))}
+        </div>
+        )}
+        {/* Assign unassigned sensors */}
+        {unassignedSensors.length > 0 && (
+          <div className="mt-3">
+            <select
+              value=""
+              onChange={(e) => {
+                if (e.target.value) {
+                  assignSensor(e.target.value, hive.id, undefined, undefined);
+                }
+              }}
+              className="w-full rounded-xl border border-stone-200 dark:border-stone-800 px-3.5 py-2.5 text-sm appearance-none bg-white dark:bg-stone-900"
+            >
+              <option value="">+ Assign a sensor to this hive…</option>
+              {unassignedSensors.map((s) => (
+                <option key={s.id} value={s.id}>{s.name} ({s.deviceId})</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
 
       {/* Hive visual editor */}
       <div className="mb-4">
