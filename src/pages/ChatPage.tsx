@@ -75,63 +75,26 @@ function buildContext(
   tasks: ReturnType<typeof useStore>['tasks'],
 ): string {
   const alerts = generateAlerts(hives, inspections, sensors, tasks);
-  const recentInspections = [...inspections].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
+  const urgentAlerts = alerts.filter(a => a.severity === 'urgent').slice(0, 3);
+  const lastInspection = [...inspections].sort((a, b) => b.date.localeCompare(a.date))[0];
+  const openTaskCount = tasks.filter(t => !t.completed).length;
 
-  const hiveSummaries = hives.map((h) => {
-    const apiary = apiaries.find((a) => a.id === h.apiaryId);
-    const hiveSensors = sensors.filter((s) => s.hiveId === h.id);
-    const lastInsp = inspections.filter((i) => i.hiveId === h.id).sort((a, b) => b.date.localeCompare(a.date))[0];
-    const hm = HEALTH_META[h.healthStatus];
-    const sensorInfo = hiveSensors.length > 0
-      ? hiveSensors.map((s) => {
-          const r = s.latestReading;
-          return r ? `${s.name} (${s.model}): ${r.temperature.toFixed(1)}°F, ${r.humidity.toFixed(0)}% humidity, ${r.batteryVoltage.toFixed(1)}V batt` : `${s.name} (${s.model}): no reading`;
-        }).join('; ')
-      : 'no sensors';
-    const lastInspInfo = lastInsp
-      ? `last inspected ${new Date(lastInsp.date).toLocaleDateString()}, health: ${hm.label}${lastInsp.queenPresent ? ', queen present' : ', no queen'}${lastInsp.notes ? `, notes: ${lastInsp.notes.slice(0, 80)}` : ''}`
-      : 'never inspected';
-    return `  - ${h.name} (${(HIVE_TYPES[h.type] || HIVE_TYPES['langstroth-10']).label}) at ${apiary?.name ?? 'unknown apiary'}: health ${hm.label}, ${h.boxes.length} box(es), ${sensorInfo}, ${lastInspInfo}`;
+  // Compact hive summaries - one line each, no sensor details (tools can fetch those)
+  const hiveLines = hives.map(h => {
+    const apiary = apiaries.find(a => a.id === h.apiaryId);
+    const lastInsp = inspections.filter(i => i.hiveId === h.id).sort((a, b) => b.date.localeCompare(a.date))[0];
+    const daysSince = lastInsp ? Math.floor((Date.now() - new Date(lastInsp.date).getTime()) / 86400000) : null;
+    return `- ${h.name} (${(HIVE_TYPES[h.type] || HIVE_TYPES['langstroth-10']).label}) @ ${apiary?.name ?? '?'}: ${HEALTH_META[h.healthStatus].label}, ${h.boxes.length} box(es)${daysSince !== null ? `, inspected ${daysSince}d ago` : ', never inspected'}`;
   }).join('\n');
 
-  const alertInfo = alerts.length > 0
-    ? alerts.slice(0, 10).map((a) => `  - [${a.severity}] ${a.title}: ${a.message}`).join('\n')
-    : '  No active alerts.';
+  return `You are Buzz, a beekeeping assistant. Be concise and actionable — 2-3 sentences max, then let the cards speak. The UI renders sensor cards automatically; you don't need to list readings in text. Focus on insights and recommendations, not data dumps.
 
-  const taskInfo = tasks.filter((t) => !t.completed).slice(0, 10).map((t) => {
-    const hive = hives.find((h) => h.id === t.hiveId);
-    return `  - ${t.title}${hive ? ` (${hive.name})` : ''}${t.dueDate ? ` due ${new Date(t.dueDate).toLocaleDateString()}` : ''} [${t.priority}]`;
-  }).join('\n');
-
-  return `You are Buzz, Mark's beekeeping assistant. You have full context about his apiary operation below. Be helpful, specific, and proactive — suggest actions when you see something that needs attention. Keep responses concise and practical. Use **markdown** formatting for emphasis, lists, and structure.
-
-CURRENT APIARY STATE:
-${apiaries.length} apiary(ies), ${hives.length} hive(s), ${sensors.length} sensor(s), ${inspections.length} inspection(s) recorded.
+${hives.length} hives, ${sensors.length} sensors. ${urgentAlerts.length > 0 ? `URGENT: ${urgentAlerts.map(a => a.title).join('; ')}.` : 'No urgent alerts.'} ${openTaskCount > 0 ? `${openTaskCount} open tasks.` : ''} ${lastInspection ? `Last inspection: ${new Date(lastInspection.date).toLocaleDateString()}.` : 'No inspections yet.'}
 
 HIVES:
-${hiveSummaries || '  No hives yet.'}
+${hiveLines || 'None'}
 
-ACTIVE ALERTS ("It's time to..."):
-${alertInfo}
-
-OPEN TASKS:
-${taskInfo || '  No open tasks.'}
-
-RECENT INSPECTIONS:
-${recentInspections.map((i) => {
-    const hive = hives.find((h) => h.id === i.hiveId);
-    return `  - ${hive?.name ?? 'Unknown'}: ${new Date(i.date).toLocaleDateString()} — ${HEALTH_META[i.healthStatus].label}${i.queenPresent ? ', queen ✓' : ', no queen'}${i.notes ? `, "${i.notes.slice(0, 60)}"` : ''}`;
-}).join('\n') || '  No inspections yet.'}
-
-When the user asks about a specific hive, use the data above to give a concrete answer. If they ask about something you don't have data for, say so. Proactively mention if a hive is overdue for inspection or if sensor readings look off.
-
-After your response, on a new line, suggest 2-3 follow-up questions the user might ask next. Format them as a JSON array on its own line, prefixed with "FOLLOW_UP:" like this:
-FOLLOW_UP: ["What should I inspect next?", "How does this compare to last week?", "When should I feed?"]
-Keep the suggestions short (under 50 chars each) and directly related to the conversation.
-
-You can also generate A2UI (Agent-to-User Interface) messages to create rich interactive UIs. A2UI is a declarative JSON format where you send component descriptions that the client renders natively. To send A2UI, include a JSON array prefixed with "A2UI:" on its own line:
-A2UI: [{"version":"v0.9","createSurface":{"surfaceId":"hive-summary","catalogId":"basic"}},{"version":"v0.9","updateComponents":{"surfaceId":"hive-summary","components":[{"id":"root","component":"Card","child":"content"},{"id":"content","component":"Column","children":["title","temp"]},{"id":"title","component":"Text","text":{"path":"/title"}},{"id":"temp","component":"Text","text":{"path":"/temp"}}]}},{"version":"v0.9","updateDataModel":{"surfaceId":"hive-summary","path":"/","value":{"title":"Hive 1 Status","temp":"100.65°F, thriving"}}}]
-Use A2UI when showing structured data like hive summaries, sensor readings, or action forms. Use Text, Card, Column, Row, Button, List, and other basic components. Keep A2UI messages on one line.`;
+When asked about sensors or hives, give a 1-2 sentence summary and let the cards show the data. Use tools for detailed queries. Be direct — what should Mark do next?`;
 }
 
 export function ChatPage() {
