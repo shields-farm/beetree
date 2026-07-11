@@ -1,3 +1,4 @@
+import { BOX_CONTENT_META, BOX_CONTENT_ORDER } from '../lib/hiveTypes';
 import { useMemo, useState } from 'react';
 import { Plus, Trash2, Check, AlertTriangle } from 'lucide-react';
 import type { Concern, Inspection, MediaItem, QueenLayingPattern, StoreLevel, Temperament, PopulationSize, HealthStatus } from '../types';
@@ -72,6 +73,8 @@ interface Props {
   onSubmit: (data: InspectionFormData) => void;
   onCancel: () => void;
   submitLabel?: string;
+  boxes?: { id: string; type: string; content?: string }[];
+  onBoxContentChange?: (boxId: string, content: string) => void;
 }
 
 function SectionTitle({ children, icon }: { children: string; icon?: React.ReactNode }) {
@@ -115,7 +118,7 @@ function SelectRow({ label, value, options, onChange }: { label: string; value: 
   );
 }
 
-export function InspectionForm({ hiveId, initial, onSubmit, onCancel, submitLabel = 'Save Inspection' }: Props) {
+export function InspectionForm({ hiveId, initial, onSubmit, onCancel, submitLabel = 'Save Inspection', boxes, onBoxContentChange }: Props) {
   const [form, setForm] = useState<InspectionFormData>(initial ?? defaultForm(hiveId));
   const [manualHealth, setManualHealth] = useState(!form.healthAutoCalculated);
 
@@ -345,6 +348,45 @@ export function InspectionForm({ hiveId, initial, onSubmit, onCancel, submitLabe
           onRemove={(id) => set('media', form.media.filter((m) => m.id !== id))}
         />
       </div>
+
+      {/* ─── BOX CONTENT QUICK SET ─── */}
+      {boxes && boxes.length > 0 && onBoxContentChange && (
+        <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-card border border-stone-100 dark:border-stone-800 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-lg">📦</span>
+            <div>
+              <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 uppercase tracking-wide">Box Content</h3>
+              <p className="text-[10px] text-stone-400 dark:text-stone-500">Quick-set what each box is majority of</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {boxes.map((box, idx) => (
+              <div key={box.id} className="flex items-center gap-2">
+                <span className="text-xs text-stone-500 w-16 shrink-0">Box {idx + 1}</span>
+                <div className="flex gap-1 flex-wrap">
+                  {(BOX_CONTENT_ORDER as readonly string[]).map((c) => {
+                    const meta = BOX_CONTENT_META[c];
+                    const active = box.content === c;
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => onBoxContentChange(box.id, c)}
+                        className={`px-2 py-1 rounded-lg text-[10px] font-medium transition-all flex items-center gap-0.5 ${
+                          active ? 'ring-2 ring-honey-500 scale-105' : 'opacity-60 hover:opacity-100'
+                        }`}
+                        style={{ background: meta.color, color: meta.textColor }}
+                      >
+                        {meta.icon} {meta.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex gap-3 pt-2">
