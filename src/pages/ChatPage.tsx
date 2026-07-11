@@ -15,12 +15,26 @@ interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: string;
-  thinking?: string;       // internal reasoning from the model
+  thinking?: string;
   toolCalls?: { name: string; args: string; result: string }[];
+  followUps?: string[];
 }
 
 function uid() {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** Extract FOLLOW_UP: [...] suggestions from the end of an AI response */
+function parseFollowUps(text: string): { content: string; followUps: string[] } {
+  const match = text.match(/FOLLOW_UP:\s*(\[[\s\S]*?\])/);
+  if (match) {
+    try {
+      const followUps = JSON.parse(match[1]) as string[];
+      const content = text.replace(match[0], '').trim();
+      return { content, followUps: followUps.slice(0, 4) };
+    } catch { /* malformed JSON, ignore */ }
+  }
+  return { content: text, followUps: [] };
 }
 
 function renderMarkdown(text: string): string {
@@ -101,7 +115,11 @@ ${recentInspections.map((i) => {
     return `  - ${hive?.name ?? 'Unknown'}: ${new Date(i.date).toLocaleDateString()} — ${HEALTH_META[i.healthStatus].label}${i.queenPresent ? ', queen ✓' : ', no queen'}${i.notes ? `, "${i.notes.slice(0, 60)}"` : ''}`;
 }).join('\n') || '  No inspections yet.'}
 
-When the user asks about a specific hive, use the data above to give a concrete answer. If they ask about something you don't have data for, say so. Proactively mention if a hive is overdue for inspection or if sensor readings look off.`;
+When the user asks about a specific hive, use the data above to give a concrete answer. If they ask about something you don't have data for, say so. Proactively mention if a hive is overdue for inspection or if sensor readings look off.
+
+After your response, on a new line, suggest 2-3 follow-up questions the user might ask next. Format them as a JSON array on its own line, prefixed with "FOLLOW_UP:" like this:
+FOLLOW_UP: ["What should I inspect next?", "How does this compare to last week?", "When should I feed?"]
+Keep the suggestions short (under 50 chars each) and directly related to the conversation.`;
 }
 
 export function ChatPage() {
@@ -207,7 +225,8 @@ Ask me about any hive, sensor trends, what needs attention, or what to do next. 
       }
 
       const data = await response.json();
-      const assistantContent = data.content ?? 'No response from AI.';
+      const rawContent = data.content ?? 'No response from AI.';
+      const { content: assistantContent, followUps } = parseFollowUps(rawContent);
       const toolCalls = data.toolCalls as { name: string; args: string; result: string }[] | undefined;
       const thinking = data.thinking as string | undefined;
 
@@ -218,6 +237,7 @@ Ask me about any hive, sensor trends, what needs attention, or what to do next. 
         timestamp: new Date().toISOString(),
         thinking,
         toolCalls,
+        followUps: followUps.length > 0 ? followUps : undefined,
       }]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get response');
@@ -290,6 +310,20 @@ Ask me about any hive, sensor trends, what needs attention, or what to do next. 
                 <div dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) }} className="prose-chat" />
               ) : (
                 <div className="whitespace-pre-wrap">{m.content}</div>
+              )}
+              {/* Follow-up question buttons */}
+              {m.followUps && m.followUps.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-stone-100 dark:border-stone-800 space-y-1.5">
+                  {m.followUps.map((q, i) => (
+                    <button
+                      key={i}
+                      onClick={() => send(q)}
+                      className="block w-full text-left text-xs text-honey-700 dark:text-honey-300 bg-honey-50 dark:bg-honey-950 hover:bg-honey-100 dark:hover:bg-honey-900 border border-honey-200 dark:border-honey-800 px-3 py-2 rounded-lg transition-colors"
+                    >
+                      → {q}
+                    </button>
+                  ))}
+                </div>
               )}
               <div className={`text-[9px] mt-1 ${m.role === 'user' ? 'text-honey-200' : 'text-stone-300 dark:text-stone-600'}`}>
                 {new Date(m.timestamp).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}

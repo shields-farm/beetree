@@ -6,6 +6,7 @@ import { PageHeader } from '../components/Layout';
 import { Card } from '../components/Card';
 import { SensorCard } from '../components/SensorCard';
 import { API_BASE, apiFetch } from '../lib/apiBase';
+import { SensorTrendChart } from '../components/SensorTrendChart';
 
 interface DiscoveredSensor {
   deviceId: string;
@@ -380,8 +381,8 @@ export function SensorDetail({ id }: { id: string }) {
 
       {/* Mock chart placeholder using recharts would go here — kept minimal for performance */}
       <Card>
-        <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 mb-2">48h Trend (mock)</h3>
-        <MockTrendChart deviceId={sensor.deviceId} />
+        <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 mb-2">Temperature & Humidity Trend</h3>
+        <SensorTrendChart sensorId={sensor.id} />
       </Card>
     </div>
   );
@@ -392,43 +393,6 @@ function ReadingTile({ label, value, color }: { label: string; value: string; co
     <div className={`rounded-xl ${color} px-3 py-2.5`}>
       <div className="text-[10px] uppercase tracking-wide font-medium opacity-70">{label}</div>
       <div className="text-lg font-bold leading-tight">{value}</div>
-    </div>
-  );
-}
-
-function MockTrendChart({ deviceId }: { deviceId: string }) {
-  // lightweight inline sparkline without recharts to keep bundle small on detail page
-  const points: { t: number; temp: number }[] = [];
-  const base = 88 + (deviceId.charCodeAt(0) % 6);
-  for (let h = 48; h >= 0; h--) {
-    const t = new Date(Date.now() - h * 3600 * 1000);
-    const cycle = Math.sin((t.getHours() / 24) * Math.PI * 2 - Math.PI / 2);
-    points.push({ t: h, temp: Number((base + cycle * 4).toFixed(1)) });
-  }
-  const temps = points.map((p) => p.temp);
-  const min = Math.min(...temps);
-  const max = Math.max(...temps);
-  const range = max - min || 1;
-  const w = 320;
-  const h = 80;
-  const path = points
-    .map((p, i) => {
-      const x = (i / (points.length - 1)) * w;
-      const y = h - ((p.temp - min) / range) * h;
-      return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(' ');
-
-  return (
-    <div className="w-full overflow-x-auto">
-      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-20" preserveAspectRatio="none">
-        <path d={path} fill="none" stroke="#f59e0b" strokeWidth="2" />
-      </svg>
-      <div className="flex justify-between text-[10px] text-stone-400 dark:text-stone-500 mt-1">
-        <span>{min.toFixed(1)}°F</span>
-        <span>48h ago → now</span>
-        <span>{max.toFixed(1)}°F</span>
-      </div>
     </div>
   );
 }
