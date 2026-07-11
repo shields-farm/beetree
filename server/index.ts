@@ -2519,6 +2519,37 @@ app.post('/api/chat', async (req, res) => {
       followUps.push('Which hive needs attention?', "What should I do this week?");
     }
 
+    // Also include raw sensor data for native rendering
+    let sensorCards: any[] | undefined;
+    if (sensorsRelevant) {
+      try {
+        const sensorsRaw = db.prepare('SELECT * FROM sensors WHERE superseded_by IS NULL').all() as any[];
+        const hivesRaw = db.prepare('SELECT * FROM hives WHERE superseded_by IS NULL').all() as any[];
+        sensorCards = sensorsRaw.map(s => {
+          const hive = hivesRaw.find((h: any) => h.id === s.hiveId);
+          const latest = s.latestReading ? JSON.parse(s.latestReading) : null;
+          return {
+            id: s.id,
+            name: s.name || `Sensor ${s.deviceId}`,
+            deviceId: s.deviceId,
+            model: s.model || '',
+            hiveId: s.hiveId,
+            hiveName: hive?.name,
+            position: s.position || '',
+            latestReading: latest ? {
+              temperature: latest.temperature ?? 0,
+              humidity: latest.humidity ?? 0,
+              batteryVoltage: latest.batteryVoltage ?? 0,
+              signalStrength: latest.signalStrength ?? null,
+              timestamp: latest.timestamp || null,
+            } : null,
+          };
+        });
+      } catch (e) {
+        console.error('[chat] sensorCards generation error:', e);
+      }
+    }
+
     res.json({
       content: assistantContent,
       model: HERMES_MODEL,
@@ -2526,6 +2557,7 @@ app.post('/api/chat', async (req, res) => {
       thinking: (thinkingLog as string) || undefined,
       a2uiMessages: a2uiMessages.length > 0 ? a2uiMessages : undefined,
       followUps: followUps.slice(0, 4),
+      sensorCards,
     });
 
     // Log the conversation to agentic log

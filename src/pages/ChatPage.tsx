@@ -9,6 +9,7 @@ import { API_BASE, apiFetch } from '../lib/apiBase';
 import { marked } from 'marked';
 import { A2UIChatRenderer } from '../components/A2UIChatRenderer';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { SensorCard } from '../components/SensorCard';
 
 marked.setOptions({ breaks: true, gfm: true });
 
@@ -21,6 +22,7 @@ interface ChatMessage {
   toolCalls?: { name: string; args: string; result: string }[];
   followUps?: string[];
   a2uiMessages?: any[];
+  sensorCards?: any[];
 }
 
 interface ChatSession {
@@ -270,6 +272,7 @@ export function ChatPage() {
       // Use server-generated follow-ups and A2UI messages (deterministic, always present)
       const followUps = (data.followUps as string[]) || [];
       const a2uiMessages = (data.a2uiMessages as any[]) || [];
+      const sensorCards = (data.sensorCards as any[]) || undefined;
       const toolCalls = data.toolCalls as { name: string; args: string; result: string }[] | undefined;
       const thinking = data.thinking as string | undefined;
 
@@ -280,6 +283,7 @@ export function ChatPage() {
           thinking, toolCalls,
           followUps: followUps.length > 0 ? followUps : undefined,
           a2uiMessages: a2uiMessages.length > 0 ? a2uiMessages : undefined,
+          sensorCards,
         }],
         updatedAt: new Date().toISOString(),
       }));
@@ -386,6 +390,14 @@ export function ChatPage() {
                   <ErrorBoundary>
                     <A2UIChatRenderer messages={m.a2uiMessages} />
                   </ErrorBoundary>
+                </div>
+              )}
+              {/* Native sensor cards (same styling as Sensors page) */}
+              {m.sensorCards && m.sensorCards.length > 0 && (
+                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {m.sensorCards.map((s: any) => (
+                    <SensorCard key={s.id} sensor={s} compact />
+                  ))}
                 </div>
               )}
               {m.followUps && m.followUps.length > 0 && (
