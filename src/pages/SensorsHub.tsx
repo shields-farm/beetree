@@ -65,7 +65,24 @@ function AnomalySummary() {
 }
 
 export function SensorsHub() {
-  const [tab, setTab] = useState<TabId>('anomalies');
+  // Persist tab in URL hash query so it survives reload
+  // Format: #/sensors?tab=readings
+  const [tab, setTab] = useState<TabId>(() => {
+    try {
+      const hash = window.location.hash;
+      const params = new URLSearchParams(hash.split('?')[1] || '');
+      const t = params.get('tab') as TabId | null;
+      if (t && TABS.some(tb => tb.id === t)) return t;
+    } catch { /* ignore */ }
+    return 'anomalies';
+  });
+
+  const handleSetTab = (t: TabId) => {
+    setTab(t);
+    // Update URL hash without triggering navigation
+    const hash = window.location.hash.split('?')[0];
+    window.history.replaceState(null, '', `${hash}?tab=${t}`);
+  };
 
   return (
     <div className="animate-fade-in">
@@ -75,7 +92,7 @@ export function SensorsHub() {
           {TABS.map((t) => (
             <button
               key={t.id}
-              onClick={() => setTab(t.id)}
+              onClick={() => handleSetTab(t.id)}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                 tab === t.id
                   ? 'bg-honey-500 text-white'
