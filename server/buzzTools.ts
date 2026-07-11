@@ -445,3 +445,25 @@ async function _dispatchBuzzToolInner(
     return JSON.stringify({ error: e instanceof Error ? e.message : 'Tool execution failed' });
   }
 }
+
+// Cached wrapper — checks cache before calling inner, caches result after
+export async function dispatchBuzzTool(
+  toolName: string,
+  args: Record<string, any>,
+): Promise<string> {
+  const cacheKey = CACHEABLE_TOOLS.has(toolName)
+    ? `${toolName}:${JSON.stringify(args)}`
+    : null;
+  if (cacheKey) {
+    const cached = getCached(cacheKey);
+    if (cached) {
+      console.log(`[buzz] cache hit: ${toolName}`);
+      return cached;
+    }
+  }
+  const result = await _dispatchBuzzToolInner(toolName, args);
+  if (cacheKey && !result.includes('"error"')) {
+    setCached(cacheKey, result);
+  }
+  return result;
+}
