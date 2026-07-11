@@ -108,13 +108,26 @@ export function ChatPage() {
   const { apiaries, hives, inspections, sensors, tasks } = useStore();
   const location = useLocation();
   const navigate = useNavigate();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem('beetree-chat-history');
+      if (saved) return JSON.parse(saved);
+    } catch { /* ignore */ }
+    return [];
+  });
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusSteps, setStatusSteps] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Persist messages to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('beetree-chat-history', JSON.stringify(messages.slice(-50)));
+    } catch { /* ignore quota errors */ }
+  }, [messages]);
 
   // Consume initialPrompt from navigation state (set by AskAIButton)
   const locationState = location.state as { initialPrompt?: string } | null;
@@ -132,7 +145,7 @@ export function ChatPage() {
     }
   }, [messages, loading, statusSteps]);
 
-  // Welcome message on first load
+  // Welcome message on first load (only if no persisted history)
   useEffect(() => {
     if (messages.length === 0) {
       const alerts = generateAlerts(hives, inspections, sensors, tasks);
