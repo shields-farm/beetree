@@ -58,7 +58,7 @@ export function HiveDetail({ id }: { id: string }) {
   // const apiary, meta, hiveInspections, hiveSensors moved up
 
   const save = () => {
-    const def = HIVE_TYPES[type];
+    const def = HIVE_TYPES[type] || HIVE_TYPES['langstroth-10'];
     // If type changed, rebuild boxes with default config
     const boxes =
       type !== hive.type
@@ -83,7 +83,7 @@ export function HiveDetail({ id }: { id: string }) {
         <div className="min-w-0">
           <h1 className="text-xl sm:text-2xl font-bold text-stone-800 dark:text-stone-100 truncate">{hive.name}</h1>
           <p className="text-sm text-stone-500 dark:text-stone-400 mt-0.5 truncate">
-            {apiary?.name ?? '—'} · {HIVE_TYPES[hive.type].label}
+            {apiary?.name ?? '—'} · {(HIVE_TYPES[hive.type] || HIVE_TYPES['langstroth-10']).label}
           </p>
         </div>
         <button
@@ -134,7 +134,7 @@ export function HiveDetail({ id }: { id: string }) {
                   <option key={def.type} value={def.type}>{def.label}</option>
                 ))}
               </select>
-              <p className="text-[11px] text-stone-400 dark:text-stone-500 mt-1">{HIVE_TYPES[type].description}</p>
+              <p className="text-[11px] text-stone-400 dark:text-stone-500 mt-1">{(HIVE_TYPES[type] || HIVE_TYPES['langstroth-10']).description}</p>
             </div>
             <div>
               <label className="text-xs text-stone-500 dark:text-stone-400 font-medium block mb-1">Notes</label>

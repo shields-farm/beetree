@@ -39,6 +39,7 @@ interface StoreContextValue extends AppState {
   // Boxes
   addBox: (hiveId: string, boxType: import('../types').BoxType) => void;
   removeBox: (hiveId: string, boxId: string) => void;
+  setBoxContent: (hiveId: string, boxId: string, content: import('../types').BoxContent) => void;
   updateFrameContent: (hiveId: string, boxId: string, framePosition: number, content: import('../types').FrameContent) => void;
   cycleFrameContent: (hiveId: string, boxId: string, framePosition: number) => void;
   // Sensors
@@ -195,6 +196,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             h.id === hiveId ? { ...h, boxes: h.boxes.filter((b) => b.id !== boxId) } : h,
           ),
           sensors: s.sensors.map((sn) => (sn.boxId === boxId ? { ...sn, boxId: undefined } : sn)),
+        })),
+
+      setBoxContent: (hiveId, boxId, content) =>
+        update((s) => ({
+          ...s,
+          hives: s.hives.map((h) =>
+            h.id === hiveId
+              ? { ...h, boxes: h.boxes.map((b) => (b.id === boxId ? { ...b, content } : b)) }
+              : h,
+          ),
         })),
 
       updateFrameContent: (hiveId, boxId, framePosition, content) =>
