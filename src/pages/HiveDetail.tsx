@@ -13,7 +13,7 @@ import { HIVE_TYPES } from '../lib/hiveTypes';
 import type { HiveType } from '../types';
 
 export function HiveDetail({ id }: { id: string }) {
-  const { hives, apiaries, inspections, sensors, updateHive, deleteHive, refreshSensorReadings } = useStore();
+  const { hives, apiaries, inspections, sensors, updateHive, deleteHive, assignSensor, refreshSensorReadings } = useStore();
   const { setQuickQuestions } = useChat();
   const navigate = useNavigate();
   const hive = hives.find((h) => h.id === id);
@@ -174,7 +174,21 @@ export function HiveDetail({ id }: { id: string }) {
           </div>
           <div className="grid sm:grid-cols-2 gap-3">
             {hiveSensors.map((s) => (
-              <SensorCard key={s.id} sensor={s} onClick={() => navigate(`/sensors/${s.id}`)} />
+              <div key={s.id} className="relative group">
+                <SensorCard sensor={s} onClick={() => navigate(`/sensors/${s.id}`)} />
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (confirm(`Remove ${s.name} from ${hive?.name ?? 'this hive'}? The sensor will remain in your sensors list.`)) {
+                      assignSensor(s.id, undefined, undefined, undefined);
+                    }
+                  }}
+                  className="absolute top-2 right-2 p-1.5 rounded-lg bg-stone-100 dark:bg-stone-800 text-stone-400 dark:text-stone-500 hover:bg-amber-50 dark:hover:bg-amber-950 hover:text-amber-600 dark:hover:text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Remove from hive (sensor stays in sensors list)"
+                >
+                  <Plus size={14} className="rotate-45" />
+                </button>
+              </div>
             ))}
           </div>
         </div>

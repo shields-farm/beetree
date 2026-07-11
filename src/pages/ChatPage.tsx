@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, MessageCircle, AlertCircle, Sparkles } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { generateAlerts } from '../lib/alerts';
 import { HEALTH_META } from '../lib/health';
 import { HIVE_TYPES } from '../lib/hiveTypes';
+import { API_BASE, apiFetch } from '../lib/apiBase';
 
 interface ChatMessage {
   id: string;
@@ -91,12 +93,23 @@ When the user asks about a specific hive, use the data above to give a concrete 
 
 export function ChatPage() {
   const { apiaries, hives, inspections, sensors, tasks } = useStore();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Consume initialPrompt from navigation state (set by AskAIButton)
+  const locationState = location.state as { initialPrompt?: string } | null;
+  useEffect(() => {
+    if (locationState?.initialPrompt && !input) {
+      setInput(locationState.initialPrompt);
+      navigate('/chat', { replace: true, state: {} });
+    }
+  }, [locationState, navigate, input]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -127,13 +140,14 @@ Ask me about any hive, sensor trends, what needs attention, or what to do next. 
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const send = useCallback(async () => {
-    if (!input.trim() || loading) return;
+  const send = useCallback(async (overrideText?: string) => {
+    const text = overrideText ?? input;
+    if (!text.trim() || loading) return;
 
     const userMsg: ChatMessage = {
       id: uid(),
       role: 'user',
-      content: input.trim(),
+      content: text.trim(),
       timestamp: new Date().toISOString(),
     };
 
@@ -145,28 +159,19 @@ Ask me about any hive, sensor trends, what needs attention, or what to do next. 
     const context = buildContext(apiaries, hives, inspections, sensors, tasks);
 
     try {
-      // BeeTree scoped subagent via Hermes API server (port 8643)
-      // This is a dedicated profile with only HA read-only access — no terminal, file, or system tools
-      const beetreeUrl = 'http://192.168.1.40:8643/v1/chat/completions';
-      const beetreeKey = 'dev-beetree-api-key-replace-me';
-
+      // Route through BeeTree Express server → Hermes API server
+      // Hermes handles: SOUL.md persona (beetree profile), persistent memory,
+      // cognitive context, fallback providers, and the full agent loop.
       const messages_payload = [
-          { role: 'system' as const, content: context },
-          ...messages.map((m) => ({ role: m.role as string, content: m.content })),
-          { role: 'user' as const, content: userMsg.content },
-        ];
+        { role: 'system' as const, content: context },
+        ...messages.map((m) => ({ role: m.role as string, content: m.content })),
+        { role: 'user' as const, content: userMsg.content },
+      ];
 
-      const response = await fetch(beetreeUrl, {
+      const response = await apiFetch(API_BASE + '/api/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${beetreeKey}`,
-        },
-        body: JSON.stringify({
-          model: 'beetree',
-          messages: messages_payload,
-          stream: false,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: messages_payload }),
       });
 
       if (!response.ok) {
@@ -174,7 +179,7 @@ Ask me about any hive, sensor trends, what needs attention, or what to do next. 
       }
 
       const data = await response.json();
-      const assistantContent = data.choices?.[0]?.message?.content ?? 'No response from AI.';
+      const assistantContent = data.content ?? 'No response from AI.';
 
       setMessages((m) => [...m, {
         id: uid(),
@@ -258,10 +263,7 @@ Ask me about any hive, sensor trends, what needs attention, or what to do next. 
             {quickQuestions.map((q) => (
               <button
                 key={q}
-                onClick={() => {
-                  setInput(q);
-                  inputRef.current?.focus();
-                }}
+                onClick={() => send(q)}
                 className="text-xs bg-honey-50 dark:bg-honey-950 border border-honey-200 text-honey-700 dark:text-honey-300 px-2.5 py-1.5 rounded-full hover:bg-honey-100"
               >
                 {q}
@@ -296,7 +298,7 @@ Ask me about any hive, sensor trends, what needs attention, or what to do next. 
           style={{ minHeight: '44px' }}
         />
         <button
-          onClick={send}
+          onClick={() => send()}
           disabled={!input.trim() || loading}
           className="w-11 h-11 rounded-xl bg-honey-500 text-white flex items-center justify-center shrink-0 disabled:opacity-40 hover:bg-honey-600"
         >

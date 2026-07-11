@@ -22,6 +22,8 @@ const Pests = lazy(() => import('./pages/Pests').then(m => ({ default: m.Pests }
 const ForageForecast = lazy(() => import('./pages/ForageForecast').then(m => ({ default: m.ForageForecast })));
 const Equipment = lazy(() => import('./pages/Equipment').then(m => ({ default: m.Equipment })));
 const Hardware = lazy(() => import('./pages/Hardware').then(m => ({ default: m.Hardware })));
+const ChatPage = lazy(() => import('./pages/ChatPage').then(m => ({ default: m.ChatPage })));
+const ActivityLog = lazy(() => import('./pages/ActivityLog').then(m => ({ default: m.ActivityLog })));
 
 import { useParams } from 'react-router-dom';
 function HiveDetailPage() {
@@ -101,6 +103,7 @@ export default function App() {
           <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/chat" element={<ChatPage />} />
             <Route path="/inspections" element={<InspectionsHub />} />
             <Route path="/inspections/new" element={<InspectionFormPage />} />
             <Route path="/inspections/:id" element={<InspectionDetailPage />} />
@@ -114,6 +117,7 @@ export default function App() {
             <Route path="/equipment" element={<Equipment />} />
             <Route path="/hardware" element={<Hardware />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/activity" element={<ActivityLog />} />
           </Routes>
           </Suspense>
           </Layout>
