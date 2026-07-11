@@ -5,62 +5,16 @@ import { useStore } from '../store/useStore';
 import { generateAlerts } from '../lib/alerts';
 import { HEALTH_META } from '../lib/health';
 import { HIVE_TYPES } from '../lib/hiveTypes';
-import { API_BASE, apiFetch } from '../lib/apiBase';
 import { marked } from 'marked';
-import { A2UIChatRenderer } from '../components/A2UIChatRenderer';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { SensorCard } from '../components/SensorCard';
+import { useChatStore } from '../lib/useChatStore';
+import * as chatStore from '../lib/chatStore';
 
 marked.setOptions({ breaks: true, gfm: true });
 
-interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp: string;
-  thinking?: string;
-  toolCalls?: { name: string; args: string; result: string }[];
-  followUps?: string[];
-  a2uiMessages?: any[];
-  sensorCards?: any[];
-}
-
-interface ChatSession {
-  id: string;
-  title: string;
-  messages: ChatMessage[];
-  createdAt: string;
-  updatedAt: string;
-}
-
 function uid() {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function sid() {
-  return `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-const SESSIONS_KEY = 'beetree-chat-sessions';
-const ACTIVE_KEY = 'beetree-chat-active';
-
-function loadSessions(): ChatSession[] {
-  try {
-    const raw = localStorage.getItem(SESSIONS_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch { /* ignore */ }
-  return [];
-}
-
-function saveSessions(sessions: ChatSession[]) {
-  try {
-    // Keep last 10 sessions, 50 messages each
-    const trimmed = sessions.slice(0, 10).map(s => ({
-      ...s,
-      messages: s.messages.slice(-50),
-    }));
-    localStorage.setItem(SESSIONS_KEY, JSON.stringify(trimmed));
-  } catch { /* ignore quota */ }
 }
 
 function renderMarkdown(text: string): string {
@@ -79,7 +33,6 @@ function buildContext(
   const lastInspection = [...inspections].sort((a, b) => b.date.localeCompare(a.date))[0];
   const openTaskCount = tasks.filter(t => !t.completed).length;
 
-  // Compact hive summaries - one line each, no sensor details (tools can fetch those)
   const hiveLines = hives.map(h => {
     const apiary = apiaries.find(a => a.id === h.apiaryId);
     const lastInsp = inspections.filter(i => i.hiveId === h.id).sort((a, b) => b.date.localeCompare(a.date))[0];
@@ -102,31 +55,40 @@ export function ChatPage() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [sessions, setSessions] = useState<ChatSession[]>(() => loadSessions());
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(() => {
-    return localStorage.getItem(ACTIVE_KEY) || null;
-  });
+  const { sessions, activeSessionId, activeSession, messages, loading } = useChatStore();
   const [showSessionList, setShowSessionList] = useState(false);
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [statusSteps, setStatusSteps] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Get active session
-  const activeSession = sessions.find((s) => s.id === activeSessionId) || null;
-  const messages = activeSession?.messages ?? [];
-
-  // Persist sessions
+  // Auto-scroll
   useEffect(() => {
-    saveSessions(sessions);
-  }, [sessions]);
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages, loading]);
 
-  // Persist active session ID
+  // Create new session
+  const newSession = useCallback(() => {
+    const alerts = generateAlerts(hives, inspections, sensors, tasks);
+    const urgentCount = alerts.filter(a => a.severity === 'urgent').length;
+    const welcome: chatStore.ChatMessage = {
+      id: uid(),
+      role: 'assistant',
+      content: `🐝 Hi Mark! I'm Buzz, your beekeeping assistant. I can see your ${apiaries.length} apiaries, ${hives.length} hives, and ${sensors.length} sensors.\n\n${urgentCount > 0 ? `⚠️ You have **${urgentCount} urgent alert${urgentCount !== 1 ? 's' : ''}** that need attention.` : 'Everything looks good right now! 🎉'}\n\nAsk me about any hive, sensor trends, what needs attention, or what to do next.`,
+      timestamp: new Date().toISOString(),
+    };
+    chatStore.newSession(welcome);
+    setShowSessionList(false);
+  }, [apiaries, hives, inspections, sensors, tasks]);
+
+  // Auto-create first session if none exists
   useEffect(() => {
-    if (activeSessionId) localStorage.setItem(ACTIVE_KEY, activeSessionId);
-  }, [activeSessionId]);
+    if (sessions.length === 0 && !activeSessionId) {
+      newSession();
+    } else if (!activeSessionId && sessions.length > 0) {
+      chatStore.setActiveSession(sessions[0].id);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Consume initialPrompt from navigation
   const locationState = location.state as { initialPrompt?: string } | null;
@@ -137,142 +99,15 @@ export function ChatPage() {
     }
   }, [locationState, navigate, input]);
 
-  // Auto-scroll
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages, loading, statusSteps]);
-
-  // Create new session
-  const newSession = useCallback(() => {
-    const alerts = generateAlerts(hives, inspections, sensors, tasks);
-    const urgentCount = alerts.filter((a) => a.severity === 'urgent').length;
-    const warningCount = alerts.filter((a) => a.severity === 'warning').length;
-    const welcome: ChatMessage = {
-      id: uid(),
-      role: 'assistant',
-      content: `🐝 Hi Mark! I'm Buzz, your beekeeping assistant. I can see your ${apiaries.length} apiaries, ${hives.length} hives, and ${sensors.length} sensors.\n\n${urgentCount > 0 ? `⚠️ You have **${urgentCount} urgent alert${urgentCount !== 1 ? 's' : ''}** that need attention.` : ''}\n${warningCount > 0 ? `🟡 **${warningCount} warning${warningCount !== 1 ? 's' : ''}** to review.` : ''}\n${urgentCount === 0 && warningCount === 0 ? 'Everything looks good right now! 🎉' : ''}\n\nAsk me about any hive, sensor trends, what needs attention, or what to do next.`,
-      timestamp: new Date().toISOString(),
-    };
-    const session: ChatSession = {
-      id: sid(),
-      title: 'New Chat',
-      messages: [welcome],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    setSessions((prev) => [session, ...prev]);
-    setActiveSessionId(session.id);
-    setShowSessionList(false);
-  }, [apiaries, hives, inspections, sensors, tasks]);
-
-  // Auto-create first session if none exists
-  useEffect(() => {
-    if (sessions.length === 0 && !activeSessionId) {
-      newSession();
-    } else if (!activeSessionId && sessions.length > 0) {
-      setActiveSessionId(sessions[0].id);
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const deleteSession = (id: string) => {
-    setSessions((prev) => prev.filter((s) => s.id !== id));
-    if (activeSessionId === id) {
-      const remaining = sessions.filter((s) => s.id !== id);
-      setActiveSessionId(remaining[0]?.id ?? null);
-      if (remaining.length === 0) {
-        setTimeout(() => newSession(), 100);
-      }
-    }
-  };
-
-  const updateSession = (id: string, updater: (s: ChatSession) => ChatSession) => {
-    setSessions((prev) => prev.map((s) => (s.id === id ? updater(s) : s)));
-  };
-
   const send = useCallback(async (overrideText?: string) => {
     const text = overrideText ?? input;
     if (!text.trim() || loading || !activeSessionId) return;
-
-    const userMsg: ChatMessage = { id: uid(), role: 'user', content: text.trim(), timestamp: new Date().toISOString() };
-    const sessionId = activeSessionId;
-
-    // Update session with user message + auto-title
-    updateSession(sessionId, (s) => ({
-      ...s,
-      title: s.messages.length <= 1 ? text.trim().slice(0, 40) : s.title,
-      messages: [...s.messages, userMsg],
-      updatedAt: new Date().toISOString(),
-    }));
-    setInput('');
-    setLoading(true);
-    setError(null);
-    setStatusSteps(['Thinking…']);
-
     const context = buildContext(apiaries, hives, inspections, sensors, tasks);
     const currentMessages = activeSession?.messages ?? [];
-
-    // Use AbortController with 120s timeout so backgrounded tabs don't hang
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 120_000);
-
-    try {
-      const messagesPayload = [
-        { role: 'system' as const, content: context },
-        ...currentMessages.map((m) => ({ role: m.role as string, content: m.content })),
-        { role: 'user' as const, content: userMsg.content },
-      ];
-
-      const response = await apiFetch(API_BASE + '/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: messagesPayload }),
-        signal: controller.signal,
-      });
-
-      if (!response.ok) throw new Error(`BeeTree API returned ${response.status}`);
-
-      const data = await response.json();
-      const rawContent = data.content ?? 'No response from AI.';
-      const cleanContent = rawContent
-        .replace(/FOLLOW_UP:\s*\[[\s\S]*?\]/, '').trim()
-        .replace(/A2UI:\s*\[[\s\S]*?\]/, '').trim();
-      const assistantContent = cleanContent;
-      const followUps = (data.followUps as string[]) || [];
-      const a2uiMessages = (data.a2uiMessages as any[]) || [];
-      const sensorCards = (data.sensorCards as any[]) || undefined;
-      const toolCalls = data.toolCalls as { name: string; args: string; result: string }[] | undefined;
-      const thinking = data.thinking as string | undefined;
-
-      updateSession(sessionId, (s) => ({
-        ...s,
-        messages: [...s.messages, {
-          id: uid(), role: 'assistant', content: assistantContent, timestamp: new Date().toISOString(),
-          thinking, toolCalls,
-          followUps: followUps.length > 0 ? followUps : undefined,
-          a2uiMessages: a2uiMessages.length > 0 ? a2uiMessages : undefined,
-          sensorCards,
-        }],
-        updatedAt: new Date().toISOString(),
-      }));
-    } catch (err) {
-      const isAbort = err instanceof DOMException && err.name === 'AbortError';
-      const errorMsg = isAbort ? 'Request timed out (120s). Try again.' : (err instanceof Error ? err.message : 'Failed to get response');
-      setError(errorMsg);
-      updateSession(sessionId, (s) => ({
-        ...s,
-        messages: [...s.messages, {
-          id: uid(), role: 'assistant',
-          content: isAbort
-            ? "⏱️ That took too long. The AI might be busy — try asking again."
-            : "Sorry, I couldn't reach the AI backend.\n\nError: " + (err instanceof Error ? err.message : 'Unknown error'),
-          timestamp: new Date().toISOString(),
-        }],
-      }));
-    } finally {
-      clearTimeout(timeout);
-      setLoading(false);
-      setStatusSteps([]);
-    }
+    setInput('');
+    setError(null);
+    // This runs outside React lifecycle — survives navigation
+    chatStore.sendChat(activeSessionId, context, currentMessages, text);
   }, [input, loading, activeSessionId, activeSession, apiaries, hives, inspections, sensors, tasks]);
 
   const quickQuestions = ["Which hive needs attention?", "What's the temp trend on my hives?", "What should I do this week?", "Any swarm risk?"];
@@ -280,7 +115,7 @@ export function ChatPage() {
   // Session list sidebar
   if (showSessionList) {
     return (
-      <div className="animate-fade-in flex flex-col" style={{ height: "calc(100dvh - 140px)" }}>
+      <div className="animate-fade-in flex flex-col" style={{ height: 'calc(100dvh - 140px)' }}>
         <div className="flex items-center justify-between mb-3">
           <button onClick={() => setShowSessionList(false)} className="flex items-center gap-1.5 text-sm text-stone-500 hover:text-stone-700">
             <ChevronLeft size={18} /> Back
@@ -294,7 +129,7 @@ export function ChatPage() {
           {sessions.length === 0 && <p className="text-sm text-stone-400 text-center py-8">No sessions yet</p>}
           {sessions.map((s) => (
             <div key={s.id} className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-colors ${s.id === activeSessionId ? 'bg-honey-50 border-honey-200' : 'bg-white dark:bg-stone-900 border-stone-100 dark:border-stone-800 hover:bg-stone-50'}`}
-              onClick={() => { setActiveSessionId(s.id); setShowSessionList(false); }}>
+              onClick={() => { chatStore.setActiveSession(s.id); setShowSessionList(false); }}>
               <MessageCircle size={16} className="text-stone-400 shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-stone-700 dark:text-stone-200 truncate">{s.title}</p>
@@ -302,7 +137,7 @@ export function ChatPage() {
                   <Clock size={10} /> {new Date(s.updatedAt).toLocaleDateString()} · {s.messages.length} msgs
                 </p>
               </div>
-              <button onClick={(e) => { e.stopPropagation(); deleteSession(s.id); }} className="p-1 text-stone-300 hover:text-red-500">
+              <button onClick={(e) => { e.stopPropagation(); chatStore.deleteSession(s.id); }} className="p-1 text-stone-300 hover:text-red-500">
                 <Trash2 size={14} />
               </button>
             </div>
@@ -313,8 +148,8 @@ export function ChatPage() {
   }
 
   return (
-    <div className="animate-fade-in flex flex-col" style={{ height: "calc(100dvh - 140px)" }}>
-      {/* Header with session controls */}
+    <div className="animate-fade-in flex flex-col" style={{ height: 'calc(100dvh - 140px)' }}>
+      {/* Header */}
       <div className="flex items-center gap-2 mb-3">
         <button onClick={() => setShowSessionList(true)} className="p-1.5 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800">
           <MessageCircle size={20} className="text-honey-600 dark:text-honey-400" />
@@ -357,18 +192,12 @@ export function ChatPage() {
               ) : (
                 <div className="whitespace-pre-wrap">{m.content}</div>
               )}
-              {m.a2uiMessages && m.a2uiMessages.length > 0 && (
-                <div className="mt-2">
-                  <ErrorBoundary>
-                    <A2UIChatRenderer messages={m.a2uiMessages} />
-                  </ErrorBoundary>
-                </div>
-              )}
-              {/* Native sensor cards (same styling as Sensors page) */}
               {m.sensorCards && m.sensorCards.length > 0 && (
                 <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {m.sensorCards.map((s: any) => (
-                    <SensorCard key={s.id} sensor={s} compact />
+                    <ErrorBoundary key={s.id}>
+                      <SensorCard sensor={s} compact />
+                    </ErrorBoundary>
                   ))}
                 </div>
               )}
@@ -390,27 +219,17 @@ export function ChatPage() {
         {loading && (
           <div className="flex justify-start">
             <div className="bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 rounded-2xl rounded-bl-md shadow-sm px-4 py-3">
-              {statusSteps.length > 0 ? (
-                <div className="space-y-1.5">
-                  {statusSteps.map((step, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs text-stone-500">
-                      <span className="w-3 h-3 rounded-full border-2 border-honey-400 border-t-transparent animate-spin shrink-0" /> {step}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex gap-1">
-                  <span className="w-2 h-2 rounded-full bg-honey-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-2 h-2 rounded-full bg-honey-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-2 h-2 rounded-full bg-honey-400 animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
-              )}
+              <div className="flex gap-1">
+                <span className="w-2 h-2 rounded-full bg-honey-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-2 h-2 rounded-full bg-honey-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-2 h-2 rounded-full bg-honey-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* Quick questions (only on first message) */}
+      {/* Quick questions */}
       {messages.length <= 1 && !loading && (
         <div className="mb-2">
           <div className="flex items-center gap-1.5 mb-1.5 px-1">
