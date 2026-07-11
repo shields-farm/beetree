@@ -2451,60 +2451,6 @@ app.post('/api/chat', async (req, res) => {
     const hivesRelevant = toolCallLog.some(tc => tc.name === 'get_hives') || /hive|colony|queen|brood|health|inspect/.test(userText);
     const weatherCalled = toolCallLog.some(tc => tc.name === 'get_weather');
 
-    if (sensorsRelevant) {
-      try {
-        const sensorsRaw = db.prepare('SELECT * FROM sensors WHERE superseded_by IS NULL').all() as any[];
-        const hivesRaw = db.prepare('SELECT * FROM hives WHERE superseded_by IS NULL').all() as any[];
-        
-        if (sensorsRaw.length > 0) {
-          const surfaceId = 'sensor-cards';
-          a2uiMessages.push({
-            version: 'v0.9',
-            createSurface: { surfaceId, catalogId: 'https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json' },
-          });
-          
-          const componentList: any[] = [
-            { id: 'root', component: 'Column', children: sensorsRaw.slice(0, 6).map((_, i) => `card-${i}`) },
-          ];
-          
-          sensorsRaw.slice(0, 6).forEach((sensor, i) => {
-            componentList.push(
-              { id: `card-${i}`, component: 'Card', child: `col-${i}` },
-              { id: `col-${i}`, component: 'Column', children: [`title-${i}`, `temp-${i}`, `hum-${i}`, `batt-${i}`] },
-              { id: `title-${i}`, component: 'Text', text: { path: `/sensors/${i}/name` } },
-              { id: `temp-${i}`, component: 'Text', text: { path: `/sensors/${i}/temp` } },
-              { id: `hum-${i}`, component: 'Text', text: { path: `/sensors/${i}/hum` } },
-              { id: `batt-${i}`, component: 'Text', text: { path: `/sensors/${i}/batt` } },
-            );
-          });
-          
-          a2uiMessages.push({
-            version: 'v0.9',
-            updateComponents: { surfaceId, components: componentList },
-          });
-          
-          const dataValue: any = { sensors: [] };
-          sensorsRaw.slice(0, 6).forEach((sensor, i) => {
-            const hive = hivesRaw.find((h: any) => h.id === sensor.hiveId);
-            const latest = sensor.latestReading ? JSON.parse(sensor.latestReading) : null;
-            dataValue.sensors.push({
-              name: `${sensor.name || 'Sensor ' + sensor.deviceId}${hive ? ' (' + hive.name + ')' : ''}`,
-              temp: latest ? `🌡️ ${latest.temperature?.toFixed(1) || '?'}°F` : '🌡️ No reading',
-              hum: latest ? `💧 ${latest.humidity?.toFixed(0) || '?'}% humidity` : '',
-              batt: latest ? `🔋 ${latest.batteryVoltage?.toFixed(1) || '?'}V` : '',
-            });
-          });
-          
-          a2uiMessages.push({
-            version: 'v0.9',
-            updateDataModel: { surfaceId, path: '/', value: dataValue },
-          });
-        }
-      } catch (e) {
-        console.error('[chat] A2UI generation error:', e);
-      }
-    }
-
     // Auto-generate follow-up questions based on context
     const followUps: string[] = [];
     if (sensorsRelevant) {
@@ -2522,13 +2468,29 @@ app.post('/api/chat', async (req, res) => {
 
     // Also include raw sensor data for native rendering
     let sensorCards: any[] | undefined;
+    let hiveCards: any[] | undefined;
+    let weatherCard: any = undefined;
+
     if (sensorsRelevant) {
       try {
         const sensorsRaw = db.prepare('SELECT * FROM sensors WHERE superseded_by IS NULL').all() as any[];
         const hivesRaw = db.prepare('SELECT * FROM hives WHERE superseded_by IS NULL').all() as any[];
+        
+        // Parse hive boxes to find box number for each sensor
         sensorCards = sensorsRaw.map(s => {
           const hive = hivesRaw.find((h: any) => h.id === s.hiveId);
           const latest = s.latestReading ? JSON.parse(s.latestReading) : null;
+          
+          // Find box number from hive's boxes array
+          let boxNumber: number | undefined;
+          if (hive && s.boxId) {
+            try {
+              const boxes = JSON.parse(hive.boxes || '[]');
+              const boxIdx = boxes.findIndex((b: any) => b.id === s.boxId);
+              if (boxIdx >= 0) boxNumber = boxIdx + 1;
+            } catch {}
+          }
+          
           return {
             id: s.id,
             name: s.name || `Sensor ${s.deviceId}`,
@@ -2536,6 +2498,8 @@ app.post('/api/chat', async (req, res) => {
             model: s.model || '',
             hiveId: s.hiveId,
             hiveName: hive?.name,
+            boxId: s.boxId || '',
+            boxNumber,
             position: s.position || '',
             latestReading: latest ? {
               temperature: latest.temperature ?? 0,
@@ -2551,6 +2515,73 @@ app.post('/api/chat', async (req, res) => {
       }
     }
 
+    // Generate hive cards when hives are relevant
+    if (hivesRelevant) {
+      try {
+        const hivesRaw = db.prepare('SELECT * FROM hives WHERE superseded_by IS NULL').all() as any[];
+        const apiariesRaw = db.prepare('SELECT * FROM apiaries').all() as any[];
+        const sensorsRaw = db.prepare('SELECT * FROM sensors WHERE superseded_by IS NULL').all() as any[];
+        const inspectionsRaw = db.prepare('SELECT * FROM inspections ORDER BY date DESC LIMIT 20').all() as any[];
+        
+        hiveCards = hivesRaw.map(h => {
+          const apiary = apiariesRaw.find((a: any) => a.id === h.apiaryId);
+          const hiveSensors = sensorsRaw.filter((s: any) => s.hiveId === h.id);
+          const lastInspection = inspectionsRaw.find((i: any) => i.hiveId === h.id);
+          let boxes: any[] = [];
+          try { boxes = JSON.parse(h.boxes || '[]'); } catch {}
+          return {
+            id: h.id,
+            name: h.name,
+            apiaryName: apiary?.name,
+            type: h.type || 'langstroth-10',
+            healthStatus: h.healthStatus || 'good',
+            boxCount: boxes.length,
+            sensorCount: hiveSensors.length,
+            lastInspectionDate: lastInspection?.date || null,
+            sensorReadings: hiveSensors.map((s: any) => {
+              const r = s.latestReading ? JSON.parse(s.latestReading) : null;
+              return r ? { name: s.name, temp: r.temperature, humidity: r.humidity, battery: r.batteryVoltage } : null;
+            }).filter(Boolean),
+          };
+        });
+      } catch (e) {
+        console.error('[chat] hiveCards generation error:', e);
+      }
+    }
+
+    // Generate weather card when weather is relevant
+    if (weatherCalled || /weather|forecast|rain|inspect.*window/.test(userText)) {
+      try {
+        const { getWeather } = await import('./weather.js');
+        const apiariesRaw = db.prepare('SELECT * FROM apiaries LIMIT 1').all() as any[];
+        const lat = apiariesRaw[0]?.location_lat ?? 33.5049;
+        const lng = apiariesRaw[0]?.location_lng ?? -83.6997;
+        const weather = await getWeather(lat, lng);
+        const current = weather.current || {};
+        const inspection = weather.inspectionWindow || {};
+        weatherCard = {
+          temp: current.temperature_2m,
+          humidity: current.relative_humidity_2m,
+          windSpeed: current.wind_speed_10m,
+          windGusts: current.wind_gusts_10m,
+          precip: current.precipitation,
+          weatherCode: current.weather_code,
+          condition: weather.condition || '',
+          inspectionRating: inspection.rating || 'unknown',
+          bestWindow: inspection.bestWindow || null,
+          dailyForecast: (weather.daily || {}).time?.slice(0, 5).map((t: string, i: number) => ({
+            date: t,
+            tempHigh: weather.daily.temperature_2m_max?.[i],
+            tempLow: weather.daily.temperature_2m_min?.[i],
+            precip: weather.daily.precipitation_sum?.[i],
+            rating: inspection.dailyRatings?.[i]?.rating || '',
+          })) || [],
+        };
+      } catch (e) {
+        console.error('[chat] weatherCard generation error:', e);
+      }
+    }
+
     res.json({
       content: assistantContent,
       model: HERMES_MODEL,
@@ -2559,6 +2590,8 @@ app.post('/api/chat', async (req, res) => {
       a2uiMessages: a2uiMessages.length > 0 ? a2uiMessages : undefined,
       followUps: followUps.slice(0, 4),
       sensorCards,
+      hiveCards,
+      weatherCard,
     });
 
     // Log the conversation to agentic log
