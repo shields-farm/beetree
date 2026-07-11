@@ -304,7 +304,7 @@ export function ChatPage() {
   // Session list sidebar
   if (showSessionList) {
     return (
-      <div className="animate-fade-in flex flex-col h-full">
+      <div className="animate-fade-in flex flex-col" style={{ height: "calc(100dvh - 140px)" }}>
         <div className="flex items-center justify-between mb-3">
           <button onClick={() => setShowSessionList(false)} className="flex items-center gap-1.5 text-sm text-stone-500 hover:text-stone-700">
             <ChevronLeft size={18} /> Back
@@ -337,7 +337,7 @@ export function ChatPage() {
   }
 
   return (
-    <div className="animate-fade-in flex flex-col h-full">
+    <div className="animate-fade-in flex flex-col" style={{ height: "calc(100dvh - 140px)" }}>
       {/* Header with session controls */}
       <div className="flex items-center gap-2 mb-3">
         <button onClick={() => setShowSessionList(true)} className="p-1.5 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800">
