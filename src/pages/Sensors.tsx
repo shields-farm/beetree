@@ -1,20 +1,71 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Thermometer, Trash2, Bluetooth, Pencil, X, ChevronRight } from 'lucide-react';
-import { useState } from 'react';
+import { Plus, Thermometer, Trash2, Bluetooth, Pencil, X, ChevronRight, RefreshCw, CheckCircle2, Wifi } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
 import { useStore } from '../store/useStore';
 import { PageHeader } from '../components/Layout';
 import { Card } from '../components/Card';
 import { SensorCard } from '../components/SensorCard';
+import { API_BASE, apiFetch } from '../lib/apiBase';
+
+interface DiscoveredSensor {
+  deviceId: string;
+  formattedId: string;
+  friendlyName: string;
+  temperature: number | null;
+  humidity: number | null;
+  batteryVoltage: number | null;
+  batteryPct: number | null;
+  signal: number | null;
+  online: boolean;
+}
 
 export function Sensors() {
-  const { sensors, hives, addSensor, refreshSensorReadings } = useStore();
+  const { sensors, hives, addSensor, deleteSensor, refreshSensorReadings } = useStore();
+  const navigate = useNavigate();
   const [showAdd, setShowAdd] = useState(false);
   const [deviceId, setDeviceId] = useState('');
   const [name, setName] = useState('');
   const [model, setModel] = useState('TH-Pro');
+  const [discovering, setDiscovering] = useState(false);
+  const [discovered, setDiscovered] = useState<DiscoveredSensor[]>([]);
+  const [alreadyRegistered, setAlreadyRegistered] = useState<DiscoveredSensor[]>([]);
+  const [discoverError, setDiscoverError] = useState<string | null>(null);
+
+  const discover = useCallback(async () => {
+    setDiscovering(true);
+    setDiscoverError(null);
+    try {
+      const resp = await apiFetch(API_BASE + '/api/sensors/discover');
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ error: 'Discovery failed' }));
+        throw new Error(err.error);
+      }
+      const data = await resp.json();
+      setDiscovered(data.discovered || []);
+      setAlreadyRegistered(data.registered || []);
+    } catch (e) {
+      setDiscoverError(e instanceof Error ? e.message : 'Discovery failed');
+    } finally {
+      setDiscovering(false);
+    }
+  }, []);
+
+  // Auto-discover when opening the add panel
+  useEffect(() => {
+    if (showAdd && discovered.length === 0 && !discovering && !discoverError) {
+      discover();
+    }
+  }, [showAdd]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAdd = () => {
     if (!deviceId.trim()) return;
+    // Prevent duplicate registration
+    const normalized = deviceId.trim().toUpperCase().replace(/:/g, '');
+    const dupe = sensors.some(s => s.deviceId.toUpperCase().replace(/:/g, '') === normalized);
+    if (dupe) {
+      alert('This sensor is already registered.');
+      return;
+    }
     addSensor({
       deviceId: deviceId.trim(),
       name: name.trim() || `BroodMinder-${deviceId.trim().slice(-2)}`,
@@ -23,6 +74,31 @@ export function Sensors() {
     setDeviceId('');
     setName('');
     setShowAdd(false);
+  };
+
+  const handleAddDiscovered = (d: DiscoveredSensor) => {
+    // Prevent duplicate registration
+    const normalized = d.deviceId.toUpperCase().replace(/:/g, '');
+    const dupe = sensors.some(s => s.deviceId.toUpperCase().replace(/:/g, '') === normalized);
+    if (dupe) return; // already registered, ignore
+    const detectedModel = 'TH-Pro';
+    // Include live readings from HA so the card shows data immediately
+    const latestReading = (d.temperature !== null || d.humidity !== null || d.batteryPct !== null) ? {
+      temperature: d.temperature,
+      humidity: d.humidity,
+      batteryVoltage: d.batteryVoltage,
+      batteryPct: d.batteryPct,
+      signal: d.signal,
+      timestamp: new Date().toISOString(),
+    } : undefined;
+    addSensor({
+      deviceId: d.formattedId,
+      name: d.friendlyName,
+      model: detectedModel,
+      latestReading,
+    } as any);
+    // Remove from discovered list
+    setDiscovered(prev => prev.filter(x => x.deviceId !== d.deviceId));
   };
 
   return (
@@ -45,19 +121,94 @@ export function Sensors() {
         <Card className="mb-4 animate-fade-in">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100">Register Sensor</h3>
-            <button onClick={() => setShowAdd(false)} className="text-stone-400 dark:text-stone-500"><X size={18} /></button>
+            <div className="flex items-center gap-2">
+              <button onClick={discover} disabled={discovering} className="text-stone-400 dark:text-stone-500 hover:text-stone-600 dark:hover:text-stone-300" title="Re-scan">
+                <RefreshCw size={16} className={discovering ? 'animate-spin' : ''} />
+              </button>
+              <button onClick={() => setShowAdd(false)} className="text-stone-400 dark:text-stone-500"><X size={18} /></button>
+            </div>
           </div>
-          <div className="space-y-3">
-            <input value={deviceId} onChange={(e) => setDeviceId(e.target.value)} placeholder="Device ID (e.g., 47:0B:AF)" className="w-full rounded-xl border border-stone-200 dark:border-stone-800 px-3.5 py-2.5 text-sm" />
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name (optional)" className="w-full rounded-xl border border-stone-200 dark:border-stone-800 px-3.5 py-2.5 text-sm" />
-            <select value={model} onChange={(e) => setModel(e.target.value)} className="w-full rounded-xl border border-stone-200 dark:border-stone-800 px-3.5 py-2.5 text-sm appearance-none">
-              <option value="TH">TH</option>
-              <option value="TH-Pro">TH-Pro</option>
-              <option value="TH-Pro2">TH-Pro2</option>
-            </select>
-            <button onClick={handleAdd} disabled={!deviceId.trim()} className="w-full py-2.5 rounded-xl bg-sky-500 text-white font-medium text-sm disabled:opacity-40 hover:bg-sky-600">
-              Register Sensor
-            </button>
+
+          {/* Discovered sensors */}
+          {discovering && (
+            <div className="flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400 py-3">
+              <RefreshCw size={14} className="animate-spin" />
+              Scanning for BroodMinder sensors via Home Assistant...
+            </div>
+          )}
+
+          {discoverError && (
+            <div className="text-xs text-amber-600 dark:text-amber-400 mb-3 p-2 bg-amber-50 dark:bg-amber-950 rounded-lg">
+              Couldn't auto-discover: {discoverError}. You can still register manually below.
+            </div>
+          )}
+
+          {discovered.length > 0 && (
+            <div className="mb-4">
+              <div className="flex items-center gap-1.5 text-[11px] font-medium text-stone-400 dark:text-stone-500 mb-2">
+                <Wifi size={12} />
+                BROADCASTING — TAP TO ADD
+              </div>
+              <div className="space-y-2">
+                {discovered.map((d) => (
+                  <button
+                    key={d.deviceId}
+                    onClick={() => handleAddDiscovered(d)}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl border border-sky-200 dark:border-sky-900 bg-sky-50 dark:bg-sky-950 hover:bg-sky-100 dark:hover:bg-sky-900 transition-colors text-left"
+                  >
+                    <Bluetooth size={18} className={d.online ? 'text-sky-500' : 'text-stone-400'} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-stone-800 dark:text-stone-100">{d.friendlyName}</div>
+                      <div className="text-[10px] text-stone-400 dark:text-stone-500 font-mono">{d.formattedId}</div>
+                    </div>
+                    <div className="flex gap-3 text-[10px] text-stone-500 dark:text-stone-400">
+                      {d.temperature !== null && <span>{d.temperature.toFixed(1)}°F</span>}
+                      {d.batteryPct !== null && <span>{d.batteryPct.toFixed(0)}%</span>}
+                      {d.signal !== null && <span>{d.signal}dBm</span>}
+                    </div>
+                    <Plus size={16} className="text-sky-500 shrink-0" />
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-stone-400 dark:text-stone-500 mt-2">
+                These sensors are broadcasting BLE advertisements detected by your Pi Zero W via Home Assistant. Tap to register with auto-detected settings.
+              </p>
+            </div>
+          )}
+
+          {alreadyRegistered.length > 0 && (
+            <div className="mb-4">
+              <div className="flex items-center gap-1.5 text-[11px] font-medium text-stone-400 dark:text-stone-500 mb-2">
+                <CheckCircle2 size={12} className="text-green-500" />
+                ALREADY REGISTERED
+              </div>
+              <div className="space-y-1.5">
+                {alreadyRegistered.map((d) => (
+                  <div key={d.deviceId} className="flex items-center gap-3 p-2 rounded-lg bg-stone-50 dark:bg-stone-900">
+                    <CheckCircle2 size={14} className="text-green-500 shrink-0" />
+                    <span className="text-xs font-medium text-stone-600 dark:text-stone-300">{d.friendlyName}</span>
+                    <span className="text-[10px] text-stone-400 font-mono ml-auto">{d.formattedId}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Manual registration fallback */}
+          <div className="pt-3 border-t border-stone-100 dark:border-stone-800">
+            <div className="text-[11px] font-medium text-stone-400 dark:text-stone-500 mb-2">MANUAL ENTRY</div>
+            <div className="space-y-3">
+              <input value={deviceId} onChange={(e) => setDeviceId(e.target.value)} placeholder="Device ID (e.g., 47:0B:AF)" className="w-full rounded-xl border border-stone-200 dark:border-stone-800 px-3.5 py-2.5 text-sm" />
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name (optional)" className="w-full rounded-xl border border-stone-200 dark:border-stone-800 px-3.5 py-2.5 text-sm" />
+              <select value={model} onChange={(e) => setModel(e.target.value)} className="w-full rounded-xl border border-stone-200 dark:border-stone-800 px-3.5 py-2.5 text-sm appearance-none">
+                <option value="TH">TH</option>
+                <option value="TH-Pro">TH-Pro</option>
+                <option value="TH-Pro2">TH-Pro2</option>
+              </select>
+              <button onClick={handleAdd} disabled={!deviceId.trim()} className="w-full py-2.5 rounded-xl bg-sky-500 text-white font-medium text-sm disabled:opacity-40 hover:bg-sky-600">
+                Register Sensor
+              </button>
+            </div>
           </div>
         </Card>
       )}
@@ -76,8 +227,8 @@ export function Sensors() {
           {sensors.map((s) => {
             const hive = hives.find((h) => h.id === s.hiveId);
             return (
-              <div key={s.id} className="relative">
-                <SensorCard sensor={s} onClick={() => {}} />
+              <div key={s.id} className="relative group">
+                <SensorCard sensor={s} onClick={() => navigate(`/sensors/${s.id}`)} />
                 {hive && (
                   <Link
                     to={`/hives/${hive.id}`}
@@ -86,6 +237,18 @@ export function Sensors() {
                     {hive.name}
                   </Link>
                 )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (confirm(`Delete ${s.name}?`)) {
+                      deleteSensor(s.id);
+                    }
+                  }}
+                  className="absolute bottom-2 right-2 p-1.5 rounded-lg bg-stone-100 dark:bg-stone-800 text-stone-400 dark:text-stone-500 hover:bg-red-50 dark:hover:bg-red-950 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Delete sensor"
+                >
+                  <Trash2 size={14} />
+                </button>
               </div>
             );
           })}
@@ -180,7 +343,20 @@ export function SensorDetail({ id }: { id: string }) {
             </button>
           </div>
         ) : (
-          <p className="text-sm text-stone-400 dark:text-stone-500">Not assigned to any hive. Assign via a hive's box editor.</p>
+          <div>
+            <select
+              value=""
+              onChange={(e) => {
+                if (e.target.value) assignSensor(sensor.id, e.target.value, undefined, undefined);
+              }}
+              className="w-full rounded-xl border border-stone-200 dark:border-stone-800 px-3.5 py-2.5 text-sm appearance-none bg-white dark:bg-stone-900"
+            >
+              <option value="">Select a hive to assign…</option>
+              {hives.map((h) => (
+                <option key={h.id} value={h.id}>{h.name}</option>
+              ))}
+            </select>
+          </div>
         )}
         {sensor.position && <p className="text-xs text-stone-400 dark:text-stone-500 mt-1">Position: {sensor.position}</p>}
       </Card>
