@@ -7,6 +7,7 @@ import { HEALTH_META } from '../lib/health';
 import { HIVE_TYPES } from '../lib/hiveTypes';
 import { API_BASE, apiFetch } from '../lib/apiBase';
 import { marked } from 'marked';
+import { A2UIChatRenderer } from '../components/A2UIChatRenderer';
 
 marked.setOptions({ breaks: true, gfm: true });
 
@@ -18,23 +19,38 @@ interface ChatMessage {
   thinking?: string;
   toolCalls?: { name: string; args: string; result: string }[];
   followUps?: string[];
+  a2uiMessages?: any[];
 }
 
 function uid() {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** Extract FOLLOW_UP: [...] suggestions from the end of an AI response */
-function parseFollowUps(text: string): { content: string; followUps: string[] } {
-  const match = text.match(/FOLLOW_UP:\s*(\[[\s\S]*?\])/);
-  if (match) {
+/** Extract FOLLOW_UP: [...] and A2UI: [...] from the end of an AI response */
+function parseFollowUps(text: string): { content: string; followUps: string[]; a2uiMessages: any[] } {
+  let followUps: string[] = [];
+  let a2uiMessages: any[] = [];
+  let content = text;
+
+  // Parse FOLLOW_UP
+  const fuMatch = content.match(/FOLLOW_UP:\s*(\[[\s\S]*?\])/);
+  if (fuMatch) {
     try {
-      const followUps = JSON.parse(match[1]) as string[];
-      const content = text.replace(match[0], '').trim();
-      return { content, followUps: followUps.slice(0, 4) };
+      followUps = JSON.parse(fuMatch[1]) as string[];
+      content = content.replace(fuMatch[0], '').trim();
     } catch { /* malformed JSON, ignore */ }
   }
-  return { content: text, followUps: [] };
+
+  // Parse A2UI
+  const a2Match = content.match(/A2UI:\s*(\[[\s\S]*?\])/);
+  if (a2Match) {
+    try {
+      a2uiMessages = JSON.parse(a2Match[1]) as any[];
+      content = content.replace(a2Match[0], '').trim();
+    } catch { /* malformed JSON, ignore */ }
+  }
+
+  return { content, followUps: followUps.slice(0, 4), a2uiMessages };
 }
 
 function renderMarkdown(text: string): string {
@@ -119,7 +135,11 @@ When the user asks about a specific hive, use the data above to give a concrete 
 
 After your response, on a new line, suggest 2-3 follow-up questions the user might ask next. Format them as a JSON array on its own line, prefixed with "FOLLOW_UP:" like this:
 FOLLOW_UP: ["What should I inspect next?", "How does this compare to last week?", "When should I feed?"]
-Keep the suggestions short (under 50 chars each) and directly related to the conversation.`;
+Keep the suggestions short (under 50 chars each) and directly related to the conversation.
+
+You can also generate A2UI (Agent-to-User Interface) messages to create rich interactive UIs. A2UI is a declarative JSON format where you send component descriptions that the client renders natively. To send A2UI, include a JSON array prefixed with "A2UI:" on its own line:
+A2UI: [{"version":"v0.9","createSurface":{"surfaceId":"hive-summary","catalogId":"basic"}},{"version":"v0.9","updateComponents":{"surfaceId":"hive-summary","components":[{"id":"root","component":"Card","child":"content"},{"id":"content","component":"Column","children":["title","temp"]},{"id":"title","component":"Text","text":{"path":"/title"}},{"id":"temp","component":"Text","text":{"path":"/temp"}}]}},{"version":"v0.9","updateDataModel":{"surfaceId":"hive-summary","path":"/","value":{"title":"Hive 1 Status","temp":"100.65°F, thriving"}}}]
+Use A2UI when showing structured data like hive summaries, sensor readings, or action forms. Use Text, Card, Column, Row, Button, List, and other basic components. Keep A2UI messages on one line.`;
 }
 
 export function ChatPage() {
@@ -226,7 +246,7 @@ Ask me about any hive, sensor trends, what needs attention, or what to do next. 
 
       const data = await response.json();
       const rawContent = data.content ?? 'No response from AI.';
-      const { content: assistantContent, followUps } = parseFollowUps(rawContent);
+      const { content: assistantContent, followUps, a2uiMessages } = parseFollowUps(rawContent);
       const toolCalls = data.toolCalls as { name: string; args: string; result: string }[] | undefined;
       const thinking = data.thinking as string | undefined;
 
@@ -238,6 +258,7 @@ Ask me about any hive, sensor trends, what needs attention, or what to do next. 
         thinking,
         toolCalls,
         followUps: followUps.length > 0 ? followUps : undefined,
+        a2uiMessages: a2uiMessages.length > 0 ? a2uiMessages : undefined,
       }]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get response');
@@ -310,6 +331,12 @@ Ask me about any hive, sensor trends, what needs attention, or what to do next. 
                 <div dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) }} className="prose-chat" />
               ) : (
                 <div className="whitespace-pre-wrap">{m.content}</div>
+              )}
+              {/* A2UI rich interactive surfaces */}
+              {m.a2uiMessages && m.a2uiMessages.length > 0 && (
+                <div className="mt-2">
+                  <A2UIChatRenderer messages={m.a2uiMessages} />
+                </div>
               )}
               {/* Follow-up question buttons */}
               {m.followUps && m.followUps.length > 0 && (
