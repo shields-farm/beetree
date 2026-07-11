@@ -637,7 +637,7 @@ function inspectionToForm(i: Inspection): InspectionFormData {
 export function InspectionFormPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { hives, inspections, addInspection, updateInspection, updateHive } = useStore();
+  const { hives, inspections, addInspection, updateInspection, updateHive, setBoxContent } = useStore();
   const hiveId = params.get('hiveId') ?? hives[0]?.id ?? '';
   const editId = params.get('editId');
   const existing = editId ? inspections.find((i) => i.id === editId) : undefined;
@@ -665,6 +665,8 @@ export function InspectionFormPage() {
       <InspectionForm
         hiveId={existing?.hiveId ?? hiveId}
         initial={initial}
+        boxes={hive?.boxes}
+        onBoxContentChange={(boxId, content) => setBoxContent(existing?.hiveId ?? hiveId, boxId, content as any)}
         onSubmit={(data) => {
           const fullData = { ...data, date: new Date(data.date).toISOString() };
           if (existing) {
