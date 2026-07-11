@@ -304,7 +304,7 @@ export function Hives({ apiaryFilter }: { apiaryFilter?: string }) {
                   <div className="text-xs text-stone-400 dark:text-stone-500 truncate flex items-center gap-1.5 flex-wrap">
                     {!apiaryFilter && apiary && <span className="truncate">{apiary.name}</span>}
                     {!apiaryFilter && apiary && <span className="text-stone-300 dark:text-stone-600">·</span>}
-                    <span>{HIVE_TYPES[h.type].label}</span>
+                    <span>{(HIVE_TYPES[h.type] || HIVE_TYPES['langstroth-10']).label}</span>
                     {hasSensor && <Thermometer size={11} className="text-sky-500" />}
                     {h.location && <MapPin size={11} className="text-honey-500" />}
                   </div>
