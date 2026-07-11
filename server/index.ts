@@ -2405,8 +2405,8 @@ app.post('/api/chat', async (req, res) => {
           });
 
           // Capture thinking/reasoning if present
-          if (msg.content && msg.content !== assistantContent) {
-            thinkingLog = msg.content;
+          if (msg.content) {
+            thinkingLog += (thinkingLog ? '\n\n' : '') + msg.content;
           }
 
           // Add tool result to conversation
@@ -2442,15 +2442,93 @@ app.post('/api/chat', async (req, res) => {
       result: tc.result,
     }));
 
+    // Auto-generate A2UI messages from tool call data OR from user query keywords
+    const a2uiMessages: any[] = [];
+    const lastUserMsg = messages.filter((m: any) => m.role === 'user').pop();
+    const userText = (lastUserMsg?.content || '').toLowerCase();
+    const sensorsRelevant = toolCallLog.some(tc => tc.name === 'get_sensors') || /sensor|temp|humid|battery|reading/.test(userText);
+    const hivesRelevant = toolCallLog.some(tc => tc.name === 'get_hives') || /hive|colony|queen|brood|health|inspect/.test(userText);
+    const weatherCalled = toolCallLog.some(tc => tc.name === 'get_weather');
+
+    if (sensorsRelevant) {
+      try {
+        const sensorsRaw = db.prepare('SELECT * FROM sensors WHERE superseded_by IS NULL').all() as any[];
+        const hivesRaw = db.prepare('SELECT * FROM hives WHERE superseded_by IS NULL').all() as any[];
+        
+        if (sensorsRaw.length > 0) {
+          const surfaceId = 'sensor-cards';
+          a2uiMessages.push({
+            version: 'v0.9',
+            createSurface: { surfaceId, catalogId: 'basic' },
+          });
+          
+          const componentList: any[] = [
+            { id: 'root', component: 'Column', children: sensorsRaw.slice(0, 6).map((_, i) => `card-${i}`) },
+          ];
+          
+          sensorsRaw.slice(0, 6).forEach((sensor, i) => {
+            componentList.push(
+              { id: `card-${i}`, component: 'Card', child: `col-${i}` },
+              { id: `col-${i}`, component: 'Column', children: [`title-${i}`, `temp-${i}`, `hum-${i}`, `batt-${i}`] },
+              { id: `title-${i}`, component: 'Text', text: { path: `/sensors/${i}/name` } },
+              { id: `temp-${i}`, component: 'Text', text: { path: `/sensors/${i}/temp` } },
+              { id: `hum-${i}`, component: 'Text', text: { path: `/sensors/${i}/hum` } },
+              { id: `batt-${i}`, component: 'Text', text: { path: `/sensors/${i}/batt` } },
+            );
+          });
+          
+          a2uiMessages.push({
+            version: 'v0.9',
+            updateComponents: { surfaceId, components: componentList },
+          });
+          
+          const dataValue: any = { sensors: [] };
+          sensorsRaw.slice(0, 6).forEach((sensor, i) => {
+            const hive = hivesRaw.find((h: any) => h.id === sensor.hiveId);
+            const latest = sensor.latestReading ? JSON.parse(sensor.latestReading) : null;
+            dataValue.sensors.push({
+              name: `${sensor.name || 'Sensor ' + sensor.deviceId}${hive ? ' (' + hive.name + ')' : ''}`,
+              temp: latest ? `🌡️ ${latest.temperature?.toFixed(1) || '?'}°F` : '🌡️ No reading',
+              hum: latest ? `💧 ${latest.humidity?.toFixed(0) || '?'}% humidity` : '',
+              batt: latest ? `🔋 ${latest.batteryVoltage?.toFixed(1) || '?'}V` : '',
+            });
+          });
+          
+          a2uiMessages.push({
+            version: 'v0.9',
+            updateDataModel: { surfaceId, path: '/', value: dataValue },
+          });
+        }
+      } catch (e) {
+        console.error('[chat] A2UI generation error:', e);
+      }
+    }
+
+    // Auto-generate follow-up questions based on context
+    const followUps: string[] = [];
+    if (sensorsRelevant) {
+      followUps.push('Which sensor has the worst battery?', 'Show me temp trends', 'Any anomalous readings?');
+    }
+    if (hivesRelevant) {
+      followUps.push('Which hive needs inspection?', 'Hive health summary', 'Any swarm risk?');
+    }
+    if (weatherCalled) {
+      followUps.push('Good inspection window this week?', 'Any rain coming?');
+    }
+    if (followUps.length === 0) {
+      followUps.push('Which hive needs attention?', "What should I do this week?");
+    }
+
     res.json({
       content: assistantContent,
       model: HERMES_MODEL,
       toolCalls: toolCallDetails.length > 0 ? toolCallDetails : undefined,
       thinking: (thinkingLog as string) || undefined,
+      a2uiMessages: a2uiMessages.length > 0 ? a2uiMessages : undefined,
+      followUps: followUps.slice(0, 4),
     });
 
     // Log the conversation to agentic log
-    const lastUserMsg = messages.filter((m: any) => m.role === 'user').pop();
     if (lastUserMsg) {
       logAgenticEvent({
         type: 'buzz-chat',
