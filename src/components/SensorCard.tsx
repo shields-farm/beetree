@@ -1,4 +1,4 @@
-import { Thermometer, Droplets, BatteryFull, Signal, Clock } from 'lucide-react';
+import { Thermometer, Droplets, BatteryFull, Signal, Clock, MapPin, Layers } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { Sensor } from '../types';
 
@@ -11,6 +11,12 @@ interface SensorCardProps {
 export function SensorCard({ sensor, onClick, compact }: SensorCardProps) {
   const r = sensor.latestReading;
   const batteryPct = r ? Math.max(0, Math.min(100, ((r.batteryVoltage - 2.2) / (3.0 - 2.2)) * 100)) : 0;
+
+  // Hive association + box placement
+  const hiveName = (sensor as any).hiveName as string | undefined;
+  const boxNumber = (sensor as any).boxNumber as number | undefined;
+  const placement = sensor.position ? sensor.position.charAt(0).toUpperCase() + sensor.position.slice(1) : '';
+  const hasHive = hiveName || sensor.hiveId;
 
   return (
     <div
@@ -26,16 +32,38 @@ export function SensorCard({ sensor, onClick, compact }: SensorCardProps) {
             </div>
             <div className="text-[11px] text-stone-400 dark:text-stone-500 mt-0.5">
               {sensor.deviceId} · {sensor.model}
-              {sensor.position ? ` · ${sensor.position}` : ''}
             </div>
           </div>
           {r && (
-            <div className="flex items-center gap-1.5 text-[10px]">
+            <div className="flex items-center gap-1.5 text-[10px] shrink-0">
               <BatteryFull size={14} className={batteryPct > 50 ? 'text-green-500' : batteryPct > 20 ? 'text-amber-500' : 'text-red-500 dark:text-red-400'} />
               <span className="text-stone-500 dark:text-stone-400">{r.batteryVoltage}V</span>
             </div>
           )}
         </div>
+
+        {/* Hive association + box placement */}
+        {hasHive ? (
+          <div className="flex items-center gap-2 mb-2 text-[10px]">
+            {hiveName && (
+              <span className="flex items-center gap-0.5 bg-honey-50 dark:bg-honey-950 text-honey-700 dark:text-honey-300 px-1.5 py-0.5 rounded-md font-medium">
+                <MapPin size={10} /> {hiveName}
+              </span>
+            )}
+            {boxNumber && (
+              <span className="flex items-center gap-0.5 bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 px-1.5 py-0.5 rounded-md">
+                <Layers size={10} /> Box {boxNumber}
+              </span>
+            )}
+            {placement && (
+              <span className="flex items-center gap-0.5 bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 px-1.5 py-0.5 rounded-md">
+                {placement}
+              </span>
+            )}
+          </div>
+        ) : (
+          <div className="mb-2 text-[10px] text-stone-300 dark:text-stone-600 italic">Unassigned</div>
+        )}
 
         {r ? (
           <>
