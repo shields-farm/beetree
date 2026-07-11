@@ -149,13 +149,24 @@ export async function sendChat(
     const response = await apiFetch(API_BASE + '/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: payload }),
+      body: JSON.stringify({ messages: payload, stream: true }),
       signal: controller.signal,
     });
 
     if (!response.ok) throw new Error(`BeeTree API returned ${response.status}`);
 
-    const data = await response.json();
+    // Handle SSE streaming response
+    const contentType = response.headers.get('Content-Type') || '';
+    let data: any;
+    if (contentType.includes('text/event-stream')) {
+      const text = await response.text();
+      const lines = text.split('\n');
+      const dataLine = lines.find(l => l.startsWith('data: '));
+      if (!dataLine) throw new Error('No data in SSE response');
+      data = JSON.parse(dataLine.slice(6));
+    } else {
+      data = await response.json();
+    }
     const rawContent = data.content ?? 'No response from AI.';
     const cleanContent = rawContent
       .replace(/FOLLOW_UP:\s*\[[\s\S]*?\]/, '').trim()
