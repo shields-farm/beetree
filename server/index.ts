@@ -2327,6 +2327,8 @@ app.post('/api/chat', async (req, res) => {
 
     let assistantContent = '';
     let toolRounds = 0;
+    const toolCallLog: { name: string; args: string; result: string }[] = [];
+    let thinkingLog = '';
 
     // Agentic loop: call Hermes → if tool_calls, dispatch and feed back → repeat
     while (toolRounds < MAX_TOOL_ROUNDS) {
@@ -2395,6 +2397,18 @@ app.post('/api/chat', async (req, res) => {
 
           const toolResult = await dispatchBuzzTool(toolName, toolArgs);
 
+          // Log for frontend display
+          toolCallLog.push({
+            name: toolName,
+            args: JSON.stringify(toolArgs).slice(0, 200),
+            result: toolResult.slice(0, 500),
+          });
+
+          // Capture thinking/reasoning if present
+          if (msg.content && msg.content !== assistantContent) {
+            thinkingLog = msg.content;
+          }
+
           // Add tool result to conversation
           conversationMessages.push({
             role: 'tool',
@@ -2421,7 +2435,19 @@ app.post('/api/chat', async (req, res) => {
       assistantContent = 'I gathered the data but ran out of tool rounds to synthesize a response. Please ask me again.';
     }
 
-    res.json({ content: assistantContent, model: HERMES_MODEL });
+    // Collect tool call details for the frontend
+    const toolCallDetails = (toolCallLog || []).map((tc) => ({
+      name: tc.name,
+      args: tc.args,
+      result: tc.result,
+    }));
+
+    res.json({
+      content: assistantContent,
+      model: HERMES_MODEL,
+      toolCalls: toolCallDetails.length > 0 ? toolCallDetails : undefined,
+      thinking: (thinkingLog as string) || undefined,
+    });
 
     // Log the conversation to agentic log
     const lastUserMsg = messages.filter((m: any) => m.role === 'user').pop();
