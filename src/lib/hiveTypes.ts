@@ -66,6 +66,15 @@ export const HIVE_TYPES: Record<HiveType, {
     singleBox: true,
     supportsSplit: true,
   },
+  'apimaye-10': {
+    type: 'apimaye-10',
+    label: 'Apimaye 10-frame',
+    description: '10-frame Apimaye insulated hive — single deep only.',
+    defaultBoxes: ['apimaye'],
+    allowedBoxTypes: ['apimaye'],
+    frameCountFor: () => 10,
+    singleBox: true,
+  },
   'queen-castle': {
     type: 'queen-castle',
     label: 'Apimaye Queen Castle',
@@ -86,6 +95,16 @@ export const BOX_TYPE_LABELS: Record<BoxType, string> = {
   'apimaye-split': 'Apimaye (Split 2×3)',
   'queen-castle-comp': 'Queen Castle',
 };
+
+export const BOX_CONTENT_META: Record<string, { label: string; color: string; textColor: string; icon: string }> = {
+  brood: { label: 'Brood', color: '#f59e0b', textColor: '#fff', icon: '🐝' },
+  honey: { label: 'Honey', color: '#fbbf24', textColor: '#78350f', icon: '🍯' },
+  empty: { label: 'Empty', color: '#e7e5e4', textColor: '#44403c', icon: '⬜' },
+  mixed: { label: 'Mixed', color: '#a3a3a3', textColor: '#fff', icon: '🔀' },
+  pollen: { label: 'Pollen', color: '#fde68a', textColor: '#92400e', icon: '🌸' },
+};
+
+export const BOX_CONTENT_ORDER = ['brood', 'honey', 'mixed', 'pollen', 'empty'] as const;
 
 export const FRAME_CONTENT_ORDER: FrameContent[] = [
   'empty',

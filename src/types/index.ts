@@ -4,9 +4,12 @@ export type HiveType =
   | 'long-hive'
   | 'nuc-5'
   | 'apimaye-7'
+  | 'apimaye-10'
   | 'queen-castle';
 
 export type BoxType = 'deep' | 'medium' | 'shallow' | 'nuc' | 'apimaye' | 'apimaye-split' | 'queen-castle-comp';
+
+export type BoxContent = 'brood' | 'honey' | 'empty' | 'mixed' | 'pollen';
 
 export type FrameContent =
   | 'empty'
@@ -66,6 +69,7 @@ export interface Box {
   type: BoxType;
   frames: FrameSlot[];
   sensorIds: string[];
+  content?: BoxContent;
 }
 
 export interface Hive {
