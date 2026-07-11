@@ -2309,9 +2309,32 @@ You also have access to BeeTree API tools (inspection schedule, swarm risk, weat
 
 app.post('/api/chat', async (req, res) => {
   try {
-    const { messages } = req.body || {};
+    const { messages, stream } = req.body || {};
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: 'messages array is required' });
+    }
+
+    // If streaming requested, use SSE to prevent proxy timeouts (Tailscale Serve 502)
+    if (stream) {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.flushHeaders();
+      // Send keep-alive ping every 10s while processing
+      const keepAlive = setInterval(() => {
+        try { res.write(': ping\n\n'); } catch {}
+      }, 10_000);
+      // Helper to send SSE data and cleanup
+      const sendSSE = (data: any) => {
+        clearInterval(keepAlive);
+        try { res.write('data: ' + JSON.stringify(data) + '\n\n'); res.end(); } catch {}
+      };
+      // Replace res.json with sendSSE for this request
+      (res as any).json = sendSSE;
+      (res as any).status = (code: number) => { 
+        if (code !== 200) { clearInterval(keepAlive); try { res.write('data: ' + JSON.stringify({ error: 'HTTP ' + code }) + '\n\n'); res.end(); } catch {} }
+        return res; 
+      };
     }
 
     // Inject seasonal context as a system message before the frontend's context
