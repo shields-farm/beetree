@@ -2442,7 +2442,8 @@ app.post('/api/chat', async (req, res) => {
       result: tc.result,
     }));
 
-    // Auto-generate A2UI messages from tool call data OR from user query keywords
+    // Native sensor cards are generated server-side and rendered with SensorCard
+    // (same styling as Sensors page). A2UI is kept for future use but not sent for sensors.
     const a2uiMessages: any[] = [];
     const lastUserMsg = messages.filter((m: any) => m.role === 'user').pop();
     const userText = (lastUserMsg?.content || '').toLowerCase();
