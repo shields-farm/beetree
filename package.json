@@ -15,6 +15,8 @@
     "precommit": "npm run typecheck && npm run lint && npm run test"
   },
   "dependencies": {
+    "@a2ui/react": "^0.10.1",
+    "@a2ui/web_core": "^0.10.4",
     "@vitejs/plugin-basic-ssl": "^2.3.0",
     "date-fns": "^4.4.0",
     "lucide-react": "^1.23.0",
