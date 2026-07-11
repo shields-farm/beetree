@@ -12,6 +12,7 @@ import { FeedingTracker } from '../components/FeedingTracker';
 import { WeightTrend } from '../components/WeightTrend';
 import { HEALTH_META } from '../lib/health';
 import { HIVE_TYPES } from '../lib/hiveTypes';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import type { HiveType } from '../types';
 
 export function HiveDetail({ id }: { id: string }) {
@@ -218,8 +219,10 @@ export function HiveDetail({ id }: { id: string }) {
 
       {/* Feeding tracker */}
       <div className="mb-4">
-        <FeedingTracker hiveId={hive.id} />
-        <WeightTrend hiveId={hive.id} />
+        <ErrorBoundary>
+          <FeedingTracker hiveId={hive.id} />
+          <WeightTrend hiveId={hive.id} />
+        </ErrorBoundary>
       </div>
 
       {/* Hive visual editor */}
