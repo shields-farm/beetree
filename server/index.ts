@@ -2459,7 +2459,7 @@ app.post('/api/chat', async (req, res) => {
           const surfaceId = 'sensor-cards';
           a2uiMessages.push({
             version: 'v0.9',
-            createSurface: { surfaceId, catalogId: 'basic' },
+            createSurface: { surfaceId, catalogId: 'https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json' },
           });
           
           const componentList: any[] = [
