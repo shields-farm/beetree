@@ -9,6 +9,7 @@ import { GpsPin } from '../components/GpsPin';
 import { HiveVisual } from '../components/HiveVisual';
 import { SensorCard } from '../components/SensorCard';
 import { FeedingTracker } from '../components/FeedingTracker';
+import { WeightTrend } from '../components/WeightTrend';
 import { HEALTH_META } from '../lib/health';
 import { HIVE_TYPES } from '../lib/hiveTypes';
 import type { HiveType } from '../types';
@@ -218,6 +219,7 @@ export function HiveDetail({ id }: { id: string }) {
       {/* Feeding tracker */}
       <div className="mb-4">
         <FeedingTracker hiveId={hive.id} />
+        <WeightTrend hiveId={hive.id} />
       </div>
 
       {/* Hive visual editor */}
