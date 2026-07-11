@@ -1,21 +1,34 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, MessageCircle, AlertCircle, Sparkles } from 'lucide-react';
+import { Send, MessageCircle, AlertCircle, Sparkles, Brain, Wrench, CheckCircle2 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { generateAlerts } from '../lib/alerts';
 import { HEALTH_META } from '../lib/health';
 import { HIVE_TYPES } from '../lib/hiveTypes';
 import { API_BASE, apiFetch } from '../lib/apiBase';
+import { marked } from 'marked';
+
+marked.setOptions({ breaks: true, gfm: true });
 
 interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: string;
+  thinking?: string;       // internal reasoning from the model
+  toolCalls?: { name: string; args: string; result: string }[];
 }
 
 function uid() {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function renderMarkdown(text: string): string {
+  try {
+    return marked.parse(text, { async: false }) as string;
+  } catch {
+    return text;
+  }
 }
 
 /**
@@ -56,7 +69,7 @@ function buildContext(
       ? `last inspected ${new Date(lastInsp.date).toLocaleDateString()}, health: ${hm.label}${lastInsp.queenPresent ? ', queen present' : ', no queen'}${lastInsp.notes ? `, notes: ${lastInsp.notes.slice(0, 80)}` : ''}`
       : 'never inspected';
 
-    return `  - ${h.name} (${HIVE_TYPES[h.type].label}) at ${apiary?.name ?? 'unknown apiary'}: health ${hm.label}, ${h.boxes.length} box(es), ${sensorInfo}, ${lastInspInfo}`;
+    return `  - ${h.name} (${(HIVE_TYPES[h.type] || HIVE_TYPES['langstroth-10']).label}) at ${apiary?.name ?? 'unknown apiary'}: health ${hm.label}, ${h.boxes.length} box(es), ${sensorInfo}, ${lastInspInfo}`;
   }).join('\n');
 
   const alertInfo = alerts.length > 0
@@ -68,7 +81,7 @@ function buildContext(
     return `  - ${t.title}${hive ? ` (${hive.name})` : ''}${t.dueDate ? ` due ${new Date(t.dueDate).toLocaleDateString()}` : ''} [${t.priority}]`;
   }).join('\n');
 
-  return `You are Buzz, Mark's beekeeping assistant. You have full context about his apiary operation below. Be helpful, specific, and proactive — suggest actions when you see something that needs attention. Keep responses concise and practical.
+  return `You are Buzz, Mark's beekeeping assistant. You have full context about his apiary operation below. Be helpful, specific, and proactive — suggest actions when you see something that needs attention. Keep responses concise and practical. Use **markdown** formatting for emphasis, lists, and structure.
 
 CURRENT APIARY STATE:
 ${apiaries.length} apiary(ies), ${hives.length} hive(s), ${sensors.length} sensor(s), ${inspections.length} inspection(s) recorded.
@@ -84,8 +97,8 @@ ${taskInfo || '  No open tasks.'}
 
 RECENT INSPECTIONS:
 ${recentInspections.map((i) => {
-  const hive = hives.find((h) => h.id === i.hiveId);
-  return `  - ${hive?.name ?? 'Unknown'}: ${new Date(i.date).toLocaleDateString()} — ${HEALTH_META[i.healthStatus].label}${i.queenPresent ? ', queen ✓' : ', no queen'}${i.notes ? `, "${i.notes.slice(0, 60)}"` : ''}`;
+    const hive = hives.find((h) => h.id === i.hiveId);
+    return `  - ${hive?.name ?? 'Unknown'}: ${new Date(i.date).toLocaleDateString()} — ${HEALTH_META[i.healthStatus].label}${i.queenPresent ? ', queen ✓' : ', no queen'}${i.notes ? `, "${i.notes.slice(0, 60)}"` : ''}`;
 }).join('\n') || '  No inspections yet.'}
 
 When the user asks about a specific hive, use the data above to give a concrete answer. If they ask about something you don't have data for, say so. Proactively mention if a hive is overdue for inspection or if sensor readings look off.`;
@@ -99,6 +112,7 @@ export function ChatPage() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statusSteps, setStatusSteps] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -116,7 +130,7 @@ export function ChatPage() {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, loading]);
+  }, [messages, loading, statusSteps]);
 
   // Welcome message on first load
   useEffect(() => {
@@ -130,8 +144,8 @@ export function ChatPage() {
         role: 'assistant',
         content: `🐝 Hi Mark! I'm Buzz, your beekeeping assistant. I can see your ${apiaries.length} apiaries, ${hives.length} hives, and ${sensors.length} sensors.
 
-${urgentCount > 0 ? `⚠️ You have ${urgentCount} urgent alert${urgentCount !== 1 ? 's' : ''} that need attention.` : ''}
-${warningCount > 0 ? `🟡 ${warningCount} warning${warningCount !== 1 ? 's' : ''} to review.` : ''}
+${urgentCount > 0 ? `⚠️ You have **${urgentCount} urgent alert${urgentCount !== 1 ? 's' : ''}** that need attention.` : ''}
+${warningCount > 0 ? `🟡 **${warningCount} warning${warningCount !== 1 ? 's' : ''}** to review.` : ''}
 ${urgentCount === 0 && warningCount === 0 ? 'Everything looks good right now! 🎉' : ''}
 
 Ask me about any hive, sensor trends, what needs attention, or what to do next. I have full context on your operation.`,
@@ -155,18 +169,19 @@ Ask me about any hive, sensor trends, what needs attention, or what to do next. 
     setInput('');
     setLoading(true);
     setError(null);
+    setStatusSteps([]);
 
     const context = buildContext(apiaries, hives, inspections, sensors, tasks);
 
     try {
       // Route through BeeTree Express server → Hermes API server
-      // Hermes handles: SOUL.md persona (beetree profile), persistent memory,
-      // cognitive context, fallback providers, and the full agent loop.
       const messages_payload = [
         { role: 'system' as const, content: context },
         ...messages.map((m) => ({ role: m.role as string, content: m.content })),
         { role: 'user' as const, content: userMsg.content },
       ];
+
+      setStatusSteps(['Thinking…']);
 
       const response = await apiFetch(API_BASE + '/api/chat', {
         method: 'POST',
@@ -180,12 +195,16 @@ Ask me about any hive, sensor trends, what needs attention, or what to do next. 
 
       const data = await response.json();
       const assistantContent = data.content ?? 'No response from AI.';
+      const toolCalls = data.toolCalls as { name: string; args: string; result: string }[] | undefined;
+      const thinking = data.thinking as string | undefined;
 
       setMessages((m) => [...m, {
         id: uid(),
         role: 'assistant',
         content: assistantContent,
         timestamp: new Date().toISOString(),
+        thinking,
+        toolCalls,
       }]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get response');
@@ -197,6 +216,7 @@ Ask me about any hive, sensor trends, what needs attention, or what to do next. 
       }]);
     } finally {
       setLoading(false);
+      setStatusSteps([]);
     }
   }, [input, loading, messages, apiaries, hives, inspections, sensors, tasks]);
 
@@ -221,32 +241,69 @@ Ask me about any hive, sensor trends, what needs attention, or what to do next. 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-3 pb-4 -mx-1 px-1">
         {messages.map((m) => (
-          <div
-            key={m.id}
-            className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm whitespace-pre-wrap ${
-                m.role === 'user'
-                  ? 'bg-honey-500 text-white rounded-br-md'
-                  : 'bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 text-stone-700 dark:text-stone-200 rounded-bl-md shadow-sm'
-              }`}
-            >
-              {m.content}
+          <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm ${m.role === 'user' ? 'bg-honey-500 text-white rounded-br-md' : 'bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 text-stone-700 dark:text-stone-200 rounded-bl-md shadow-sm'}`}>
+              {/* Thinking / internal reasoning (collapsible) */}
+              {m.thinking && (
+                <details className="mb-2 rounded-lg bg-stone-50 dark:bg-stone-800 px-3 py-2 text-xs">
+                  <summary className="cursor-pointer text-stone-400 dark:text-stone-500 flex items-center gap-1.5">
+                    <Brain size={12} /> Internal reasoning
+                  </summary>
+                  <div className="mt-1.5 text-stone-400 dark:text-stone-500 whitespace-pre-wrap border-l-2 border-stone-200 dark:border-stone-700 pl-2">
+                    {m.thinking}
+                  </div>
+                </details>
+              )}
+              {/* Tool calls (collapsible) */}
+              {m.toolCalls && m.toolCalls.length > 0 && (
+                <details className="mb-2 rounded-lg bg-sky-50 dark:bg-sky-950 px-3 py-2 text-xs">
+                  <summary className="cursor-pointer text-sky-500 flex items-center gap-1.5">
+                    <Wrench size={12} /> {m.toolCalls.length} tool call{m.toolCalls.length !== 1 ? 's' : ''}
+                  </summary>
+                  <div className="mt-1.5 space-y-1.5">
+                    {m.toolCalls.map((tc, i) => (
+                      <div key={i} className="text-stone-400 dark:text-stone-500">
+                        <div className="flex items-center gap-1 text-sky-600 dark:text-sky-400 font-medium">
+                          <CheckCircle2 size={10} /> {tc.name}
+                        </div>
+                        <div className="ml-4 text-[10px] whitespace-pre-wrap">{tc.result.slice(0, 200)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+              {/* Content — rendered as markdown for assistant, plain for user */}
+              {m.role === 'assistant' ? (
+                <div dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) }} className="prose-chat" />
+              ) : (
+                <div className="whitespace-pre-wrap">{m.content}</div>
+              )}
               <div className={`text-[9px] mt-1 ${m.role === 'user' ? 'text-honey-200' : 'text-stone-300 dark:text-stone-600'}`}>
                 {new Date(m.timestamp).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
               </div>
             </div>
           </div>
         ))}
+        {/* Working indicator with steps */}
         {loading && (
           <div className="flex justify-start">
             <div className="bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 rounded-2xl rounded-bl-md shadow-sm px-4 py-3">
-              <div className="flex gap-1">
-                <span className="w-2 h-2 rounded-full bg-honey-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-2 h-2 rounded-full bg-honey-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-2 h-2 rounded-full bg-honey-400 animate-bounce" style={{ animationDelay: '300ms' }} />
-              </div>
+              {statusSteps.length > 0 ? (
+                <div className="space-y-1.5">
+                  {statusSteps.map((step, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
+                      <span className="w-3 h-3 rounded-full border-2 border-honey-400 border-t-transparent animate-spin shrink-0" />
+                      {step}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 rounded-full bg-honey-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 rounded-full bg-honey-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 rounded-full bg-honey-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -261,11 +318,7 @@ Ask me about any hive, sensor trends, what needs attention, or what to do next. 
           </div>
           <div className="flex flex-wrap gap-1.5">
             {quickQuestions.map((q) => (
-              <button
-                key={q}
-                onClick={() => send(q)}
-                className="text-xs bg-honey-50 dark:bg-honey-950 border border-honey-200 text-honey-700 dark:text-honey-300 px-2.5 py-1.5 rounded-full hover:bg-honey-100"
-              >
+              <button key={q} onClick={() => send(q)} className="text-xs bg-honey-50 dark:bg-honey-950 border border-honey-200 text-honey-700 dark:text-honey-300 px-2.5 py-1.5 rounded-full hover:bg-honey-100">
                 {q}
               </button>
             ))}
@@ -297,11 +350,7 @@ Ask me about any hive, sensor trends, what needs attention, or what to do next. 
           className="flex-1 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-3.5 py-2.5 text-sm resize-none max-h-24"
           style={{ minHeight: '44px' }}
         />
-        <button
-          onClick={() => send()}
-          disabled={!input.trim() || loading}
-          className="w-11 h-11 rounded-xl bg-honey-500 text-white flex items-center justify-center shrink-0 disabled:opacity-40 hover:bg-honey-600"
-        >
+        <button onClick={() => send()} disabled={!input.trim() || loading} className="w-11 h-11 rounded-xl bg-honey-500 text-white flex items-center justify-center shrink-0 disabled:opacity-40 hover:bg-honey-600">
           <Send size={18} />
         </button>
       </div>
