@@ -194,9 +194,10 @@ export function ChatPage() {
     if (!text.trim() || loading || !activeSessionId) return;
 
     const userMsg: ChatMessage = { id: uid(), role: 'user', content: text.trim(), timestamp: new Date().toISOString() };
+    const sessionId = activeSessionId;
 
     // Update session with user message + auto-title
-    updateSession(activeSessionId, (s) => ({
+    updateSession(sessionId, (s) => ({
       ...s,
       title: s.messages.length <= 1 ? text.trim().slice(0, 40) : s.title,
       messages: [...s.messages, userMsg],
@@ -210,6 +211,10 @@ export function ChatPage() {
     const context = buildContext(apiaries, hives, inspections, sensors, tasks);
     const currentMessages = activeSession?.messages ?? [];
 
+    // Use AbortController with 120s timeout so backgrounded tabs don't hang
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 120_000);
+
     try {
       const messagesPayload = [
         { role: 'system' as const, content: context },
@@ -221,25 +226,24 @@ export function ChatPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: messagesPayload }),
+        signal: controller.signal,
       });
 
       if (!response.ok) throw new Error(`BeeTree API returned ${response.status}`);
 
       const data = await response.json();
       const rawContent = data.content ?? 'No response from AI.';
-      // Strip any FOLLOW_UP/A2UI tags the model might have added (we use server-generated ones)
       const cleanContent = rawContent
         .replace(/FOLLOW_UP:\s*\[[\s\S]*?\]/, '').trim()
         .replace(/A2UI:\s*\[[\s\S]*?\]/, '').trim();
       const assistantContent = cleanContent;
-      // Use server-generated follow-ups and A2UI messages (deterministic, always present)
       const followUps = (data.followUps as string[]) || [];
       const a2uiMessages = (data.a2uiMessages as any[]) || [];
       const sensorCards = (data.sensorCards as any[]) || undefined;
       const toolCalls = data.toolCalls as { name: string; args: string; result: string }[] | undefined;
       const thinking = data.thinking as string | undefined;
 
-      updateSession(activeSessionId, (s) => ({
+      updateSession(sessionId, (s) => ({
         ...s,
         messages: [...s.messages, {
           id: uid(), role: 'assistant', content: assistantContent, timestamp: new Date().toISOString(),
@@ -251,16 +255,21 @@ export function ChatPage() {
         updatedAt: new Date().toISOString(),
       }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to get response');
-      updateSession(activeSessionId, (s) => ({
+      const isAbort = err instanceof DOMException && err.name === 'AbortError';
+      const errorMsg = isAbort ? 'Request timed out (120s). Try again.' : (err instanceof Error ? err.message : 'Failed to get response');
+      setError(errorMsg);
+      updateSession(sessionId, (s) => ({
         ...s,
         messages: [...s.messages, {
           id: uid(), role: 'assistant',
-          content: "Sorry, I couldn't reach the AI backend.\n\nError: " + (err instanceof Error ? err.message : 'Unknown error'),
+          content: isAbort
+            ? "⏱️ That took too long. The AI might be busy — try asking again."
+            : "Sorry, I couldn't reach the AI backend.\n\nError: " + (err instanceof Error ? err.message : 'Unknown error'),
           timestamp: new Date().toISOString(),
         }],
       }));
     } finally {
+      clearTimeout(timeout);
       setLoading(false);
       setStatusSteps([]);
     }
