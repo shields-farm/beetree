@@ -8,6 +8,7 @@ import { HIVE_TYPES } from '../lib/hiveTypes';
 import { API_BASE, apiFetch } from '../lib/apiBase';
 import { marked } from 'marked';
 import { A2UIChatRenderer } from '../components/A2UIChatRenderer';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 
 marked.setOptions({ breaks: true, gfm: true });
 
@@ -268,7 +269,7 @@ export function ChatPage() {
       const assistantContent = cleanContent;
       // Use server-generated follow-ups and A2UI messages (deterministic, always present)
       const followUps = (data.followUps as string[]) || [];
-      const a2uiMessages = (data.a2uiMessages as any[]) || undefined;
+      const a2uiMessages = (data.a2uiMessages as any[]) || [];
       const toolCalls = data.toolCalls as { name: string; args: string; result: string }[] | undefined;
       const thinking = data.thinking as string | undefined;
 
@@ -381,7 +382,11 @@ export function ChatPage() {
                 <div className="whitespace-pre-wrap">{m.content}</div>
               )}
               {m.a2uiMessages && m.a2uiMessages.length > 0 && (
-                <div className="mt-2"><A2UIChatRenderer messages={m.a2uiMessages} /></div>
+                <div className="mt-2">
+                  <ErrorBoundary>
+                    <A2UIChatRenderer messages={m.a2uiMessages} />
+                  </ErrorBoundary>
+                </div>
               )}
               {m.followUps && m.followUps.length > 0 && (
                 <div className="mt-2 pt-2 border-t border-stone-100 dark:border-stone-800 space-y-1.5">
