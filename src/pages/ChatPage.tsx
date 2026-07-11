@@ -60,23 +60,6 @@ function saveSessions(sessions: ChatSession[]) {
   } catch { /* ignore quota */ }
 }
 
-/** Extract FOLLOW_UP and A2UI from AI response */
-function parseFollowUps(text: string): { content: string; followUps: string[]; a2uiMessages: any[] } {
-  let followUps: string[] = [];
-  let a2uiMessages: any[] = [];
-  let content = text;
-
-  const fuMatch = content.match(/FOLLOW_UP:\s*(\[[\s\S]*?\])/);
-  if (fuMatch) {
-    try { followUps = JSON.parse(fuMatch[1]) as string[]; content = content.replace(fuMatch[0], '').trim(); } catch {}
-  }
-  const a2Match = content.match(/A2UI:\s*(\[[\s\S]*?\])/);
-  if (a2Match) {
-    try { a2uiMessages = JSON.parse(a2Match[1]) as any[]; content = content.replace(a2Match[0], '').trim(); } catch {}
-  }
-  return { content, followUps: followUps.slice(0, 4), a2uiMessages };
-}
-
 function renderMarkdown(text: string): string {
   try { return marked.parse(text, { async: false }) as string; } catch { return text; }
 }
@@ -278,7 +261,14 @@ export function ChatPage() {
 
       const data = await response.json();
       const rawContent = data.content ?? 'No response from AI.';
-      const { content: assistantContent, followUps, a2uiMessages } = parseFollowUps(rawContent);
+      // Strip any FOLLOW_UP/A2UI tags the model might have added (we use server-generated ones)
+      const cleanContent = rawContent
+        .replace(/FOLLOW_UP:\s*\[[\s\S]*?\]/, '').trim()
+        .replace(/A2UI:\s*\[[\s\S]*?\]/, '').trim();
+      const assistantContent = cleanContent;
+      // Use server-generated follow-ups and A2UI messages (deterministic, always present)
+      const followUps = (data.followUps as string[]) || [];
+      const a2uiMessages = (data.a2uiMessages as any[]) || undefined;
       const toolCalls = data.toolCalls as { name: string; args: string; result: string }[] | undefined;
       const thinking = data.thinking as string | undefined;
 
