@@ -493,10 +493,15 @@ app.put('/api/hives/:id', (req, res) => {
 });
 
 app.delete('/api/hives/:id', (req, res) => {
-  // Delete all versions of this hive + associated boxes/frame_slots
+  // Delete all versions of this hive + associated data
+  // Disable FK checks during delete because feeding_events FK references
+  // hives(entity_id) which isn't UNIQUE (cowSupersede creates multiple versions)
+  db.pragma('foreign_keys = OFF');
   db.prepare('DELETE FROM frame_slots WHERE boxId IN (SELECT entity_id FROM boxes WHERE hiveId = ?)').run(req.params.id);
   db.prepare('DELETE FROM boxes WHERE hiveId = ?').run(req.params.id);
+  db.prepare('DELETE FROM feeding_events WHERE hiveId = ?').run(req.params.id);
   db.prepare('DELETE FROM hives WHERE entity_id = ?').run(req.params.id);
+  db.pragma('foreign_keys = ON');
   res.json({ ok: true });
 });
 
@@ -705,9 +710,107 @@ app.post('/api/inspections/:id/revert', (req, res) => {
 // ============================================================================
 // /api/sensors
 // ============================================================================
+const HASS_URL = process.env.HASS_URL || 'http://homeassistant.local:8123';
+const HASS_TOKEN = process.env.HASS_TOKEN || '';
+
+interface DiscoveredSensor {
+  deviceId: string;
+  formattedId: string;
+  friendlyName: string;
+  temperature: number | null;
+  humidity: number | null;
+  batteryVoltage: number | null;
+  batteryPct: number | null;
+  signal: number | null;
+  online: boolean;
+}
+
 app.get('/api/sensors', (_req, res) => {
   const rows = db.prepare('SELECT * FROM sensors WHERE superseded_by IS NULL').all() as any[];
   res.json(rows.map(mapSensor));
+});
+
+// /api/sensors/discover — must be BEFORE /api/sensors/:id or Express eats it as a param
+// Known BroodMinder device IDs for this apiary (from physical inventory)
+const KNOWN_BROODMINDER_IDS = [
+  '470BAF', '470BB0', '470BB1',
+  '471287', '471288', '471289', '4712C8',
+];
+
+app.get('/api/sensors/discover', async (_req, res) => {
+  try {
+    if (!HASS_TOKEN) {
+      return res.status(500).json({ error: 'HASS_TOKEN not configured' });
+    }
+    const haResp = await fetch(`${HASS_URL}/api/states`, {
+      headers: { 'Authorization': `Bearer ${HASS_TOKEN}` },
+    });
+    if (!haResp.ok) {
+      return res.status(502).json({ error: `Home Assistant returned ${haResp.status}` });
+    }
+    const entities = await haResp.json() as any[];
+    const devices = new Map<string, DiscoveredSensor>();
+
+    // First, add all known devices from inventory (so missing ones show too)
+    for (const id of KNOWN_BROODMINDER_IDS) {
+      devices.set(id, {
+        deviceId: id,
+        formattedId: id.match(/.{2}/g)!.join(':'),
+        friendlyName: `BroodMinder-${id.slice(-2)}`,
+        temperature: null, humidity: null, batteryVoltage: null, batteryPct: null, signal: null,
+        online: false,
+      });
+    }
+
+    // Then merge in live data from HA
+    for (const e of entities) {
+      const eid: string = e.entity_id || '';
+      if (!eid.includes('broodminder_')) continue;
+      const match = eid.match(/broodminder_([0-9a-fA-F]{6})/i);
+      if (!match) continue;
+      const rawId = match[1].toUpperCase();
+      if (!rawId.startsWith('47')) continue; // filter out invalid IDs
+      const formattedId = rawId.match(/.{2}/g)!.join(':');
+      if (!devices.has(rawId)) {
+        devices.set(rawId, {
+          deviceId: rawId, formattedId, friendlyName: `BroodMinder-${rawId.slice(-2)}`,
+          temperature: null, humidity: null, batteryVoltage: null, batteryPct: null, signal: null, online: false,
+        });
+      }
+      const dev = devices.get(rawId)!;
+      const state = e.state;
+      const num = state === 'unavailable' || state === 'unknown' ? null : parseFloat(state);
+      if (eid.includes('temperature') && num !== null) { dev.temperature = num; dev.online = true; }
+      if (eid.includes('humidity') && num !== null) dev.humidity = num;
+      if (eid.includes('battery_voltage') && num !== null) dev.batteryVoltage = num;
+      if (eid.includes('battery') && !eid.includes('voltage') && num !== null) dev.batteryPct = num;
+      if (eid.includes('signal') && num !== null) dev.signal = num;
+    }
+    const registered = new Set(
+      (db.prepare('SELECT deviceId FROM sensors WHERE superseded_by IS NULL').all() as { deviceId: string }[])
+        .map(r => r.deviceId.toUpperCase().replace(/:/g, ''))
+    );
+    const discovered = Array.from(devices.values()).filter(d => d.deviceId.startsWith('47'));
+    res.json({
+      discovered: discovered.filter(d => !registered.has(d.deviceId)),
+      registered: discovered.filter(d => registered.has(d.deviceId)),
+      total: discovered.length,
+    });
+  } catch (e) {
+    console.error('[sensors/discover] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'discovery failed' });
+  }
+});
+
+// /api/sensors/timeseries — must be BEFORE /api/sensors/:id
+app.get('/api/sensors/timeseries', async (_req, res) => {
+  try {
+    const range = (_req.query.range as string) || '-24h';
+    const all = await getAllSensorTimeSeries(range);
+    res.json(all);
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : 'timeseries query failed' });
+  }
 });
 
 app.get('/api/sensors/:id', (req, res) => {
@@ -718,6 +821,14 @@ app.get('/api/sensors/:id', (req, res) => {
 
 app.post('/api/sensors', (req, res) => {
   const b = req.body || {};
+  // Prevent duplicate registration by deviceId
+  const normalizedDeviceId = (b.deviceId ?? '').toUpperCase().replace(/:/g, '');
+  // Check all sensors, normalize deviceId in JS (SQLite can't easily do string replace)
+  const allSensors = db.prepare('SELECT deviceId FROM sensors WHERE superseded_by IS NULL').all() as { deviceId: string }[];
+  const existing = allSensors.some(s => s.deviceId.toUpperCase().replace(/:/g, '') === normalizedDeviceId);
+  if (existing) {
+    return res.status(409).json({ error: 'Sensor with this device ID is already registered' });
+  }
   const entityId = b.id || genId('s');
   const rowId = genId('s');
   db.prepare(`INSERT INTO sensors (id, entity_id, version, superseded_by, superseded_at, deviceId, name, model, hiveId, boxId, position, latestReading) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?, ?, ?, ?)`)
@@ -729,17 +840,18 @@ app.post('/api/sensors', (req, res) => {
 app.put('/api/sensors/:id', (req, res) => {
   const b = req.body || {};
   const entityId = req.params.id;
-  const exists = db.prepare('SELECT 1 FROM sensors WHERE entity_id = ? AND superseded_by IS NULL').get(entityId);
-  if (!exists) return res.status(404).json({ error: 'not found' });
+  // Read existing row to preserve fields not included in the request body
+  const existing = db.prepare('SELECT * FROM sensors WHERE entity_id = ? AND superseded_by IS NULL').get(entityId) as any;
+  if (!existing) return res.status(404).json({ error: 'not found' });
 
   const newRowId = cowSupersede('sensors', entityId, () => ({
-    deviceId: b.deviceId ?? '',
-    name: b.name ?? '',
-    model: b.model ?? '',
-    hiveId: b.hiveId ?? null,
-    boxId: b.boxId ?? null,
-    position: b.position ?? null,
-    latestReading: b.latestReading ? JSON.stringify(b.latestReading) : null,
+    deviceId: b.deviceId ?? existing.deviceId ?? '',
+    name: b.name ?? existing.name ?? '',
+    model: b.model ?? existing.model ?? '',
+    hiveId: b.hiveId ?? existing.hiveId ?? null,
+    boxId: b.boxId ?? existing.boxId ?? null,
+    position: b.position ?? existing.position ?? null,
+    latestReading: b.latestReading ? JSON.stringify(b.latestReading) : existing.latestReading ?? null,
   }));
 
   const row = db.prepare('SELECT * FROM sensors WHERE id = ?').get(newRowId) as any;
@@ -756,6 +868,18 @@ app.get('/api/sensors/:id/history', (req, res) => {
   const rows = db.prepare('SELECT * FROM sensors WHERE entity_id = ? ORDER BY version DESC').all(req.params.id) as any[];
   if (rows.length === 0) return res.status(404).json({ error: 'not found' });
   res.json(rows.map((r) => ({ ...mapSensor(r), supersededBy: r.superseded_by, supersededAt: r.superseded_at })));
+});
+
+// InfluxDB time-series for a specific sensor
+app.get('/api/sensors/:id/timeseries', async (req, res) => {
+  try {
+    const range = (req.query.range as string) || '-7d';
+    const sensor = db.prepare('SELECT deviceId FROM sensors WHERE entity_id = ? AND superseded_by IS NULL').get(req.params.id) as { deviceId: string } | undefined;
+    const ts = await getSensorTimeSeries(req.params.id, range, sensor?.deviceId);
+    res.json(ts);
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : 'timeseries query failed' });
+  }
 });
 
 app.post('/api/sensors/:id/revert', (req, res) => {
@@ -1389,6 +1513,7 @@ app.get('/api/swarm/risk', async (_req, res) => {
 // /api/schedule — Smart inspection scheduler
 // ============================================================================
 import { getInspectionSchedule, getHiveSchedule } from './scheduler.js';
+import { getSensorTimeSeries, getAllSensorTimeSeries } from './influxdb.js';
 
 app.get('/api/schedule', async (_req, res) => {
   try {
@@ -1560,6 +1685,40 @@ app.get('/api/treatment', (_req, res) => {
 // /api/forage — Forage & nectar flow forecast
 // ============================================================================
 import { getForageForecast, getForageForecastWithPreview, getAllForageSpecies } from './forage.js';
+import { getWeather } from './weather.js';
+
+// /api/weather — Weather + inspection window for an apiary or lat/lng
+// ============================================================================
+app.get('/api/weather', async (req, res) => {
+  try {
+    let lat: number | undefined;
+    let lng: number | undefined;
+
+    // Allow lat/lng query params, or use apiary GPS
+    if (req.query.lat && req.query.lng) {
+      lat = Number(req.query.lat);
+      lng = Number(req.query.lng);
+    } else if (req.query.apiaryId) {
+      const apiary = db.prepare('SELECT * FROM apiaries WHERE entity_id = ? AND superseded_by IS NULL').get(req.query.apiaryId as string) as ApiaryRow | undefined;
+      if (apiary) {
+        lat = apiary.location_lat;
+        lng = apiary.location_lng;
+      }
+    }
+
+    // Default to the home apiary Rd, Georgia, USA if no coordinates
+    if (lat === undefined || lng === undefined || isNaN(lat) || isNaN(lng)) {
+      lat = 33.8875;
+      lng = -83.4201;
+    }
+
+    const weather = await getWeather(lat, lng);
+    res.json(weather);
+  } catch (e) {
+    console.error('[weather] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'weather failed' });
+  }
+});
 
 app.get('/api/forage', (_req, res) => {
   try {
@@ -1761,7 +1920,143 @@ app.get('/api/outlier', (_req, res) => {
     res.json(getAllOutlierReports());
   } catch (e) {
     console.error('[outlier] error:', e);
-    res.status(500).json({ error: e instanceof Error ? e.message : 'outlier detection failed' });
+    res.status(500).json({ error: e instanceof Error ? e.message : 'outlier failed' });
+  }
+});
+
+// ============================================================================
+// /api/weight — Hive weight trend analysis
+// ============================================================================
+app.get('/api/weight', (_req, res) => {
+  try {
+    res.json(getAllWeightTrends());
+  } catch (e) {
+    console.error('[weight] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'weight tracking failed' });
+  }
+});
+
+app.get('/api/weight/:hiveId', (req, res) => {
+  try {
+    res.json(getWeightTrendForHive(req.params.hiveId));
+  } catch (e) {
+    console.error('[weight/:hiveId] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'weight tracking failed' });
+  }
+});
+
+// ============================================================================
+// /api/feeding — Feeding event tracking + syrup refill prediction
+// ============================================================================
+app.get('/api/feeding', (_req, res) => {
+  try {
+    res.json(getAllFeedingStatuses());
+  } catch (e) {
+    console.error('[feeding] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'feeding status failed' });
+  }
+});
+
+app.get('/api/feeding/:hiveId', (req, res) => {
+  try {
+    res.json(getFeedingStatus(req.params.hiveId));
+  } catch (e) {
+    console.error('[feeding/:hiveId] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'feeding status failed' });
+  }
+});
+
+app.get('/api/feeding/events/all', (_req, res) => {
+  try {
+    res.json(getAllFeedingEvents());
+  } catch (e) {
+    console.error('[feeding/events] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'feeding events failed' });
+  }
+});
+
+app.post('/api/feeding', (req, res) => {
+  try {
+    const { hiveId, feedType, amount, feederType, note, date } = req.body || {};
+    if (!hiveId) return res.status(400).json({ error: 'hiveId is required' });
+    if (!feedType) return res.status(400).json({ error: 'feedType is required' });
+    if (typeof amount !== 'number') return res.status(400).json({ error: 'amount (number) is required' });
+
+    // Verify hive exists
+    const exists = db.prepare('SELECT 1 FROM hives WHERE entity_id = ? AND superseded_by IS NULL').get(hiveId);
+    if (!exists) return res.status(404).json({ error: 'hive not found' });
+
+    const event = recordFeeding({ hiveId, feedType, amount, feederType, note, date });
+    res.status(201).json(event);
+  } catch (e) {
+    console.error('[feeding POST] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'feeding record failed' });
+  }
+});
+
+app.get('/api/feeding/syrup-recommendation', (_req, res) => {
+  try {
+    res.json(syrupTypeForSeason());
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : 'syrup recommendation failed' });
+  }
+});
+
+// ============================================================================
+// /api/agentic-log — Activity log for all agentic activity
+// ============================================================================
+app.get('/api/agentic-log', (req, res) => {
+  try {
+    const { limit, offset, type, source, hiveId, severity, search, since, until } = req.query;
+    const result = queryAgenticLog({
+      limit: limit ? Number(limit) : 50,
+      offset: offset ? Number(offset) : 0,
+      type: type as string | undefined,
+      source: source as string | undefined,
+      hiveId: hiveId as string | undefined,
+      severity: severity as string | undefined,
+      search: search as string | undefined,
+      since: since as string | undefined,
+      until: until as string | undefined,
+    });
+    res.json(result);
+  } catch (e) {
+    console.error('[agentic-log] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'log query failed' });
+  }
+});
+
+app.get('/api/agentic-log/stats', (_req, res) => {
+  try {
+    res.json(getAgenticLogStats());
+  } catch (e) {
+    console.error('[agentic-log/stats] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'log stats failed' });
+  }
+});
+
+app.get('/api/agentic-log/:id', (req, res) => {
+  try {
+    const entry = getAgenticLogEntry(req.params.id);
+    if (!entry) return res.status(404).json({ error: 'log entry not found' });
+    res.json(entry);
+  } catch (e) {
+    console.error('[agentic-log/:id] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'log entry failed' });
+  }
+});
+
+app.post('/api/agentic-log', (req, res) => {
+  try {
+    const { type, source, title, body, hiveId, hiveName, severity, metadata, delivered } = req.body || {};
+    if (!type || !source || !title) {
+      return res.status(400).json({ error: 'type, source, and title are required' });
+    }
+    const entry = logAgenticEvent({ type, source, title, body, hiveId, hiveName, severity, metadata, delivered });
+    res.status(201).json(entry);
+  } catch (e) {
+    console.error('[agentic-log POST] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'log entry failed' });
   }
 });
 
@@ -1800,14 +2095,217 @@ app.post('/api/vision/reconstruct', async (req, res) => {
 });
 
 // ============================================================================
-// /api/chat — Buzz the beekeeper AI (Ollama glm-5.2:cloud)
+// /api/chat — Buzz the beekeeper AI (agentic tool-calling loop)
+// Hermes handles: SOUL.md persona, persistent memory, cognitive context,
+// fallback providers. BeeTree provides tool definitions so Buzz can call
+// its own analysis modules (schedule, swarm risk, weather, forage, etc.)
+// mid-conversation for grounded, real-time data.
 // ============================================================================
-const CHAT_URL = 'http://localhost:11434/v1/chat/completions';
-const CHAT_MODEL = 'glm-5.2:cloud';
-const CHAT_SYSTEM_PROMPT =
-  'You are Buzz, a UGA Master Craftsman Beekeeper with decades of experience. ' +
-  'You are helpful, concise, and practical. You know Georgia beekeeping, seasonal management, ' +
-  'and Integrated Pest Management. Answer in a friendly, expert tone. Keep responses under 200 words unless asked for detail.';
+import { buzzToolSchemas, dispatchBuzzTool } from './buzzTools.js';
+import { getAllWeightTrends, getWeightTrend as getWeightTrendForHive } from './weightTracking.js';
+import { getAllFeedingStatuses, getFeedingStatus, recordFeeding, getAllFeedingEvents } from './feeding.js';
+import { syrupTypeForSeason } from './weightTracking.js';
+import { logAgenticEvent, queryAgenticLog, getAgenticLogEntry, getAgenticLogStats } from './agenticLog.js';
+import { getWeather as getWeatherData, wmoDescription } from './weather.js';
+
+const HERMES_API_URL = process.env.HERMES_API_URL || 'http://127.0.0.1:8642/v1/chat/completions';
+const HERMES_API_KEY = process.env.HERMES_API_KEY || 'dev-hermes-api-key-replace-me';
+const HERMES_MODEL = 'hermes-agent';
+const MAX_TOOL_ROUNDS = 5; // Prevent infinite loops
+
+/** Build temporal + seasonal context for the system prompt.
+ *  Also enriches with live BeeTree data (schedule, swarm risk, forage, weather)
+ *  so Buzz always has grounded, real-time information. */
+async function buildSeasonalContext(): Promise<string> {
+  const now = new Date();
+  const month = now.getMonth(); // 0-indexed
+  const monthName = now.toLocaleString('en-US', { month: 'long' });
+  const day = now.getDate();
+  const year = now.getFullYear();
+
+  // Georgia seasonal phase
+  let season = 'winter';
+  if (month >= 2 && month <= 4) season = 'spring';
+  else if (month >= 5 && month <= 8) season = 'summer';
+  else if (month >= 9 && month <= 10) season = 'fall';
+
+  // Pull forage forecast
+  let forageSnippet = '';
+  try {
+    const forecast = getForageForecast(month + 1);
+    const active = forecast.majorFlows.filter((f: any) => f.status === 'active' || f.status === 'ending');
+    const upcoming = forecast.majorFlows.filter((f: any) => f.status === 'upcoming').slice(0, 3);
+    forageSnippet = `\nFORAGE FORECAST (${monthName}):\n${forecast.recommendation}\n`;
+    if (active.length > 0) {
+      forageSnippet += `Active flows: ${active.map((f: any) => f.plant).join(', ')}\n`;
+    }
+    if (upcoming.length > 0) {
+      forageSnippet += `Upcoming: ${upcoming.map((f: any) => `${f.plant} (${f.startMonth})`).join(', ')}\n`;
+    }
+    if (forecast.managementTips.length > 0) {
+      forageSnippet += `Management tips: ${forecast.managementTips.join(' ')}\n`;
+    }
+  } catch {
+    // forage module not loaded — skip
+  }
+
+  // Pull inspection schedule
+  let scheduleSnippet = '';
+  try {
+    const schedule = await getInspectionSchedule();
+    if (schedule.length > 0) {
+      scheduleSnippet = '\nINSPECTION SCHEDULE:\n';
+      for (const s of schedule.slice(0, 5)) {
+        scheduleSnippet += `  ${s.hiveName}: ${s.priority} priority, ${s.daysUntil} days until due (${s.reason})\n`;
+      }
+    }
+  } catch { /* skip */ }
+
+  // Pull swarm risk
+  let swarmSnippet = '';
+  try {
+    const swarm = await calculateSwarmRiskAll();
+    if (swarm.length > 0) {
+      swarmSnippet = '\nSWARM RISK:\n';
+      for (const s of swarm.slice(0, 5)) {
+        const hiveName = getHiveNameByEntityId(s.hiveId) ?? s.hiveId;
+        swarmSnippet += `  ${hiveName}: ${s.riskLevel} (score ${s.riskScore})\n`;
+      }
+    }
+  } catch { /* skip */ }
+
+  // Pull weather (default to the home apiary coordinates)
+  let weatherSnippet = '';
+  try {
+    const weather = await getWeatherData(33.8875, -83.4201);
+    const c = weather.current;
+    weatherSnippet = `\nWEATHER (the home apiary Rd):\nCurrently ${c.temperature}°F, ${wmoDescription(c.weatherCode)}, wind ${c.windSpeed} mph, humidity ${c.humidity}%\n`;
+    if (weather.inspectionWindow.status !== 'go') {
+      weatherSnippet += `Inspection window: ${weather.inspectionWindow.status} — ${weather.inspectionWindow.summary}\n`;
+    } else {
+      weatherSnippet += `Inspection window: GO — conditions are good right now.\n`;
+    }
+  } catch { /* skip */ }
+
+  // Pull outlier report
+  let outlierSnippet = '';
+  try {
+    const outliers = getAllOutlierReports();
+    const significant = outliers.flatMap((r: any) => r.outliers.filter((o: any) => o.severity === 'significant'));
+    const moderate = outliers.flatMap((r: any) => r.outliers.filter((o: any) => o.severity === 'moderate'));
+    if (significant.length > 0 || moderate.length > 0) {
+      outlierSnippet = '\nHIVE OUTLIERS:\n';
+      for (const o of significant) {
+        outlierSnippet += `  ⚠️ ${o.hiveName}: ${o.detail}\n`;
+      }
+      for (const o of moderate) {
+        outlierSnippet += `  ${o.hiveName}: ${o.detail}\n`;
+      }
+    }
+  } catch { /* skip */ }
+
+  // Pull health trends
+  let trendSnippet = '';
+  try {
+    const trends = getAllHealthTrends();
+    const concerning = trends.filter((t: any) => t.trend === 'declining');
+    if (concerning.length > 0) {
+      trendSnippet = '\nHEALTH TRENDS:\n';
+      for (const t of concerning) {
+        trendSnippet += `  ⚠️ ${t.hiveName}: ${t.trend} — ${t.commentary}\n`;
+      }
+    }
+  } catch { /* skip */ }
+
+  // Pull treatment recommendations
+  let treatmentSnippet = '';
+  try {
+    const recs = getAllTreatmentRecommendations();
+    const urgent = recs.filter((r: any) => r.treatments.some((t: any) => t.priority === 'high'));
+    if (urgent.length > 0) {
+      treatmentSnippet = '\nTREATMENT RECOMMENDATIONS:\n';
+      for (const r of urgent) {
+        const high = r.treatments.filter((t: any) => t.priority === 'high');
+        treatmentSnippet += `  ${r.hiveName}: ${high.map((t: any) => t.type + ' — ' + t.reason).join('; ')}\n`;
+      }
+    }
+  } catch { /* skip */ }
+
+  // Pull sensor anomalies
+  let sensorSnippet = '';
+  try {
+    const sensors = db.prepare('SELECT * FROM sensors WHERE superseded_by IS NULL').all() as any[];
+    const lowBattery = sensors.filter((s: any) => {
+      const r = s.latestReading ? JSON.parse(s.latestReading) : null;
+      return r && r.batteryVoltage > 0 && r.batteryVoltage < 2.5;
+    });
+    const highTemp = sensors.filter((s: any) => {
+      const r = s.latestReading ? JSON.parse(s.latestReading) : null;
+      return r && r.temperature > 99;
+    });
+    const stale = sensors.filter((s: any) => {
+      const r = s.latestReading ? JSON.parse(s.latestReading) : null;
+      if (!r || !r.timestamp) return false;
+      return (Date.now() - new Date(r.timestamp).getTime()) / (60 * 60 * 1000) > 6;
+    });
+    if (lowBattery.length > 0 || highTemp.length > 0 || stale.length > 0) {
+      sensorSnippet = '\nSENSOR ALERTS:\n';
+      for (const s of lowBattery) {
+        const r = JSON.parse(s.latestReading);
+        sensorSnippet += `  ⚠️ ${s.name}: battery at ${r.batteryVoltage}V — replace soon\n`;
+      }
+      for (const s of highTemp) {
+        const r = JSON.parse(s.latestReading);
+        sensorSnippet += `  ⚠️ ${s.name}: temp ${r.temperature}°F — elevated, check for swarm prep\n`;
+      }
+      for (const s of stale) {
+        const r = JSON.parse(s.latestReading);
+        const hours = Math.round((Date.now() - new Date(r.timestamp).getTime()) / (60 * 60 * 1000));
+        sensorSnippet += `  ${s.name}: no reading in ${hours}h\n`;
+      }
+    }
+  } catch { /* skip */ }
+
+  // Pull weight trends (declining or below threshold)
+  let weightSnippet = '';
+  try {
+    const weightTrends = getAllWeightTrends();
+    const concerning = weightTrends.filter((w: any) => w.trend === 'declining' || w.belowThreshold);
+    if (concerning.length > 0) {
+      weightSnippet = '\nWEIGHT ALERTS:\n';
+      for (const w of concerning) {
+        if (w.belowThreshold) {
+          weightSnippet += `  ⚠️ ${w.hiveName}: ${w.currentWeight} lbs — below ${w.threshold} lb seasonal minimum\n`;
+        } else if (w.trend === 'declining') {
+          weightSnippet += `  ${w.hiveName}: declining (${w.ratePerWeek} lbs/week, now at ${w.currentWeight} lbs)\n`;
+        }
+      }
+    }
+  } catch { /* skip */ }
+
+  // Pull feeding alerts (syrup running low)
+  let feedingSnippet = '';
+  try {
+    const feedingStatuses = getAllFeedingStatuses();
+    const needsRefill = feedingStatuses.filter((f: any) => f.alert !== null);
+    if (needsRefill.length > 0) {
+      feedingSnippet = '\nFEEDING ALERTS:\n';
+      for (const f of needsRefill) {
+        feedingSnippet += `  🍯 ${f.alert}\n`;
+      }
+    }
+  } catch { /* skip */ }
+
+  return `CURRENT DATE: ${monthName} ${day}, ${year}
+LOCATION: middle Georgia (USDA Zone 8a)
+SEASON: ${season}
+${forageSnippet}${scheduleSnippet}${swarmSnippet}${weatherSnippet}${outlierSnippet}${trendSnippet}${treatmentSnippet}${sensorSnippet}${weightSnippet}${feedingSnippet}
+
+You are answering as Buzz in the BeeTree app. The user is Mark, a beekeeper in Georgia.
+Use the date and season above to give temporally-aware advice. Do NOT ask what time of year it is — you already know.
+Reference the current forage forecast, weather, and sensor data when relevant. Be specific about what "it's time to" do THIS month.
+You also have access to BeeTree API tools (inspection schedule, swarm risk, weather, forage, treatments, queen status, etc.) — use them to get fresh data when you need it.`;
+}
 
 app.post('/api/chat', async (req, res) => {
   try {
@@ -1816,36 +2314,127 @@ app.post('/api/chat', async (req, res) => {
       return res.status(400).json({ error: 'messages array is required' });
     }
 
-    const payload = {
-      model: CHAT_MODEL,
-      messages: [
-        { role: 'system', content: CHAT_SYSTEM_PROMPT },
-        ...messages.filter((m: any) => m.role === 'user' || m.role === 'assistant')
-          .map((m: any) => ({ role: m.role, content: m.content })),
-      ],
-      stream: false,
-      temperature: 0.7,
-    };
+    // Inject seasonal context as a system message before the frontend's context
+    const seasonalContext = await buildSeasonalContext();
 
-    const ollamaResp = await fetch(CHAT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    // Build the message array for the agentic loop.
+    // We keep a running list that grows as tool calls are dispatched.
+    const conversationMessages: any[] = [
+      { role: 'system', content: seasonalContext },
+      ...messages.filter((m: any) => m.role === 'user' || m.role === 'assistant')
+        .map((m: any) => ({ role: m.role, content: m.content })),
+    ];
 
-    if (!ollamaResp.ok) {
-      const txt = await ollamaResp.text().catch(() => '');
-      console.error('[chat] Ollama error:', ollamaResp.status, txt.slice(0, 200));
-      return res.status(ollamaResp.status).json({ error: `Ollama ${ollamaResp.status}: ${txt.slice(0, 200)}` });
+    let assistantContent = '';
+    let toolRounds = 0;
+
+    // Agentic loop: call Hermes → if tool_calls, dispatch and feed back → repeat
+    while (toolRounds < MAX_TOOL_ROUNDS) {
+      const payload: any = {
+        model: HERMES_MODEL,
+        messages: conversationMessages,
+        tools: buzzToolSchemas,
+        stream: false,
+        temperature: 0.7,
+      };
+
+      const hermesResp = await fetch(HERMES_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${HERMES_API_KEY}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!hermesResp.ok) {
+        const txt = await hermesResp.text().catch(() => '');
+        console.error('[chat] Hermes API error:', hermesResp.status, txt.slice(0, 200));
+        return res.status(hermesResp.status).json({ error: `Hermes ${hermesResp.status}: ${txt.slice(0, 200)}` });
+      }
+
+      const data = await hermesResp.json() as any;
+      const choice = data.choices?.[0];
+      if (!choice) {
+        return res.status(500).json({ error: 'Hermes returned no choices' });
+      }
+
+      const msg = choice.message;
+
+      // If the model made tool calls, dispatch them and continue the loop
+      if (msg.tool_calls && msg.tool_calls.length > 0) {
+        // Add the assistant message with tool_calls to the conversation
+        conversationMessages.push({
+          role: 'assistant',
+          content: msg.content ?? '',
+          tool_calls: msg.tool_calls,
+        });
+
+        // Dispatch each tool call
+        for (const tc of msg.tool_calls) {
+          const toolName = tc.function.name;
+          let toolArgs: Record<string, any> = {};
+          try {
+            toolArgs = JSON.parse(tc.function.arguments || '{}');
+          } catch {
+            toolArgs = {};
+          }
+
+          console.log(`[chat] tool call: ${toolName}(${JSON.stringify(toolArgs).slice(0, 100)})`);
+
+          // Log tool call to agentic log
+          logAgenticEvent({
+            type: 'tool-call',
+            source: 'buzz-chat',
+            title: `${toolName}`,
+            body: JSON.stringify(toolArgs).slice(0, 500),
+            hiveId: toolArgs.hiveId ?? null,
+            severity: 'info',
+            metadata: { toolName, args: toolArgs },
+          });
+
+          const toolResult = await dispatchBuzzTool(toolName, toolArgs);
+
+          // Add tool result to conversation
+          conversationMessages.push({
+            role: 'tool',
+            tool_call_id: tc.id,
+            content: toolResult,
+          });
+        }
+
+        toolRounds++;
+        continue; // Loop back to get the next response from Hermes
+      }
+
+      // No tool calls — this is the final text response
+      assistantContent = msg.content ?? '';
+      if (!assistantContent) {
+        return res.status(500).json({ error: 'Hermes returned empty response' });
+      }
+
+      break;
     }
 
-    const data = await ollamaResp.json() as any;
-    const content = data.choices?.[0]?.message?.content ?? '';
-    if (!content) {
-      return res.status(500).json({ error: 'Ollama returned empty response' });
+    if (!assistantContent) {
+      // Hit the tool round limit without a final text response
+      assistantContent = 'I gathered the data but ran out of tool rounds to synthesize a response. Please ask me again.';
     }
 
-    res.json({ content, model: CHAT_MODEL });
+    res.json({ content: assistantContent, model: HERMES_MODEL });
+
+    // Log the conversation to agentic log
+    const lastUserMsg = messages.filter((m: any) => m.role === 'user').pop();
+    if (lastUserMsg) {
+      logAgenticEvent({
+        type: 'buzz-chat',
+        source: 'buzz-chat',
+        title: lastUserMsg.content?.slice(0, 80) ?? 'Chat',
+        body: assistantContent.slice(0, 1000),
+        severity: 'info',
+        metadata: { toolRounds, userMessage: lastUserMsg.content?.slice(0, 200) },
+      });
+    }
   } catch (e) {
     console.error('[chat] error:', e);
     res.status(500).json({ error: e instanceof Error ? e.message : 'chat failed' });
