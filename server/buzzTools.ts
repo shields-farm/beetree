@@ -268,7 +268,37 @@ export const buzzToolSchemas = [
 // Tool dispatch — execute a tool call and return the result as a string
 // ────────────────────────────────────────────────────────────────────────────
 
-export async function dispatchBuzzTool(
+// ─── Tool result cache (60s TTL for read-only tools) ───────────────────────
+const TOOL_CACHE_TTL_MS = 60_000;
+const toolCache = new Map<string, { value: string; expires: number }>();
+
+const CACHEABLE_TOOLS = new Set([
+  'get_hives', 'get_sensors', 'get_tasks', 'get_inspection_schedule',
+  'get_swarm_risk', 'get_outlier_report', 'get_health_trends',
+  'get_treatment_recs', 'get_forage_forecast', 'get_weather',
+  'get_queen_status', 'get_inspections', 'get_weight_trends',
+  'get_feeding_status', 'get_syrup_recommendation',
+]);
+
+function getCached(key: string): string | null {
+  const entry = toolCache.get(key);
+  if (entry && entry.expires > Date.now()) return entry.value;
+  if (entry) toolCache.delete(key);
+  return null;
+}
+
+function setCached(key: string, value: string): void {
+  toolCache.set(key, { value, expires: Date.now() + TOOL_CACHE_TTL_MS });
+  if (toolCache.size > 50) {
+    const now = Date.now();
+    for (const [k, v] of toolCache) {
+      if (v.expires <= now) toolCache.delete(k);
+    }
+  }
+}
+
+// Original dispatch function (renamed)
+async function _dispatchBuzzToolInner(
   toolName: string,
   args: Record<string, any>,
 ): Promise<string> {
