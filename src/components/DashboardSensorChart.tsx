@@ -4,7 +4,8 @@ import { apiFetch } from '../lib/apiBase';
 interface TimeSeriesPoint { time: string; temperature?: number; }
 interface SensorTS { deviceId: string; points: TimeSeriesPoint[]; }
 
-const COLORS = ['#f97316', '#f59e0b', '#eab308', '#84cc16', '#06b6d4', '#8b5cf6'];
+// Okabe-Ito colorblind-safe palette
+const COLORS = ['#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00'];
 
 export function DashboardSensorChart() {
   const [data, setData] = useState<SensorTS[]>([]);

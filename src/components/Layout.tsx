@@ -4,6 +4,18 @@ import { Hexagon, Settings as SettingsIcon } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { BottomNav } from './BottomNav';
 import { ApiKeyBanner } from './ApiKeyBanner';
+import { PullToRefresh } from './PullToRefresh';
+import { useStore } from '../store/useStore';
+
+function RefreshableContent({ children }: { children: ReactNode }) {
+  const { syncFromServer } = useStore();
+  return (
+    <PullToRefresh onRefresh={syncFromServer}>
+      <ApiKeyBanner />
+      {children}
+    </PullToRefresh>
+  );
+}
 
 export function Layout({ children }: { children: ReactNode }) {
   return (
@@ -29,8 +41,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <main
           className="flex-1 w-full max-w-6xl mx-auto px-4 py-4 sm:px-6 lg:px-8 pb-28 lg:pb-10"
         >
-          <ApiKeyBanner />
-          {children}
+          <RefreshableContent>{children}</RefreshableContent>
         </main>
       </div>
       <BottomNav />
