@@ -101,7 +101,7 @@ export function PullToRefresh({ children, onRefresh }: PullToRefreshProps) {
   const progress = Math.min(pullDist / PULL_THRESHOLD, 1);
 
   return (
-    <div ref={containerRef} style={{ position: 'relative' }}>
+    <div ref={containerRef} style={{ position: 'relative', touchAction: 'pan-y' }}>
       {/* Pull drawer */}
       <div
         style={{
