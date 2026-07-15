@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Boxes, ClipboardList, Thermometer, CheckSquare, MoreHorizontal, X, Flower2, Bug, ShoppingBag, Settings as SettingsIcon, Cpu, MessageCircle, Activity } from 'lucide-react';
+import { Boxes, ClipboardList, Thermometer, CheckSquare, MoreHorizontal, X, Flower2, Bug, ShoppingBag, Settings as SettingsIcon, Cpu, MessageCircle, Activity, RefreshCw } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
+import { useStore } from '../store/useStore';
 
 /** Custom icon: a 10-frame deep hive box (side view with vertical frame lines) */
 function HiveBoxIcon({ size = 22, strokeWidth = 2 }: { size?: number; strokeWidth?: number }) {
@@ -42,6 +43,18 @@ const SECONDARY_NAV = [
 
 export function BottomNav() {
   const [moreOpen, setMoreOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const { syncFromServer } = useStore();
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await syncFromServer();
+    } finally {
+      setRefreshing(false);
+      setMoreOpen(false);
+    }
+  };
 
   return (
     <>
@@ -65,6 +78,15 @@ export function BottomNav() {
             </button>
           </div>
           <div className="grid grid-cols-3 gap-2 p-4">
+            {/* Hard refresh button */}
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="flex flex-col items-center justify-center gap-1 py-3 rounded-xl text-[10px] font-medium text-honey-600 dark:text-honey-300 bg-honey-50 dark:bg-honey-950 hover:bg-honey-100 dark:hover:bg-honey-900 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw size={22} strokeWidth={2} className={refreshing ? 'animate-spin' : ''} />
+              {refreshing ? 'Syncing…' : 'Refresh'}
+            </button>
             {SECONDARY_NAV.map((item) => {
               const Icon = item.icon;
               return (
