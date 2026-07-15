@@ -80,7 +80,7 @@ const RANGES = [
 ];
 
 export function TelemetryTab() {
-  const { sensors, hives } = useStore();
+  const { sensors, hives, refreshTick } = useStore();
   const [data, setData] = useState<SensorTS[]>([]);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState('-24h');
@@ -97,7 +97,7 @@ export function TelemetryTab() {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [range]);
+  }, [range, refreshTick]);
 
   // Build deviceId → sensor map for hive filtering and naming
   const deviceMap = useMemo(() => {
