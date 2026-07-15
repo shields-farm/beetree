@@ -283,6 +283,13 @@ setInterval(() => {
   updateGaugesFromDB();
 }, 30_000);
 
+// Telemetry cache poller — fetch from InfluxDB every 5 min so API reads
+// are instant and InfluxDB outages don't break the frontend.
+refreshTelemetryCache(); // initial fill on boot
+setInterval(() => {
+  refreshTelemetryCache();
+}, 5 * 60 * 1000);
+
 // ============================================================================
 // Helper: get hive name by entity_id
 // ============================================================================
@@ -1513,7 +1520,7 @@ app.get('/api/swarm/risk', async (_req, res) => {
 // /api/schedule — Smart inspection scheduler
 // ============================================================================
 import { getInspectionSchedule, getHiveSchedule } from './scheduler.js';
-import { getSensorTimeSeries, getAllSensorTimeSeries } from './influxdb.js';
+import { getSensorTimeSeries, getAllSensorTimeSeries, refreshTelemetryCache } from './influxdb.js';
 
 app.get('/api/schedule', async (_req, res) => {
   try {

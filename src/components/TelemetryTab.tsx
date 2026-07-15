@@ -69,7 +69,8 @@ const METRIC_META: Record<Metric, {
   },
 };
 
-const SENSOR_COLORS = ['#f97316', '#f59e0b', '#eab308', '#84cc16', '#06b6d4', '#8b5cf6', '#ec4899', '#ef4444'];
+// Okabe-Ito colorblind-safe palette (8 colors, distinguishable across all CVD types)
+const SENSOR_COLORS = ['#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#000000'];
 
 const RANGES = [
   { value: '-6h', label: '6h' },
