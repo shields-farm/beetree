@@ -53,11 +53,21 @@ async function influxQuery(query: string): Promise<any[]> {
 }
 
 function buildEntityId(deviceId: string, measurement: string): string {
-  // HA InfluxDB stores entity_id WITHOUT "sensor." prefix as a field (not tag):
-  // broodminder_{deviceId}_broodminder_{deviceId}_{measurement}
-  // deviceId in HA is lowercase, no colons
+  // HA InfluxDB stores entity_id WITHOUT "sensor." prefix.
+  // Two naming patterns exist in the wild (HA firmware version dependent):
+  //   Double-prefix: broodminder_{cleanId}_broodminder_{cleanId}_{measurement}
+  //   Single-prefix: broodminder_{cleanId}_{cleanId}_{measurement}
+  // We query both patterns using OR so we catch whichever one HA assigned.
   const cleanId = deviceId.replace(/:/g, '').toLowerCase();
   return `broodminder_${cleanId}_broodminder_${cleanId}_${measurement}`;
+}
+
+/** Build a WHERE clause that matches either entity_id naming pattern. */
+function buildEntityFilter(deviceId: string, measurement: string): string {
+  const cleanId = deviceId.replace(/:/g, '').toLowerCase();
+  const double = `broodminder_${cleanId}_broodminder_${cleanId}_${measurement}`;
+  const single = `broodminder_${cleanId}_${cleanId}_${measurement}`;
+  return `(entity_id = '${double}' OR entity_id = '${single}')`;
 }
 
 export async function getSensorTimeSeries(
@@ -69,16 +79,11 @@ export async function getSensorTimeSeries(
   const queries: string[] = [];
 
   if (deviceId) {
-    const tempEntity = buildEntityId(deviceId, 'temperature');
-    const humEntity = buildEntityId(deviceId, 'humidity');
-    const battEntity = buildEntityId(deviceId, 'battery_voltage');
-    const signalEntity = buildEntityId(deviceId, 'signal');
-
     queries.push(
-      `SELECT value FROM "°F" WHERE entity_id = '${tempEntity}' AND time > now() ${range} ORDER BY time ASC`,
-      `SELECT value FROM "%" WHERE entity_id = '${humEntity}' AND time > now() ${range} ORDER BY time ASC`,
-      `SELECT value FROM "V" WHERE entity_id = '${battEntity}' AND time > now() ${range} ORDER BY time ASC`,
-      `SELECT value FROM "dBm" WHERE entity_id = '${signalEntity}' AND time > now() ${range} ORDER BY time ASC`,
+      `SELECT value FROM "°F" WHERE ${buildEntityFilter(deviceId, 'temperature')} AND time > now() ${range} ORDER BY time ASC`,
+      `SELECT value FROM "%" WHERE ${buildEntityFilter(deviceId, 'humidity')} AND time > now() ${range} ORDER BY time ASC`,
+      `SELECT value FROM "V" WHERE ${buildEntityFilter(deviceId, 'battery_voltage')} AND time > now() ${range} ORDER BY time ASC`,
+      `SELECT value FROM "dBm" WHERE ${buildEntityFilter(deviceId, 'signal')} AND time > now() ${range} ORDER BY time ASC`,
     );
   }
 
@@ -274,10 +279,15 @@ async function fetchAllFromInflux(range: string): Promise<SensorTimeSeries[]> {
     return timeMap.get(time)!;
   }
 
-  // Extract deviceId from entity_id: broodminder_{cleanId}_broodminder_{cleanId}_{measurement}
+  // Extract deviceId from entity_id, handling both HA naming patterns:
+  //   Double-prefix: broodminder_{cleanId}_broodminder_{cleanId}_{measurement}
+  //   Single-prefix: broodminder_{cleanId}_{cleanId}_{measurement}
   function extractDeviceId(entityId: string): string | null {
-    const m = entityId.match(/^broodminder_([a-f0-9]+)_broodminder_\1_/);
-    return m ? m[1] : null;
+    const m1 = entityId.match(/^broodminder_([a-f0-9]+)_broodminder_\1_/);
+    if (m1) return m1[1];
+    const m2 = entityId.match(/^broodminder_([a-f0-9]+)_\1_/);
+    if (m2) return m2[1];
+    return null;
   }
 
   for (const result of results) {
