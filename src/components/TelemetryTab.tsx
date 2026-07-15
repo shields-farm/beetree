@@ -84,7 +84,7 @@ export function TelemetryTab() {
   const [data, setData] = useState<SensorTS[]>([]);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState('-24h');
-  const [hiveOnly, setHiveOnly] = useState(true);
+  const [hiveOnly, setHiveOnly] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
