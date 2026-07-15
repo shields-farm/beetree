@@ -28,6 +28,7 @@ export function uid(prefix = 'id'): string {
 }
 
 interface StoreContextValue extends AppState {
+  refreshTick: number;  // bumps on every syncFromServer — components can depend on this to re-fetch
   // Apiaries
   addApiary: (a: Omit<Apiary, 'id'>) => Apiary;
   updateApiary: (id: string, patch: Partial<Apiary>) => void;
@@ -67,6 +68,7 @@ const StoreContext = createContext<StoreContextValue | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState>(loadState);
+  const [refreshTick, setRefreshTick] = useState(0);
   const firstRender = useRef(true);
 
   // Persist to localStorage on every change (except first render)
@@ -109,6 +111,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     return {
       ...state,
+      refreshTick,
 
       addApiary: (a) => {
         const apiary: Apiary = { ...a, id: uid('apiary') };
@@ -360,12 +363,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ]);
           // Replace local state entirely with server data
           update(() => ({ apiaries, hives, inspections, sensors, tasks }));
+          // Bump tick so components like TelemetryTab re-fetch their own data
+          setRefreshTick((t) => t + 1);
         } catch {
           // server not running — keep local state
         }
       },
     };
-  }, [state]);
+  }, [state, refreshTick]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
