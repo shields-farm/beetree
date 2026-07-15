@@ -131,6 +131,12 @@ input[type='range']::-moz-range-thumb {
   animation: slideUp 0.25s ease-out;
 }
 
+/* Pull-to-refresh bee spinner */
+@keyframes bee-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* Buzz chat markdown styles */
 .buzz-markdown p { margin: 0 0 0.25rem 0; line-height: 1.5; }
 .buzz-markdown p:last-child { margin-bottom: 0; }
