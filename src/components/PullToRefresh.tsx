@@ -16,11 +16,18 @@ export function PullToRefresh({ children, onRefresh }: PullToRefreshProps) {
   const pulling = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Keep latest values in refs so the native event listeners don't go stale
+  const refreshingRef = useRef(refreshing);
+  refreshingRef.current = refreshing;
+  const pullDistRef = useRef(pullDist);
+  pullDistRef.current = pullDist;
+  const onRefreshRef = useRef(onRefresh);
+  onRefreshRef.current = onRefresh;
+
   // Check if we're scrolled to top
   const isAtTop = useCallback(() => {
     const el = containerRef.current;
     if (!el) return true;
-    // Check nearest scrollable ancestor
     let node: HTMLElement | null = el;
     while (node) {
       if (node.scrollTop > 0) return false;
@@ -29,48 +36,61 @@ export function PullToRefresh({ children, onRefresh }: PullToRefreshProps) {
     return window.scrollY <= 0;
   }, []);
 
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
-    if (refreshing) return;
-    if (!isAtTop()) return;
-    startY.current = e.touches[0].clientY;
-    pulling.current = true;
-  }, [refreshing, isAtTop]);
+  // ── Native listeners (non-passive) so preventDefault actually works ──────
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
 
-  const onTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!pulling.current || refreshing) return;
+    const handleTouchStart = (e: TouchEvent) => {
+      if (refreshingRef.current || !isAtTop()) return;
+      startY.current = e.touches[0].clientY;
+      pulling.current = true;
+    };
 
-    const delta = e.touches[0].clientY - startY.current;
-    if (delta <= 0) {
-      setPullDist(0);
-      return;
-    }
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!pulling.current || refreshingRef.current) return;
+      const delta = e.touches[0].clientY - startY.current;
+      if (delta <= 0) {
+        if (pullDistRef.current > 0) setPullDist(0);
+        return;
+      }
+      // Prevent native scroll/refresh — requires passive: false
+      if (delta > 4 && isAtTop()) {
+        e.preventDefault();
+      }
+      const resisted = Math.min(delta * RESISTANCE, MAX_PULL);
+      setPullDist(resisted);
+    };
 
-    // Prevent native pull-to-refresh (Chrome's interstitial)
-    if (delta > 4 && isAtTop()) {
-      e.preventDefault();
-    }
-
-    const resisted = Math.min(delta * RESISTANCE, MAX_PULL);
-    setPullDist(resisted);
-  }, [refreshing, isAtTop]);
-
-  const onTouchEnd = useCallback(async () => {
-    if (!pulling.current) return;
-    pulling.current = false;
-
-    if (pullDist >= PULL_THRESHOLD) {
-      setRefreshing(true);
-      setPullDist(PULL_THRESHOLD);
-      try {
-        await onRefresh();
-      } finally {
-        setRefreshing(false);
+    const handleTouchEnd = async () => {
+      if (!pulling.current) return;
+      pulling.current = false;
+      const dist = pullDistRef.current;
+      if (dist >= PULL_THRESHOLD) {
+        setRefreshing(true);
+        setPullDist(PULL_THRESHOLD);
+        try {
+          await onRefreshRef.current();
+        } finally {
+          setRefreshing(false);
+          setPullDist(0);
+        }
+      } else {
         setPullDist(0);
       }
-    } else {
-      setPullDist(0);
-    }
-  }, [pullDist, onRefresh]);
+    };
+
+    // touchmove MUST be non-passive for preventDefault to work
+    el.addEventListener('touchstart', handleTouchStart, { passive: true });
+    el.addEventListener('touchmove', handleTouchMove, { passive: false });
+    el.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+    return () => {
+      el.removeEventListener('touchstart', handleTouchStart);
+      el.removeEventListener('touchmove', handleTouchMove);
+      el.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [isAtTop]);
 
   // Clean up on unmount
   useEffect(() => {
@@ -81,13 +101,7 @@ export function PullToRefresh({ children, onRefresh }: PullToRefreshProps) {
   const progress = Math.min(pullDist / PULL_THRESHOLD, 1);
 
   return (
-    <div
-      ref={containerRef}
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
-      style={{ position: 'relative' }}
-    >
+    <div ref={containerRef} style={{ position: 'relative' }}>
       {/* Pull drawer */}
       <div
         style={{
