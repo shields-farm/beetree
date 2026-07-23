@@ -1,0 +1,45 @@
+# Data files - too large for git
+*.tar.gz
+*.zip
+*.wav
+*.mp3
+*.flac
+*.ogg
+
+# Model checkpoints
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.gguf
+*.onnx
+
+# Audio features (regenerable)
+*.npy
+*.npz
+*.tensorgram
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Secrets
+.env
+*.key
+*.pem
+
+# Staging (local data, not for git)
+staging/
+data/audio/
+data/raw/
