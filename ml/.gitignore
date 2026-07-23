@@ -1,0 +1,22 @@
+# ML artifacts - too large for git
+*.tar.gz
+*.zip
+*.wav
+*.mp3
+*.npy
+*.npz
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.gguf
+*.onnx
+
+# ML venvs
+ml/.venv/
+ml/venv/
+
+# Staging data
+ml/staging/
+ml/data/audio/
+ml/data/raw/
