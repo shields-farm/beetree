@@ -1,0 +1,33 @@
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  prometheus:
+    endpoint: 0.0.0.0:9999
+    namespace: ""
+    resource_to_telemetry_conversion:
+      enabled: true
+    const_labels:
+      source: otel-collector
+  # Honeycomb OTLP exporter — sends traces + metrics to Honeycomb cloud
+  otlp_http/honeycomb:
+    endpoint: https://api.honeycomb.io
+    headers:
+      x-honeycomb-team: hcaik_01kwy5g933f34ytdk31ejhxg5bm9kpw8wsth5fvmdxnzqe6sxzhtbrxvz2
+      x-honeycomb-dataset: beetree
+  debug:
+    verbosity: basic
+    sampling_initial: 2
+    sampling_thereafter: 200
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [otlp_http/honeycomb, debug]
+    metrics:
+      receivers: [otlp]
+      exporters: [prometheus, otlp_http/honeycomb, debug]

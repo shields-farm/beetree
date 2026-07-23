@@ -1,0 +1,21 @@
+repos:
+  - repo: local
+    hooks:
+      - id: typecheck
+        name: 🔍 typecheck (tsc)
+        entry: npm run typecheck
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: lint
+        name: 🧹 lint (oxlint)
+        entry: npx oxlint
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: test
+        name: 🧪 tests (vitest)
+        entry: npx vitest run
+        language: system
+        pass_filenames: false
+        always_run: true
