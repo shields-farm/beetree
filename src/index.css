@@ -1,0 +1,170 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #faf7f2;
+  color: #1c1917;
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dark body {
+  background: #0c0a09;
+  color: #e7e5e4;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+input, textarea, select {
+  font-size: 16px; /* prevent iOS zoom on focus */
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Hide scrollbar for nav but keep functionality */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Range slider styling */
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 9999px;
+  background: #fef3c7;
+  outline: none;
+}
+.dark input[type='range'] {
+  background: #451a03;
+}
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  background: #f59e0b;
+  cursor: pointer;
+  border: 3px solid white;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+input[type='range']::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  background: #f59e0b;
+  cursor: pointer;
+  border: 3px solid white;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+
+/* checkbox custom */
+.fancy-check {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 2px solid #d6d3d1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  background: white;
+}
+.dark .fancy-check {
+  border-color: #44403c;
+  background: #1c1917;
+}
+.fancy-check.checked {
+  background: #f59e0b;
+  border-color: #f59e0b;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.animate-slide-up {
+  animation: slideUp 0.25s ease-out;
+}
+
+/* Pull-to-refresh bee spinner */
+@keyframes bee-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Buzz chat markdown styles */
+.buzz-markdown p { margin: 0 0 0.25rem 0; line-height: 1.5; }
+.buzz-markdown p:last-child { margin-bottom: 0; }
+.buzz-markdown strong { font-weight: 700; color: #44403c; }
+.dark .buzz-markdown strong { color: #f5f5f4; }
+.buzz-markdown ul { margin: 0.25rem 0; padding-left: 1.1rem; list-style: disc; }
+.buzz-markdown li { margin: 0.1rem 0; }
+.buzz-markdown em { font-style: italic; color: #78716c; }
+.dark .buzz-markdown em { color: #a8a29e; }
+/* Chat markdown rendering */
+.prose-chat p { margin: 0.25em 0; }
+.prose-chat p:first-child { margin-top: 0; }
+.prose-chat p:last-child { margin-bottom: 0; }
+.prose-chat strong { font-weight: 600; }
+.prose-chat em { font-style: italic; }
+.prose-chat ul, .prose-chat ol { margin: 0.25em 0; padding-left: 1.25em; }
+.prose-chat li { margin: 0.1em 0; }
+.prose-chat ul { list-style: disc; }
+.prose-chat ol { list-style: decimal; }
+.prose-chat h1, .prose-chat h2, .prose-chat h3 { font-weight: 600; margin: 0.5em 0 0.25em; }
+.prose-chat h1 { font-size: 1.1em; }
+.prose-chat h2 { font-size: 1em; }
+.prose-chat h3 { font-size: 0.9em; }
+.prose-chat code { font-family: ui-monospace, monospace; font-size: 0.85em; background: rgba(0,0,0,0.05); padding: 0.1em 0.3em; border-radius: 3px; }
+.prose-chat pre { background: rgba(0,0,0,0.05); padding: 0.5em; border-radius: 6px; overflow-x: auto; margin: 0.5em 0; }
+.prose-chat pre code { background: none; padding: 0; }
+.prose-chat blockquote { border-left: 3px solid #d6d3d1; padding-left: 0.75em; margin: 0.5em 0; color: #78716c; }
+.prose-chat a { color: #d97706; text-decoration: underline; }
+.prose-chat hr { border: none; border-top: 1px solid #e7e5e4; margin: 0.5em 0; }
+.dark .prose-chat code { background: rgba(255,255,255,0.08); }
+.dark .prose-chat pre { background: rgba(255,255,255,0.08); }
