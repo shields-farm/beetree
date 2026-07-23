@@ -1,41 +1,45 @@
-# Dependencies
-node_modules/
-.pnp
-.pnp.js
+# Data files - too large for git
+*.tar.gz
+*.zip
+*.wav
+*.mp3
+*.flac
+*.ogg
 
-# Build output
-dist/
-dist-ssr/
-*.local
+# Model checkpoints
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.gguf
+*.onnx
 
-# Editor
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+# Audio features (regenerable)
+*.npy
+*.npz
+*.tensorgram
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Environment
+# IDE
+.vscode/
+.idea/
+
+# Secrets
 .env
-.env.*
-!.env.example
+*.key
+*.pem
 
-# Data
-data/
-*.db
-*.db-journal
-*.sqlite
-
-# Logs
-*.log
-npm-debug.log*
-
-# PWA artifacts
-sw.js
-workbox-*.js
-# TLS certs (self-signed, not for git)
-certs/
+# Staging (local data, not for git)
+staging/
+data/audio/
+data/raw/
