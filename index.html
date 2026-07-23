@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="BeeTree" />
+    <meta name="theme-color" content="#f59e0b" />
+    <meta name="description" content="BeeTree — Beekeeping management & sensor monitoring. Like a B-tree, but for bees." />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <title>BeeTree — Beekeeping Management</title>
+    <script>
+      // Apply theme before first paint to avoid FOUC
+      (function() {
+        try {
+          var t = localStorage.getItem('beetree-theme');
+          if (t !== 'light' && t !== 'dark' && t !== 'system') t = 'system';
+          var resolved = t === 'system'
+            ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+            : t;
+          if (resolved === 'dark') document.documentElement.classList.add('dark');
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
