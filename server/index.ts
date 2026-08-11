@@ -40,6 +40,11 @@ import {
 
 initSchema();
 
+// Ontology: structured world-model (threat catalog, colony graph, season frames)
+import { initOntology } from './ontology.js';
+const ontoBoot = initOntology();
+console.log(`[ontology] boot: seeded ${ontoBoot.catalog.seeded} species, ${ontoBoot.catalog.aliases} aliases; ${ontoBoot.vocab.name}@${ontoBoot.vocab.version}`);
+
 // No auto-seed — fresh installs start empty. Setup wizard handles initial data.
 
 // ============================================================================
