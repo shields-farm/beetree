@@ -13,14 +13,15 @@ import { getWeather } from './weather.js';
 import { getQueenStatus, getAllQueenStatuses } from './queenTracking.js';
 import { db, genId } from './db.js';
 import { getWeightTrend, getAllWeightTrends } from './weightTracking.js';
-import { getFeedingStatus, getAllFeedingStatuses, recordFeeding } from './feeding.js';
+import { recordFeeding, getFeedingStatus, getAllFeedingStatuses } from './feeding.js';
 import { syrupTypeForSeason } from './weightTracking.js';
+import { ontologyToolSchemas, dispatchOntologyTool } from './ontologyTools.js';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Tool schemas (OpenAI function-calling format)
 // ────────────────────────────────────────────────────────────────────────────
 
-export const buzzToolSchemas = [
+export const buzzToolSchemas = [...ontologyToolSchemas,
   {
     type: 'function' as const,
     function: {
@@ -280,6 +281,12 @@ const CACHEABLE_TOOLS = new Set([
   'get_feeding_status', 'get_syrup_recommendation',
 ]);
 
+const ONTOLOGY_TOOLS = new Set([
+  'onto_lookup_pest', 'onto_list_threats', 'onto_assert_relationship',
+  'onto_record_event', 'onto_record_state', 'onto_get_graph',
+  'onto_current_state', 'onto_lookup_species_detail', 'onto_current_season',
+]);
+
 function getCached(key: string): string | null {
   const entry = toolCache.get(key);
   if (entry && entry.expires > Date.now()) return entry.value;
@@ -303,6 +310,7 @@ async function _dispatchBuzzToolInner(
   args: Record<string, any>,
 ): Promise<string> {
   try {
+    if (ONTOLOGY_TOOLS.has(toolName)) return dispatchOntologyTool(toolName, args);
     switch (toolName) {
       case 'get_hives': {
         const rows = db.prepare('SELECT * FROM hives WHERE superseded_by IS NULL').all();
