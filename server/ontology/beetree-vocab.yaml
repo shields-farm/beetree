@@ -1,0 +1,120 @@
+schema_version: 2026-08-11
+name: beetree-vocab
+version: 1.1.0
+description: >
+  BeeTree spatial + threat ontology. Human-canonical YAML, loaded at boot
+  via js-yaml. The agent's world-model: yard entities, their relations,
+  season frames, threat vocabulary, colony-state taxonomy.
+
+classes:
+  Branch:
+    extends: Site
+    parent_of: [Hive]
+    description: an apiary/yard, a physical location grouping hives.
+  Hive:
+    parent_of: [Box, Colony, Sensor]
+  Box:
+    parent_of: [FrameSlot]
+  FrameSlot: {}
+  Sensor: 
+    emits: [Reading]
+  Reading: {}
+  Colony:
+    headed_by: [Queen]
+    description: the living colony — persists across re-queening and hive moves.
+    inferred_states: [Queenright, Queenless, SwarmPrep, Dwindling, Robbing, Starving]
+  Queen: { events: [Swarm, Supersedure, MatingFlight] }
+  SwarmEvent: { observed_via: [Reading, Inspection] }
+  SeasonWindow:
+    phase: { enum: [Buildup, HoneyFlow, Dearth, WinterCluster] }
+  ThreatSpecies:
+    kind: { enum: [pest, parasite, disease, commensal] }
+    vector_of: [ThreatSpecies]
+  TreatmentPlan: {}
+  Intervention: {}
+
+relations:
+  heads:            { inverse: headedBy }
+  isOn:             { inverse: hosts }
+  emits:            { inverse: emittedBy }
+  detectedIn:       { inverse: hasDetection }
+  descendedFrom:    { inverse: ancestorOf }
+  precedes:         {}
+  vectorOf:         { inverse: vectoredBy }
+  resolvedBy:       {}
+
+season_phase_inference:
+  # middle-GA defaults — site overrideable
+  Buildup:        { months: [1, 2, 3],      mean_temp_band_c: [4, 18] }
+  HoneyFlow:      { months: [3, 4, 5, 6],   mean_temp_band_c: [15, 28] }
+  Dearth:         { months: [7, 8, 9],      mean_temp_band_c: [26, 38] }
+  WinterCluster:  { months: [10, 11, 12, 1], mean_temp_band_c: [-5, 10] }
+
+# alias → canonical ThreatSpecies id — ingestion and agent lookup key.
+threat_aliases:
+  kettlebeetle: shb
+  shb: shb
+  tracheal: tracheal_mites
+  acarapis: tracheal_mites
+  tropi: tropilaelaps
+  tropilaelaps_mite: tropilaelaps
+  varroa: varroa_destructor
+  varroamite: varroa_destructor
+  greater_wax: wax_moths
+  lesser_wax: wax_moths
+  wax_moth: wax_moths
+  foulbrood: afb
+  afb: afb
+  efb: efb
+  chalk: chalkbrood
+  dwv: dwv
+  sack_brood: sbv
+  black_queen: bqcv
+  chronic_bee: cbpv
+  amoeba: malpighamoeba
+  microsporidia: nosemosis
+  thai_sacbrood: tsbv
+
+# Full 31-species known-threat catalog (USDA APHIS honey-bee lists).
+threat_species:
+  - { id: shb,            name: Small hive beetle,           scientific: Aethina tumida,             kind: pest,     notes: "Larvae slime comb; weak colonies at risk." }
+  - { id: wax_moths,      name: Wax moths (greater and lesser), scientific: "Galleria mellonella / Achroia grisella", kind: pest, notes: "Weak/stressed colonies only." }
+  - { id: ants,           name: Ants,                        scientific: Formicidae,                 kind: pest,     notes: "Rob weak colonies." }
+  - { id: roaches,        name: Cockroaches,                 scientific: Blattodea,                  kind: commensal, notes: "Usually commensal." }
+  - { id: earwigs,        name: Earwigs,                     scientific: Forficula auricularia,      kind: commensal, notes: "Usually commensal." }
+  - { id: mice,           name: Mice,                        scientific: Mus musculus,               kind: pest,     notes: "Winter nesting in hives." }
+  - { id: bears,          name: Bears,                       scientific: Ursus americanus,           kind: pest,     notes: "Physical destruction; regional." }
+  - { id: skunks,         name: Skunks,                      scientific: Mephitis mephitis,          kind: pest,     notes: "Scratch entrances, eat bees at night." }
+  - { id: raccoons,       name: Raccoons,                    scientific: Procyon lotor,              kind: pest,     notes: "Hive disturbance." }
+  - { id: birds_bee_eaters, name: Bee-eating birds,         scientific: "Meropidae / Passeridae",    kind: pest,     notes: "Mostly non-US; noted for completeness." }
+  - { id: bots,           name: Bee bots (parasitic phorid fly), scientific: Apocephalus borealis,   kind: parasite, notes: "Zombie fly; emerging threat." }
+  - { id: varroa_destructor, name: Varroa destructor,        scientific: Varroa destructor,          kind: parasite, vectors: [dwv, bqcv, sbv, abpv], notes: "#1 managed-bee threat worldwide." }
+  - { id: tropilaelaps,   name: Tropilaelaps mites,          scientific: Tropilaelaps clareae,       kind: parasite, notes: "Exotic — not established in continental US." }
+  - { id: tracheal_mites, name: Tracheal mites,              scientific: Acarapis woodi,             kind: parasite, notes: "Internal airways." }
+  - { id: nosemosis,      name: Nosema,                      scientific: Nosema ceranae,             kind: parasite, notes: "Gut parasite; N. ceranae dominant in GA." }
+  - { id: malpighamoeba,  name: Amoeba disease,              scientific: Malpighamoeba mellificae,   kind: parasite, notes: "Rare." }
+  - { id: dwv,            name: Deformed wing virus,         scientific: Deformed wing virus,        kind: disease, vectored_by: [varroa_destructor] }
+  - { id: sbv,            name: Sacbrood virus,              scientific: Sacbrood virus,             kind: disease, vectored_by: [varroa_destructor] }
+  - { id: bqcv,           name: Black queen cell virus,      scientific: Black queen cell virus,     kind: disease, vectored_by: [varroa_destructor] }
+  - { id: abpv,           name: Acute bee paralysis virus,   scientific: Acute bee paralysis virus,  kind: disease, vectored_by: [varroa_destructor] }
+  - { id: dvpv,           name: Deformed wing virus B,       scientific: DWV-B,                      kind: disease, vectored_by: [varroa_destructor] }
+  - { id: kbv,            name: Kashmir bee virus,           scientific: Kashmir bee virus,          kind: disease }
+  - { id: cbpv,           name: Chronic bee paralysis virus, scientific: Chronic bee paralysis virus, kind: disease, notes: "Hairless-black syndrome." }
+  - { id: sisp,           name: Slow bee paralysis virus,    scientific: Slow bee paralysis virus,   kind: disease }
+  - { id: cpbv,           name: Cloudy wing virus,           scientific: Cloudy wing virus,          kind: disease }
+  - { id: afb,            name: American foulbrood,          scientific: Paenibacillus larvae,       kind: disease, notifiable: true, notes: "Destroy colony + equipment by law in GA." }
+  - { id: efb,            name: European foulbrood,          scientific: Melissococcus plutonius,    kind: disease, notifiable: true }
+  - { id: chalkbrood,     name: Chalkbrood,                  scientific: Ascosphaera apis,           kind: disease, notes: "Fungal; cold/stress-linked." }
+  - { id: stonebrood,     name: Stonebrood,                  scientific: Aspergillus flavus,         kind: disease }
+  - { id: tsbv,           name: Thai sacbrood virus,         scientific: Thai sacbrood virus,        kind: disease, notes: "Exotic; monitor." }
+  - { id: spiroplasma,    name: May disease (Spiroplasma),   scientific: "Spiroplasma apis / melliferum", kind: disease, notes: "Spring 'May disease'; GA-documented." }
+
+# What the agent SHOULD do when it can't resolve to a defined entity:
+undefined_behavior:
+  alias_miss: "Unknown pest name — agent should checkpoint with user: 'I don't recognize that pest. Did you mean small hive beetle?'"
+  predicate_miss: "Unknown relation type — agent asks which of the defined relations was intended rather than asserting."
+  species_miss: "Species lookup returned nothing — agent states plainly and offers nearest defined species."
+notes: >
+  Catalog sourced from USDA APHIS honey-bee pests/diseases lists; middle-GA
+  framing after Ricigliano et al. 2026 (Trends in Biotechnology 44(1):111-127)
+  + GBA UGA extension context.
