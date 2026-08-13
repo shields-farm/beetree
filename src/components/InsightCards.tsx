@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight, Sparkles, RefreshCw } from 'lucide-react';
+import { ChevronRight, Sparkles } from 'lucide-react';
 import { apiFetch } from '../lib/apiBase';
 
 interface Insight {
@@ -91,25 +91,8 @@ export function InsightCards() {
   const c = COLOR_MAP;
 
   return (
-    <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-card border border-stone-100 dark:border-stone-800 p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <Sparkles size={16} className="text-honey-500" />
-          <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200">AI Insights</h3>
-          <span className="text-[10px] text-stone-400 dark:text-stone-500 bg-stone-100 dark:bg-stone-800 px-1.5 py-0.5 rounded-full">
-            ontology
-          </span>
-        </div>
-        <button
-          onClick={load}
-          className="text-stone-400 hover:text-honey-600 transition-colors"
-          title="Refresh insights"
-        >
-          <RefreshCw size={14} />
-        </button>
-      </div>
-      <div className="space-y-2">
-        {insights.slice(0, 6).map((insight) => {
+    <div className="space-y-2">
+      {insights.slice(0, 8).map((insight) => {
           const colors = c[insight.color] ?? c.stone;
           const link = TYPE_LINK[insight.type] ?? '/';
           return (
@@ -137,7 +120,6 @@ export function InsightCards() {
             </Link>
           );
         })}
-      </div>
     </div>
   );
 }
