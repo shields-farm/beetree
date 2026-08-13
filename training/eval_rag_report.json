@@ -1,0 +1,760 @@
+{
+  "model": "mlx-community/gemma-3-text-12b-it-4bit",
+  "adapter": "/Users/developer/beetree/training/adapters",
+  "method": "RAG + LoRA",
+  "total": 25,
+  "pass": 12,
+  "cases": [
+    {
+      "q": "What is kettlebeetle?",
+      "ok": true,
+      "hits": [
+        "Small hive beetle",
+        "Aethina tumida",
+        "slime"
+      ],
+      "expect": [
+        "Small hive beetle",
+        "Aethina tumida",
+        "slime"
+      ],
+      "completion": "Small hive beetle (Aethina tumida) — pest. Larvae slime comb; weak colonies at risk.",
+      "retrieved": []
+    },
+    {
+      "q": "Tell me about varroa.",
+      "ok": true,
+      "hits": [
+        "Varroa destructor",
+        "parasite",
+        "vector"
+      ],
+      "expect": [
+        "Varroa destructor",
+        "parasite",
+        "vector"
+      ],
+      "completion": "Varroa destructor (Varroa destructor) — parasite. #1 managed-bee threat worldwide. Vectors: Deformed wing virus, Black queen cell virus, Sacbrood virus, Acute bee paralysis virus.",
+      "retrieved": [
+        {
+          "type": "threat",
+          "id": "varroa_destructor"
+        },
+        {
+          "type": "varroa_indicator",
+          "id": "phoretic_mites_visible"
+        }
+      ]
+    },
+    {
+      "q": "What is foulbrood?",
+      "ok": false,
+      "hits": [
+        "foulbrood"
+      ],
+      "expect": [
+        "foulbrood",
+        "notifiable"
+      ],
+      "completion": "American foulbrood (Paenibacillus larvae) — disease. Destroy colony + equipment by law in GA.",
+      "retrieved": [
+        {
+          "type": "threat",
+          "id": "afb"
+        },
+        {
+          "type": "threat",
+          "id": "efb"
+        }
+      ]
+    },
+    {
+      "q": "What is tropi?",
+      "ok": true,
+      "hits": [
+        "Tropilaelaps"
+      ],
+      "expect": [
+        "Tropilaelaps"
+      ],
+      "completion": "Tropilaelaps mites (Tropilaelaps clareae) — parasite. Exotic — not established in continental US.",
+      "retrieved": [
+        {
+          "type": "threat",
+          "id": "tropilaelaps"
+        }
+      ]
+    },
+    {
+      "q": "What season phase is August?",
+      "ok": true,
+      "hits": [
+        "Dearth"
+      ],
+      "expect": [
+        "Dearth"
+      ],
+      "completion": "August falls in the Dearth phase. Typical months: July, August, September. Nectar gap. Robbing risk is high — reduce entrances, avoid open feeding, watch for dwindling colonies.",
+      "retrieved": [
+        {
+          "type": "season_phase",
+          "id": "dearth"
+        },
+        {
+          "type": "season_phase",
+          "id": "buildup"
+        },
+        {
+          "type": "season_phase",
+          "id": "honeyflow"
+        },
+        {
+          "type": "season_phase",
+          "id": "wintercluster"
+        }
+      ]
+    },
+    {
+      "q": "What phase are hives in during March?",
+      "ok": false,
+      "hits": [
+        "Buildup"
+      ],
+      "expect": [
+        "HoneyFlow",
+        "Buildup"
+      ],
+      "completion": "Buildup. Colonies are ramping brood production. Watch for early swarm signs as congestion builds; ensure feed through the gap before the flow.",
+      "retrieved": [
+        {
+          "type": "season_phase",
+          "id": "buildup"
+        },
+        {
+          "type": "season_phase",
+          "id": "honeyflow"
+        },
+        {
+          "type": "season_phase",
+          "id": "dearth"
+        },
+        {
+          "type": "season_phase",
+          "id": "wintercluster"
+        }
+      ]
+    },
+    {
+      "q": "Spotty brood and most of the capped cells are bullet-shaped drone cells.",
+      "ok": false,
+      "hits": [
+        "drone"
+      ],
+      "expect": [
+        "DroneLayer",
+        "drone"
+      ],
+      "completion": "Bullet-shaped drone cappings = drones being raised in worker cells because there are no worker larvae to fill the normal spots. Means only unfertilized eggs are being laid. Distinguish drone-laying queen vs laying workers:\n- Single egg per cell, orderly pattern → drone-laying queen\n- Multiple eggs p",
+      "retrieved": [
+        {
+          "type": "brood_pattern",
+          "id": "spotty_drone_dominant"
+        },
+        {
+          "type": "brood_pattern",
+          "id": "spotty_mixed"
+        },
+        {
+          "type": "brood_pattern",
+          "id": "drone_only_pupal"
+        },
+        {
+          "type": "comb_condition",
+          "id": "drone_comb_in_worker_area"
+        },
+        {
+          "type": "queen_pattern",
+          "id": "swarm_cells"
+        }
+      ]
+    },
+    {
+      "q": "The brood is solid and fully capped across the frame.",
+      "ok": false,
+      "hits": [],
+      "expect": [
+        "Queenright",
+        "90"
+      ],
+      "completion": "Healthy brood. Good queen, good nutrition. Note as positive finding.",
+      "retrieved": [
+        {
+          "type": "brood_pattern",
+          "id": "solid_capped"
+        },
+        {
+          "type": "brood_pattern",
+          "id": "solid_scattered_uncapped"
+        },
+        {
+          "type": "comb_condition",
+          "id": "cross_comb"
+        }
+      ]
+    },
+    {
+      "q": "The brood is spotty — lots of empty cells mixed with capped and uncapped.",
+      "ok": true,
+      "hits": [
+        "differential",
+        "Varroa",
+        "queen"
+      ],
+      "expect": [
+        "differential",
+        "Varroa",
+        "queen"
+      ],
+      "completion": "Differential diagnosis — do NOT jump to a conclusion. Check: (1) Varroa: alcohol wash or sugar shake. High mite load + spotty brood = virus. (2) Queen: look for eggs. No eggs + spotty = queen failing or gone. (3) Disease: smell (AFB = rotten), rope test, check for chalkbrood mummies. (4) Pesticide: ",
+      "retrieved": [
+        {
+          "type": "brood_pattern",
+          "id": "spotty_mixed"
+        },
+        {
+          "type": "brood_pattern",
+          "id": "spotty_drone_dominant"
+        },
+        {
+          "type": "comb_condition",
+          "id": "distorted_cells"
+        },
+        {
+          "type": "varroa_indicator",
+          "id": "parasitic_mite_syndrome"
+        }
+      ]
+    },
+    {
+      "q": "Brood is only in the center of the frame — tight cluster, nothing at the edges.",
+      "ok": false,
+      "hits": [],
+      "expect": [
+        "center",
+        "Queenright",
+        "Dwindling"
+      ],
+      "completion": "Small colony or cold-weather contraction. Season-dependent: normal in winter/early spring (cluster contraction), suggests small colony or stress if in active season. Check: colony size vs neighbors, food stores, varroa load.",
+      "retrieved": [
+        {
+          "type": "brood_pattern",
+          "id": "center_cluster_only"
+        },
+        {
+          "type": "brood_pattern",
+          "id": "peripheral_brood"
+        },
+        {
+          "type": "brood_pattern",
+          "id": "solid_capped"
+        },
+        {
+          "type": "brood_pattern",
+          "id": "drone_only_pupal"
+        },
+        {
+          "type": "deadout_pattern",
+          "id": "dead_queen_only"
+        }
+      ]
+    },
+    {
+      "q": "This comb is black — really old.",
+      "ok": true,
+      "hits": [
+        "Replace",
+        "old",
+        "narrow"
+      ],
+      "expect": [
+        "Replace",
+        "old",
+        "narrow"
+      ],
+      "completion": "Black comb — very old, cells significantly narrowed, heavy cocoon and propolis buildup. Replace immediately. This comb is overdue and potentially harmful to colony health. Render the wax (or discard if treated with acaricides) and replace with new foundation or a clean drawn frame.",
+      "retrieved": [
+        {
+          "type": "comb_condition",
+          "id": "black_old"
+        },
+        {
+          "type": "varroa_indicator",
+          "id": "hairless_black_bees"
+        },
+        {
+          "type": "threat",
+          "id": "bqcv"
+        }
+      ]
+    },
+    {
+      "q": "The comb is dark brown — been in the hive a while.",
+      "ok": false,
+      "hits": [
+        "Rotate"
+      ],
+      "expect": [
+        "Rotate",
+        "dark_brown"
+      ],
+      "completion": "Dark brown comb — many brood cycles, cocoons built up, cells slightly smaller. Rotate out this season. Move to the outside of the brood box or replace with new foundation/frame.",
+      "retrieved": [
+        {
+          "type": "comb_condition",
+          "id": "dark_brown"
+        },
+        {
+          "type": "comb_condition",
+          "id": "golden_medium"
+        },
+        {
+          "type": "varroa_indicator",
+          "id": "hairless_black_bees"
+        },
+        {
+          "type": "varroa_indicator",
+          "id": "phoretic_mites_visible"
+        },
+        {
+          "type": "deadout_pattern",
+          "id": "nosema_dysentery"
+        }
+      ]
+    },
+    {
+      "q": "How often should I rotate my brood comb?",
+      "ok": false,
+      "hits": [],
+      "expect": [
+        "3-4 years",
+        "12-16",
+        "cocoon"
+      ],
+      "completion": "Brood comb rotation is not mentioned in the ontology. Do you have another question?",
+      "retrieved": []
+    },
+    {
+      "q": "There's webbing and tunnels in the comb — looks like wax moth.",
+      "ok": true,
+      "hits": [
+        "wax moth",
+        "Remove",
+        "weak"
+      ],
+      "expect": [
+        "wax moth",
+        "Remove",
+        "weak"
+      ],
+      "completion": "Silken webbing, tunnels through comb, larvae visible. Comb is being destroyed. Remove affected frames immediately. If salvageable, freeze the frame for 48 hours to kill larvae, then clean out webbing. If too far gone, discard. Wax moths attack weak/stressed colonies and stored comb. A strong colony ",
+      "retrieved": [
+        {
+          "type": "comb_condition",
+          "id": "wax_moth_damage"
+        },
+        {
+          "type": "threat",
+          "id": "wax_moths"
+        },
+        {
+          "type": "comb_condition",
+          "id": "white_new"
+        },
+        {
+          "type": "comb_condition",
+          "id": "burr_comb"
+        },
+        {
+          "type": "comb_condition",
+          "id": "brace_comb"
+        }
+      ]
+    },
+    {
+      "q": "Lots of burr comb on these frames — is this genetic?",
+      "ok": false,
+      "hits": [
+        "space",
+        "genetics"
+      ],
+      "expect": [
+        "space",
+        "genetics",
+        "scrape"
+      ],
+      "completion": "Some lines are just comb-happy — they build wax constantly regardless of space. Check if the colony needs more space (add a box, pull honey frames). If the colony is a chronic comb-builder across seasons, note the genetics — you may not want to raise queens from this line.",
+      "retrieved": [
+        {
+          "type": "comb_condition",
+          "id": "burr_comb"
+        }
+      ]
+    },
+    {
+      "q": "I see queen cells along the bottom edge of the frames, multiple peanut-shaped ones.",
+      "ok": true,
+      "hits": [
+        "SwarmPrep",
+        "swarm",
+        "split"
+      ],
+      "expect": [
+        "SwarmPrep",
+        "swarm",
+        "split"
+      ],
+      "completion": "SwarmPrep. The colony is preparing to swarm. ACTION NEEDED: Artificial swarm (split the colony) before they swarm naturally and you lose half your bees. If cells are capped, you have ~days before the swarm departs. Destroying cells does NOT stop swarming — they'll build more. You must give them more",
+      "retrieved": [
+        {
+          "type": "queen_pattern",
+          "id": "swarm_cells"
+        },
+        {
+          "type": "queen_pattern",
+          "id": "supersedure_cells"
+        },
+        {
+          "type": "queen_pattern",
+          "id": "queen_cups_empty"
+        },
+        {
+          "type": "brood_pattern",
+          "id": "solid_capped"
+        },
+        {
+          "type": "brood_pattern",
+          "id": "spotty_drone_dominant"
+        }
+      ]
+    },
+    {
+      "q": "There are a couple queen cells on the face of the frame, not the bottom edge.",
+      "ok": false,
+      "hits": [
+        "DO NOT",
+        "Let"
+      ],
+      "expect": [
+        "supersedure",
+        "DO NOT",
+        "Let"
+      ],
+      "completion": "Normal age-cohort replacement. The colony is replacing its queen — she may be old, failing, or poorly mated. This is normal and healthy. DO NOT destroy these cells. Let the new queen emerge, mate, and take over. Check back in <start_of_turn>weeks for eggs from the new queen.",
+      "retrieved": [
+        {
+          "type": "queen_pattern",
+          "id": "supersedure_cells"
+        },
+        {
+          "type": "queen_pattern",
+          "id": "swarm_cells"
+        },
+        {
+          "type": "brood_pattern",
+          "id": "peripheral_brood"
+        },
+        {
+          "type": "queen_pattern",
+          "id": "queen_not_found_eggs_present"
+        },
+        {
+          "type": "queen_pattern",
+          "id": "queen_not_found_no_eggs"
+        }
+      ]
+    },
+    {
+      "q": "Multiple eggs per cell and some eggs on the cell walls.",
+      "ok": false,
+      "hits": [
+        "Combine"
+      ],
+      "expect": [
+        "LayingWorkers",
+        "Combine"
+      ],
+      "completion": "Laying workers. Worker bees laying unfertilized eggs in absence of a queen. Multiple eggs per cell and eggs on cell walls (not the base) are diagnostic — a real queen lays one egg per cell, centered. Requeening almost always fails (workers reject the queen). Combine with a stronger colony or shake o",
+      "retrieved": [
+        {
+          "type": "queen_pattern",
+          "id": "eggs_present_multiple_per_cell"
+        },
+        {
+          "type": "queen_pattern",
+          "id": "eggs_present_single"
+        },
+        {
+          "type": "queen_pattern",
+          "id": "queen_not_found_eggs_present"
+        },
+        {
+          "type": "brood_pattern",
+          "id": "drone_only_pupal"
+        },
+        {
+          "type": "comb_condition",
+          "id": "distorted_cells"
+        }
+      ]
+    },
+    {
+      "q": "I can't find the queen but there are single eggs in the cells.",
+      "ok": false,
+      "hits": [
+        "eggs",
+        "3 days"
+      ],
+      "expect": [
+        "Queenright",
+        "eggs",
+        "3 days"
+      ],
+      "completion": "Don't panic — queens are hard to spot, especially in a populous hive. Eggs present = she was here within 3 days. Mark this frame so you know where she was. Try again next inspection or don't worry — the eggs confirm she's there.",
+      "retrieved": [
+        {
+          "type": "queen_pattern",
+          "id": "queen_not_found_eggs_present"
+        },
+        {
+          "type": "queen_pattern",
+          "id": "queen_not_found_no_eggs"
+        },
+        {
+          "type": "queen_pattern",
+          "id": "eggs_present_single"
+        },
+        {
+          "type": "queen_pattern",
+          "id": "queen_spotted_unmarked"
+        },
+        {
+          "type": "queen_pattern",
+          "id": "virgin_queen"
+        }
+      ]
+    },
+    {
+      "q": "I see queen cups on the bottom bars but they're empty — no eggs.",
+      "ok": true,
+      "hits": [
+        "queen cups",
+        "NOT",
+        "empty"
+      ],
+      "expect": [
+        "queen cups",
+        "NOT",
+        "empty"
+      ],
+      "completion": "This indicates Queenright. (85% confidence) Queen cups are play cups — workers drawing them on the bottom bars as a normal spring behavior. EMPTY queen cups are harmless. They do not mean the colony is going to swarm. The key distinction: a queen cup becomes a queen cell only when an egg is laid in ",
+      "retrieved": [
+        {
+          "type": "queen_pattern",
+          "id": "queen_cups_empty"
+        },
+        {
+          "type": "queen_pattern",
+          "id": "queen_not_found_eggs_present"
+        },
+        {
+          "type": "queen_pattern",
+          "id": "queen_not_found_no_eggs"
+        },
+        {
+          "type": "queen_pattern",
+          "id": "virgin_queen"
+        },
+        {
+          "type": "queen_pattern",
+          "id": "no_queen_no_eggs_no_cells"
+        }
+      ]
+    },
+    {
+      "q": "I'm seeing bees with shriveled, crumpled wings coming out of the cells.",
+      "ok": true,
+      "hits": [
+        "DWV",
+        "varroa",
+        "treat"
+      ],
+      "expect": [
+        "DWV",
+        "varroa",
+        "treat"
+      ],
+      "completion": "Deformed Wing Virus (DWV) — vectored by varroa. DWV symptoms mean high varroa load has been present for weeks. The virus causes wing deformity and reduced lifespan. ACTION: treat for varroa immediately. If during honey flow, use a treatment that doesn'<start_of_turn>\n<start_of_turn>\n<start_of_turn>\n",
+      "retrieved": [
+        {
+          "type": "varroa_indicator",
+          "id": "deformed_wings"
+        },
+        {
+          "type": "varroa_indicator",
+          "id": "k_wing"
+        },
+        {
+          "type": "varroa_indicator",
+          "id": "parasitic_mite_syndrome"
+        },
+        {
+          "type": "deadout_pattern",
+          "id": "pesticide_tongues_out"
+        }
+      ]
+    },
+    {
+      "q": "Varroa mites visible on the backs of adult bees — small brown discs.",
+      "ok": true,
+      "hits": [
+        "phoretic",
+        "treat",
+        "5%"
+      ],
+      "expect": [
+        "phoretic",
+        "treat",
+        "5%"
+      ],
+      "completion": "That's textbook Varroa destructor. Seeing mites on adult bees means the colony is heavily infested — by the time mites are phoretic and visible, the load is typically >5%. Treat immediately. Do an alcohol wash to confirm the count and document for your records.",
+      "retrieved": [
+        {
+          "type": "threat",
+          "id": "varroa_destructor"
+        },
+        {
+          "type": "varroa_indicator",
+          "id": "phoretic_mites_visible"
+        },
+        {
+          "type": "varroa_indicator",
+          "id": "no_visible_symptoms"
+        },
+        {
+          "type": "comb_condition",
+          "id": "dark_brown"
+        },
+        {
+          "type": "brood_pattern",
+          "id": "drone_only_pupal"
+        }
+      ]
+    },
+    {
+      "q": "My hive died — dead bees head-first in empty cells, no honey left.",
+      "ok": false,
+      "hits": [
+        "Starvation"
+      ],
+      "expect": [
+        "Starvation",
+        "starved",
+        "stores"
+      ],
+      "completion": "Starvation. Bees crawled into cells looking for food and died there. The colony ran out of honey. Check heft going into winter; feed syrup (2:1) in fall until they won't take more. Emergency fondant in winter if heft is light.",
+      "retrieved": [
+        {
+          "type": "deadout_pattern",
+          "id": "starved_headfirst"
+        },
+        {
+          "type": "deadout_pattern",
+          "id": "absconded"
+        },
+        {
+          "type": "deadout_pattern",
+          "id": "robbing_destroyed"
+        },
+        {
+          "type": "brood_pattern",
+          "id": "spotty_mixed"
+        },
+        {
+          "type": "brood_pattern",
+          "id": "absent"
+        }
+      ]
+    },
+    {
+      "q": "Big pile of dead bees at the entrance with their tongues sticking out.",
+      "ok": false,
+      "hits": [
+        "pesticide"
+      ],
+      "expect": [
+        "pesticide",
+        "tongues"
+      ],
+      "completion": "Pesticide poisoning. Acute exposure — bees died returning from foraging. Check with neighbors about recent spraying. Report to your state agricultural department if warranted. Move hives if exposure is chronic. The colony may recover if the queen survived and enough bees remain — check in a few days",
+      "retrieved": [
+        {
+          "type": "deadout_pattern",
+          "id": "pesticide_tongues_out"
+        },
+        {
+          "type": "deadout_pattern",
+          "id": "starved_headfirst"
+        },
+        {
+          "type": "deadout_pattern",
+          "id": "dead_queen_only"
+        },
+        {
+          "type": "deadout_pattern",
+          "id": "absconded"
+        },
+        {
+          "type": "deadout_pattern",
+          "id": "robbing_destroyed"
+        }
+      ]
+    },
+    {
+      "q": "Hive is empty, no dead bees, but there's brood left behind and some honey.",
+      "ok": true,
+      "hits": [
+        "Absconding",
+        "left",
+        "stress"
+      ],
+      "expect": [
+        "Absconding",
+        "left",
+        "stress"
+      ],
+      "completion": "Absconding. The entire colony left — usually due to stress (mites, predators, disturbance, starvation). Absconding is common with packages or small colonies under severe stress (varroa, small hive beetle pressure, pesticide, or even repeated disturbance). The brood left behind tells you they left in",
+      "retrieved": [
+        {
+          "type": "deadout_pattern",
+          "id": "absconded"
+        },
+        {
+          "type": "deadout_pattern",
+          "id": "starved_headfirst"
+        },
+        {
+          "type": "deadout_pattern",
+          "id": "robbing_destroyed"
+        },
+        {
+          "type": "brood_pattern",
+          "id": "spotty_mixed"
+        },
+        {
+          "type": "brood_pattern",
+          "id": "peripheral_brood"
+        }
+      ]
+    }
+  ]
+}

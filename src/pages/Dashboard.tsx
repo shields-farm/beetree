@@ -12,6 +12,7 @@ import { API_BASE, apiFetch } from '../lib/apiBase';
 import { TelemetryTab } from '../components/TelemetryTab';
 import { getPestPrefs, filterTreatments } from '../lib/pestPrefs';
 import { useAnomalies } from '../lib/useAnomalies';
+import { InsightCards } from '../components/InsightCards';
 
 // ─── Types (mirror server modules) ───────────────────────────────────────────
 interface ForageFlow {
@@ -233,6 +234,9 @@ export function Dashboard() {
       {/* ── NOW tab ─────────────────────────────────────────────────────── */}
       {tab === 'now' && (
         <div className="space-y-5">
+          {/* AI Insight Cards — ontology-grounded */}
+          <InsightCards />
+
           {/* It's Time To... */}
           <div className="space-y-3">
             {topAlert ? (
