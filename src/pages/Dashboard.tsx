@@ -92,10 +92,11 @@ function checkLowStores(hives: any[], inspections: any[]): { hiveName: string; h
 }
 
 // ─── Tabs ────────────────────────────────────────────────────────────────────
-type TabId = 'now' | 'telemetry' | 'hives';
+type TabId = 'now' | 'alerts' | 'telemetry' | 'hives';
 
 const TABS: { id: TabId; label: string; icon: typeof Activity }[] = [
   { id: 'now', label: 'Now', icon: Clock },
+  { id: 'alerts', label: 'Alerts', icon: AlertTriangle },
   { id: 'telemetry', label: 'Telemetry', icon: Thermometer },
   { id: 'hives', label: 'Hives', icon: Boxes },
 ];
@@ -231,12 +232,19 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* ── NOW tab ─────────────────────────────────────────────────────── */}
+      {/* ── NOW tab — AI insights only ─────────────────────────────────── */}
       {tab === 'now' && (
         <div className="space-y-5">
-          {/* AI Insight Cards — ontology-grounded */}
           <InsightCards />
+          <div className="pt-1">
+            <AskAIButton prompt="What should I focus on right now? Give me the short version." label="Ask Buzz" />
+          </div>
+        </div>
+      )}
 
+      {/* ── ALERTS tab — heuristic alerts + pillar cards ────────────────── */}
+      {tab === 'alerts' && (
+        <div className="space-y-5">
           {/* It's Time To... */}
           <div className="space-y-3">
             {topAlert ? (
@@ -391,11 +399,6 @@ export function Dashboard() {
                 <PillarLine text="No active pest concerns" check />
               )}
             </PillarCard>
-          </div>
-
-          {/* Ask Buzz */}
-          <div className="pt-1">
-            <AskAIButton prompt="What should I focus on right now? Give me the short version." label="Ask Buzz" />
           </div>
         </div>
       )}
