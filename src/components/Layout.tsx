@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Hexagon, Settings as SettingsIcon } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { BottomNav } from './BottomNav';
@@ -9,6 +9,17 @@ import { useStore } from '../store/useStore';
 
 function RefreshableContent({ children }: { children: ReactNode }) {
   const { syncFromServer } = useStore();
+  const location = useLocation();
+  // Don't wrap chat in pull-to-refresh — it interferes with scrolling messages
+  const isChat = location.pathname === '/chat';
+  if (isChat) {
+    return (
+      <>
+        <ApiKeyBanner />
+        {children}
+      </>
+    );
+  }
   return (
     <PullToRefresh onRefresh={syncFromServer}>
       <ApiKeyBanner />
