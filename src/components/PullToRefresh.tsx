@@ -44,22 +44,33 @@ export function PullToRefresh({ children, onRefresh }: PullToRefreshProps) {
     const handleTouchStart = (e: TouchEvent) => {
       if (refreshingRef.current || !isAtTop()) return;
       startY.current = e.touches[0].clientY;
-      pulling.current = true;
+      pulling.current = true;  // armed — actual pull confirmed in touchmove
     };
 
     const handleTouchMove = (e: TouchEvent) => {
       if (!pulling.current || refreshingRef.current) return;
       const delta = e.touches[0].clientY - startY.current;
+
+      // Scrolling content up (finger moving down) = negative delta from initial
+      // If user drags down (positive delta) we pull-refresh.
+      // If user drags up (negative delta) we release and let native scroll work.
       if (delta <= 0) {
         if (pullDistRef.current > 0) setPullDist(0);
+        pulling.current = false;
         return;
       }
-      // Prevent native scroll/refresh — requires passive: false
-      if (delta > 4 && isAtTop()) {
+
+      // Only intercept the scroll once we're committed to a pull gesture
+      // (delta > 10px past the start point while at top).
+      // This lets normal scrolling work even when the page is at scrollTop=0.
+      if (isAtTop() && delta > 10) {
         e.preventDefault();
+        const resisted = Math.min(delta * RESISTANCE, MAX_PULL);
+        setPullDist(resisted);
+      } else {
+        // Not at top, or small delta — let native scroll handle it
+        pulling.current = false;
       }
-      const resisted = Math.min(delta * RESISTANCE, MAX_PULL);
-      setPullDist(resisted);
     };
 
     const handleTouchEnd = async () => {
