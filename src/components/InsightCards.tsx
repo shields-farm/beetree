@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight, Sparkles } from 'lucide-react';
+import { ChevronRight, AlertTriangle, Thermometer, Bug, Crown, Flower2, Calendar, Activity, CloudRain } from 'lucide-react';
 import { apiFetch } from '../lib/apiBase';
 
 interface Insight {
@@ -20,19 +20,22 @@ interface InsightsResponse {
   season: string;
 }
 
-const COLOR_MAP: Record<string, { bg: string; border: string; text: string; dot: string }> = {
-  red: { bg: 'bg-red-50 dark:bg-red-950', border: 'border-red-200 dark:border-red-800', text: 'text-red-700 dark:text-red-300', dot: 'bg-red-500' },
-  amber: { bg: 'bg-amber-50 dark:bg-amber-950', border: 'border-amber-200 dark:border-amber-800', text: 'text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' },
-  orange: { bg: 'bg-orange-50 dark:bg-orange-950', border: 'border-orange-200 dark:border-orange-800', text: 'text-orange-700 dark:text-orange-300', dot: 'bg-orange-500' },
-  emerald: { bg: 'bg-emerald-50 dark:bg-emerald-950', border: 'border-emerald-200 dark:border-emerald-800', text: 'text-emerald-700 dark:text-emerald-300', dot: 'bg-emerald-500' },
-  sky: { bg: 'bg-sky-50 dark:bg-sky-950', border: 'border-sky-200 dark:border-sky-800', text: 'text-sky-700 dark:text-sky-300', dot: 'bg-sky-500' },
-  stone: { bg: 'bg-stone-50 dark:bg-stone-900', border: 'border-stone-200 dark:border-stone-800', text: 'text-stone-700 dark:text-stone-300', dot: 'bg-stone-500' },
+// Type → icon + accent color (matches our insight products' pattern)
+const TYPE_CONFIG: Record<string, { icon: typeof Activity; accent: string; accentSoft: string }> = {
+  season:    { icon: Flower2,     accent: '#f59e0b', accentSoft: 'rgba(245,158,11,0.12)' },
+  forage:    { icon: Flower2,     accent: '#50c17b', accentSoft: 'rgba(80,193,123,0.12)' },
+  swarm:     { icon: AlertTriangle, accent: '#ef4444', accentSoft: 'rgba(239,68,68,0.12)' },
+  schedule:  { icon: Calendar,    accent: '#0a84ff', accentSoft: 'rgba(10,132,255,0.12)' },
+  colony:    { icon: Crown,       accent: '#a855f7', accentSoft: 'rgba(168,85,247,0.12)' },
+  weather:   { icon: CloudRain,   accent: '#38bdf8', accentSoft: 'rgba(56,189,248,0.12)' },
+  sensor:    { icon: Thermometer, accent: '#ff9f0a', accentSoft: 'rgba(255,159,10,0.12)' },
+  treatment: { icon: Bug,         accent: '#ff453a', accentSoft: 'rgba(255,69,58,0.12)' },
 };
 
-const PRIORITY_BORDER: Record<string, string> = {
-  urgent: 'border-l-4 border-l-red-500',
-  warning: 'border-l-4 border-l-amber-500',
-  info: 'border-l-4 border-l-stone-300 dark:border-l-stone-700',
+const PRIORITY_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
+  urgent:   { label: 'URGENT',  bg: 'rgba(239,68,68,0.15)',  text: '#ef4444' },
+  warning:  { label: 'WATCH',   bg: 'rgba(245,158,11,0.15)', text: '#f59e0b' },
+  info:     { label: '',        bg: '',                      text: '' },
 };
 
 const TYPE_LINK: Record<string, string> = {
@@ -70,16 +73,18 @@ export function InsightCards() {
 
   if (loading) {
     return (
-      <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-card border border-stone-100 dark:border-stone-800 p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Sparkles size={16} className="text-honey-500" />
-          <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200">AI Insights</h3>
-        </div>
-        <div className="space-y-2">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-16 rounded-xl bg-stone-100 dark:bg-stone-800 animate-pulse" />
-          ))}
-        </div>
+      <div className="space-y-2.5">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="bg-white dark:bg-slate-900 rounded-2xl border border-stone-100 dark:border-slate-800 p-3.5 animate-pulse">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-stone-100 dark:bg-slate-800" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3 w-32 rounded bg-stone-100 dark:bg-slate-800" />
+                <div className="h-2.5 w-48 rounded bg-stone-100 dark:bg-slate-800" />
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
@@ -88,38 +93,72 @@ export function InsightCards() {
     return null;
   }
 
-  const c = COLOR_MAP;
-
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       {insights.slice(0, 8).map((insight) => {
-          const colors = c[insight.color] ?? c.stone;
-          const link = TYPE_LINK[insight.type] ?? '/';
-          return (
-            <Link
-              key={insight.id}
-              to={link}
-              className={`block ${PRIORITY_BORDER[insight.priority] ?? PRIORITY_BORDER.info} ${colors.bg} ${colors.border} border rounded-xl p-3 hover:shadow-sm transition-all`}
-            >
-              <div className="flex items-start gap-2">
-                <span className="text-lg shrink-0 leading-5">{insight.emoji}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs font-semibold ${colors.text}`}>{insight.title}</span>
-                    {insight.priority === 'urgent' && (
-                      <span className="text-[9px] font-bold uppercase text-red-600 dark:text-red-400">urgent</span>
-                    )}
-                  </div>
-                  <p className="text-xs text-stone-600 dark:text-stone-300 mt-0.5 truncate">{insight.summary}</p>
-                  {insight.detail && (
-                    <p className="text-[11px] text-stone-400 dark:text-stone-500 mt-0.5 line-clamp-2">{insight.detail}</p>
+        const tc = TYPE_CONFIG[insight.type] ?? TYPE_CONFIG.sensor;
+        const pc = PRIORITY_CONFIG[insight.priority] ?? PRIORITY_CONFIG.info;
+        const link = TYPE_LINK[insight.type] ?? '/';
+        const Icon = tc.icon;
+
+        return (
+          <Link
+            key={insight.id}
+            to={link}
+            className="group relative block bg-white dark:bg-slate-900 rounded-2xl border border-stone-100 dark:border-slate-800 overflow-hidden transition-all hover:shadow-md hover:border-stone-200 dark:hover:border-slate-700 hover:-translate-y-px"
+            style={{ paddingLeft: '20px' }}
+          >
+            {/* Left accent bar — colored by type */}
+            <div
+              className="absolute left-0 top-0 bottom-0 w-[5px] transition-all group-hover:w-[6px]"
+              style={{ background: tc.accent }}
+            />
+
+            <div className="flex items-start gap-3 p-3.5">
+              {/* Icon in a soft-colored rounded square */}
+              <div
+                className="shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105"
+                style={{ background: tc.accentSoft }}
+              >
+                <Icon size={17} style={{ color: tc.accent }} strokeWidth={2.2} />
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-[13px] font-bold text-stone-800 dark:text-slate-100 truncate">
+                    {insight.title}
+                  </span>
+                  {pc.label && (
+                    <span
+                      className="text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md shrink-0"
+                      style={{ background: pc.bg, color: pc.text }}
+                    >
+                      {pc.label}
+                    </span>
                   )}
                 </div>
-                <ChevronRight size={14} className="text-stone-300 dark:text-stone-600 shrink-0 mt-0.5" />
+
+                <p className="text-[12.5px] text-stone-600 dark:text-slate-300 leading-snug">
+                  {insight.summary}
+                </p>
+
+                {insight.detail && (
+                  <p className="text-[11px] text-stone-400 dark:text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                    {insight.detail}
+                  </p>
+                )}
               </div>
-            </Link>
-          );
-        })}
+
+              {/* Chevron */}
+              <ChevronRight
+                size={16}
+                className="shrink-0 mt-1 text-stone-300 dark:text-slate-600 transition-all group-hover:text-stone-500 dark:group-hover:text-slate-400 group-hover:translate-x-0.5"
+              />
+            </div>
+          </Link>
+        );
+      })}
     </div>
   );
 }
