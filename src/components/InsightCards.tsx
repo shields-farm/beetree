@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ChevronRight, AlertTriangle, Thermometer, Bug, Crown, Flower2, Calendar, Activity, CloudRain } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ChevronRight, AlertTriangle, Thermometer, Bug, Crown, Flower2, Calendar, Activity, CloudRain, MessageCircle } from 'lucide-react';
 import { apiFetch } from '../lib/apiBase';
 
 interface Insight {
@@ -20,16 +20,16 @@ interface InsightsResponse {
   season: string;
 }
 
-// Type → icon + accent color (matches our insight products' pattern)
+// Type → icon + accent color
 const TYPE_CONFIG: Record<string, { icon: typeof Activity; accent: string; accentSoft: string }> = {
-  season:    { icon: Flower2,     accent: '#f59e0b', accentSoft: 'rgba(245,158,11,0.12)' },
-  forage:    { icon: Flower2,     accent: '#50c17b', accentSoft: 'rgba(80,193,123,0.12)' },
+  season:    { icon: Flower2,       accent: '#f59e0b', accentSoft: 'rgba(245,158,11,0.12)' },
+  forage:    { icon: Flower2,       accent: '#50c17b', accentSoft: 'rgba(80,193,123,0.12)' },
   swarm:     { icon: AlertTriangle, accent: '#ef4444', accentSoft: 'rgba(239,68,68,0.12)' },
-  schedule:  { icon: Calendar,    accent: '#0a84ff', accentSoft: 'rgba(10,132,255,0.12)' },
-  colony:    { icon: Crown,       accent: '#a855f7', accentSoft: 'rgba(168,85,247,0.12)' },
-  weather:   { icon: CloudRain,   accent: '#38bdf8', accentSoft: 'rgba(56,189,248,0.12)' },
-  sensor:    { icon: Thermometer, accent: '#ff9f0a', accentSoft: 'rgba(255,159,10,0.12)' },
-  treatment: { icon: Bug,         accent: '#ff453a', accentSoft: 'rgba(255,69,58,0.12)' },
+  schedule:  { icon: Calendar,      accent: '#0a84ff', accentSoft: 'rgba(10,132,255,0.12)' },
+  colony:    { icon: Crown,          accent: '#a855f7', accentSoft: 'rgba(168,85,247,0.12)' },
+  weather:   { icon: CloudRain,     accent: '#38bdf8', accentSoft: 'rgba(56,189,248,0.12)' },
+  sensor:    { icon: Thermometer,   accent: '#ff9f0a', accentSoft: 'rgba(255,159,10,0.12)' },
+  treatment: { icon: Bug,           accent: '#ff453a', accentSoft: 'rgba(255,69,58,0.12)' },
 };
 
 const PRIORITY_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
@@ -49,10 +49,23 @@ const TYPE_LINK: Record<string, string> = {
   season: '/',
 };
 
+// Per-type prompt templates for "Ask Buzz"
+const TYPE_PROMPT: Record<string, (i: Insight) => string> = {
+  season:   (i) => `We're in ${i.title} season (${i.summary}). What should I be doing right now as a beekeeper in Middle Georgia?`,
+  forage:   (i) => `Current forage: ${i.summary}. ${i.detail}. How should I manage supers and colony nutrition during this flow?`,
+  swarm:    (i) => `I have swarm risk on: ${i.summary}. ${i.detail}. What's my action plan to prevent swarming?`,
+  schedule: (i) => `I have overdue inspections: ${i.summary}. ${i.detail}. What should I prioritize checking when I open these hives?`,
+  colony:   (i) => `Colony status: ${i.summary}. ${i.detail}. What does this confidence level mean and how should I verify the colony state?`,
+  weather:  (i) => `Weather window: ${i.summary}. ${i.detail}. Is it safe to inspect right now? What conditions should I watch for?`,
+  sensor:   (i) => `Sensor alert: ${i.summary}. ${i.detail}. What could cause this and how do I troubleshoot the sensor?`,
+  treatment:(i) => `Treatment needed: ${i.summary}. ${i.detail}. What treatment protocol should I follow and when?`,
+};
+
 export function InsightCards() {
   const [insights, setInsights] = useState<Insight[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const navigate = useNavigate();
 
   const load = async () => {
     setLoading(true);
@@ -70,6 +83,14 @@ export function InsightCards() {
   useEffect(() => {
     load();
   }, []);
+
+  const askBuzz = (insight: Insight, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const promptFn = TYPE_PROMPT[insight.type];
+    const prompt = promptFn ? promptFn(insight) : `Tell me about: ${insight.title}. ${insight.summary} ${insight.detail}`;
+    navigate('/chat', { state: { initialPrompt: prompt } });
+  };
 
   if (loading) {
     return (
@@ -148,6 +169,20 @@ export function InsightCards() {
                     {insight.detail}
                   </p>
                 )}
+
+                {/* Ask Buzz button */}
+                <button
+                  onClick={(e) => askBuzz(insight, e)}
+                  className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                  style={{
+                    color: tc.accent,
+                    borderColor: `${tc.accent}40`,
+                    background: tc.accentSoft,
+                  }}
+                >
+                  <MessageCircle size={11} strokeWidth={2.2} />
+                  Ask Buzz
+                </button>
               </div>
 
               {/* Chevron */}
