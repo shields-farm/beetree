@@ -24,6 +24,7 @@ const Equipment = lazy(() => import('./pages/Equipment').then(m => ({ default: m
 const Hardware = lazy(() => import('./pages/Hardware').then(m => ({ default: m.Hardware })));
 const ChatPage = lazy(() => import('./pages/ChatPage').then(m => ({ default: m.ChatPage })));
 const ActivityLog = lazy(() => import('./pages/ActivityLog').then(m => ({ default: m.ActivityLog })));
+const World = lazy(() => import('./pages/World').then(m => ({ default: m.World })));
 
 import { useParams } from 'react-router-dom';
 function HiveDetailPage() {
@@ -118,6 +119,7 @@ export default function App() {
             <Route path="/hardware" element={<Hardware />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/activity" element={<ActivityLog />} />
+            <Route path="/world" element={<World />} />
           </Routes>
           </Suspense>
           </Layout>
