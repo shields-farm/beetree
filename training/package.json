@@ -1,0 +1,15 @@
+{
+  "name": "training",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/three": "^0.185.4"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "3d-force-graph": "^1.80.0",
+    "three": "^0.185.1"
+  }
+}

@@ -2651,6 +2651,71 @@ app.post('/api/chat', async (req, res) => {
 // ============================================================================
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
 
+// ============================================================================
+// On-device inference (RAG + LoRA)
+// Proxies to Python inference server on port 3002.
+// Start it: .venvs/beetree-train/bin/python training/inference_server.py
+// ============================================================================
+const INFER_URL = process.env.BEETREE_INFER_URL || 'http://127.0.0.1:3002';
+
+app.post('/api/assist', async (req, res) => {
+  try {
+    const { query, max_tokens } = req.body || {};
+    if (!query || typeof query !== 'string') {
+      return res.status(400).json({ error: 'query string is required' });
+    }
+    const r = await fetch(`${INFER_URL}/infer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, max_tokens: max_tokens || 512 }),
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!r.ok) {
+      const txt = await r.text().catch(() => '');
+      return res.status(502).json({ error: `Inference server ${r.status}: ${txt.slice(0, 200)}` });
+    }
+    const data = await r.json() as any;
+    res.json(data);
+  } catch (e: any) {
+    if (e.name === 'TimeoutError') {
+      return res.status(504).json({ error: 'Inference server timed out (60s). Is the Python inference server running on port 3002?' });
+    }
+    res.status(502).json({ error: `Inference server unavailable: ${e.message}. Start it: python training/inference_server.py` });
+  }
+});
+
+app.post('/api/assist/retrieve', async (req, res) => {
+  try {
+    const { query, top_k } = req.body || {};
+    if (!query || typeof query !== 'string') {
+      return res.status(400).json({ error: 'query string is required' });
+    }
+    const r = await fetch(`${INFER_URL}/retrieve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, top_k: top_k || 5 }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!r.ok) {
+      const txt = await r.text().catch(() => '');
+      return res.status(502).json({ error: `Inference server ${r.status}: ${txt.slice(0, 200)}` });
+    }
+    res.json(await r.json());
+  } catch (e: any) {
+    res.status(502).json({ error: `Inference server unavailable: ${e.message}` });
+  }
+});
+
+app.get('/api/assist/health', async (_req, res) => {
+  try {
+    const r = await fetch(`${INFER_URL}/health`, { signal: AbortSignal.timeout(3_000) });
+    const data = await r.json() as any;
+    res.json({ status: 'ok', model_loaded: data.model_loaded, url: INFER_URL });
+  } catch {
+    res.json({ status: 'offline', url: INFER_URL });
+  }
+});
+
 app.get('/api/key', (_req, res) => {
   res.json({ key: API_KEY });
 });
@@ -2679,8 +2744,328 @@ app.get('/api/migrations', async (_req, res) => {
 });
 
 // ============================================================================
-// Serve built frontend (production mode)
+// Ontology / World graph — read API for the World tab
 // ============================================================================
+app.get('/api/ontology/summary', async (_req, res) => {
+  const o = await import('./ontology.js');
+  const entities = o.findEntities();
+  const byType: Record<string, number> = {};
+  for (const e of entities) byType[e.entity_type] = (byType[e.entity_type] ?? 0) + 1;
+  const threats = o.listThreatSpecies();
+  const threatKinds: Record<string, number> = {};
+  for (const t of threats) threatKinds[t.kind] = (threatKinds[t.kind] ?? 0) + 1;
+  const predicates = [...o.knownPredicates()];
+  const edgeCount = (db.prepare(
+    `SELECT COUNT(*) as c FROM onto_relation WHERE superseded_by IS NULL`
+  ).get() as { c: number }).c;
+  const stateCount = (db.prepare(
+    `SELECT COUNT(*) as c FROM onto_instantiation WHERE superseded_by IS NULL AND valid_to IS NULL`
+  ).get() as { c: number }).c;
+  const eventCount = (db.prepare(
+    `SELECT COUNT(*) as c FROM onto_event WHERE superseded_by IS NULL`
+  ).get() as { c: number }).c;
+  const season = o.getSeasonPhaseFor(new Date().toISOString());
+  const vocab = o.loadVocab();
+  res.json({
+    vocab: { name: vocab.name, version: vocab.version, schema_version: vocab.schema_version },
+    entityCount: entities.length,
+    entitiesByType: byType,
+    threatCount: threats.length,
+    threatKinds,
+    predicates,
+    edgeCount,
+    activeStates: stateCount,
+    eventCount,
+    currentSeason: season.phase,
+  });
+});
+
+app.get('/api/ontology/entities', async (req, res) => {
+  const o = await import('./ontology.js');
+  const type = typeof req.query.type === 'string' ? req.query.type : undefined;
+  const q = typeof req.query.q === 'string' ? req.query.q : undefined;
+  res.json(o.findEntities(type, q));
+});
+
+app.get('/api/ontology/threats', async (req, res) => {
+  const o = await import('./ontology.js');
+  const kind = typeof req.query.kind === 'string' ? req.query.kind : undefined;
+  res.json(o.listThreatSpecies(kind));
+});
+
+app.get('/api/ontology/threats/:id', async (req, res) => {
+  const o = await import('./ontology.js');
+  const t = o.getThreatSpecies(req.params.id);
+  if (!t) return res.status(404).json({ error: 'Species not found' });
+  res.json(t);
+});
+
+app.get('/api/ontology/entity/:id/graph', async (req, res) => {
+  const o = await import('./ontology.js');
+  const graph = o.getEntityGraph(req.params.id);
+  if (!graph.node) return res.status(404).json({ error: 'Entity not found' });
+  res.json(graph);
+});
+
+app.get('/api/ontology/entity/:id/state', async (req, res) => {
+  const o = await import('./ontology.js');
+  res.json(o.currentState(req.params.id));
+});
+
+// ============================================================================
+// Ontology Insights — structured AI cards for the dashboard
+// ============================================================================
+app.get('/api/ontology/insights', async (_req, res) => {
+  const o = await import('./ontology.js');
+  const insights: any[] = [];
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const monthName = now.toLocaleString('en-US', { month: 'long' });
+
+  // 1. Season phase from ontology
+  try {
+    const season = o.getSeasonPhaseFor(now.toISOString()) as any;
+    const phaseInfo: Record<string, { emoji: string; color: string; title: string }> = {
+      Buildup: { emoji: '🌱', color: 'emerald', title: 'Spring Buildup' },
+      HoneyFlow: { emoji: '🌻', color: 'amber', title: 'Honey Flow' },
+      Dearth: { emoji: '🥵', color: 'orange', title: 'Summer Dearth' },
+      WinterCluster: { emoji: '❄️', color: 'sky', title: 'Winter Cluster' },
+    };
+    const meta = phaseInfo[season.phase ?? ''] ?? { emoji: '🐝', color: 'stone', title: season.phase ?? 'Unknown' };
+    insights.push({
+      id: 'season',
+      type: 'season',
+      emoji: meta.emoji,
+      color: meta.color,
+      title: meta.title,
+      summary: `Current phase: ${season.phase ?? 'unknown'}. ${season.recommendation ?? ''}`,
+      detail: season.months?.join('–') ?? monthName,
+      priority: 'info',
+    });
+  } catch { /* skip */ }
+
+  // 2. Forage forecast
+  try {
+    const forecast = getForageForecast(month);
+    const active = forecast.majorFlows.filter((f: any) => f.status === 'active' || f.status === 'ending');
+    const upcoming = forecast.majorFlows.filter((f: any) => f.status === 'upcoming').slice(0, 2);
+    if (active.length > 0) {
+      insights.push({
+        id: 'forage-active',
+        type: 'forage',
+        emoji: '🌸',
+        color: 'amber',
+        title: 'Active Forage',
+        summary: active.map((f: any) => f.plant).join(', '),
+        detail: forecast.recommendation,
+        priority: 'info',
+      });
+    } else if (upcoming.length > 0) {
+      insights.push({
+        id: 'forage-upcoming',
+        type: 'forage',
+        emoji: '🌾',
+        color: 'emerald',
+        title: 'Forage Coming',
+        summary: upcoming.map((f: any) => `${f.plant} (${f.startMonth})`).join(', '),
+        detail: forecast.recommendation,
+        priority: 'info',
+      });
+    } else {
+      insights.push({
+        id: 'forage-dearth',
+        type: 'forage',
+        emoji: '🥵',
+        color: 'orange',
+        title: 'Forage Dearth',
+        summary: 'No major flows active or upcoming',
+        detail: forecast.recommendation,
+        priority: 'warning',
+      });
+    }
+  } catch { /* skip */ }
+
+  // 3. Swarm risk (from ontology SwarmPrep states + swarm module)
+  try {
+    const swarm = await calculateSwarmRiskAll();
+    const high = swarm.filter((s: any) => s.riskLevel === 'high' || s.riskLevel === 'very-high');
+    const moderate = swarm.filter((s: any) => s.riskLevel === 'moderate');
+    if (high.length > 0) {
+      insights.push({
+        id: 'swarm-high',
+        type: 'swarm',
+        emoji: '⚠️',
+        color: 'red',
+        title: 'Swarm Risk — High',
+        summary: high.map((s: any) => `${getHiveNameByEntityId(s.hiveId) ?? s.hiveId}: ${s.riskLevel}`).join(', '),
+        detail: high[0]?.recommendations?.[0] ?? 'Check for queen cells this inspection.',
+        priority: 'urgent',
+      });
+    } else if (moderate.length > 0) {
+      insights.push({
+        id: 'swarm-moderate',
+        type: 'swarm',
+        emoji: '🔍',
+        color: 'amber',
+        title: 'Swarm Risk — Moderate',
+        summary: moderate.map((s: any) => getHiveNameByEntityId(s.hiveId) ?? s.hiveId).join(', '),
+        detail: 'Watch for swarm cells at next inspection. Consider preemptive split if congestion building.',
+        priority: 'warning',
+      });
+    }
+  } catch { /* skip */ }
+
+  // 4. Inspection schedule — what's due
+  try {
+    const schedule = await getInspectionSchedule();
+    const overdue = schedule.filter((s: any) => s.daysUntil <= 0);
+    const dueSoon = schedule.filter((s: any) => s.daysUntil > 0 && s.daysUntil <= 7);
+    if (overdue.length > 0) {
+      insights.push({
+        id: 'inspection-overdue',
+        type: 'schedule',
+        emoji: '📅',
+        color: 'red',
+        title: 'Inspections Overdue',
+        summary: overdue.map((s: any) => s.hiveName).join(', '),
+        detail: `${overdue.length} hive${overdue.length !== 1 ? 's' : ''} past due — inspect ASAP.`,
+        priority: 'urgent',
+      });
+    } else if (dueSoon.length > 0) {
+      insights.push({
+        id: 'inspection-due',
+        type: 'schedule',
+        emoji: '📅',
+        color: 'amber',
+        title: 'Inspections Due Soon',
+        summary: dueSoon.map((s: any) => `${s.hiveName} (${s.daysUntil}d)`).join(', '),
+        detail: `Weather permitting, inspect this week.`,
+        priority: 'warning',
+      });
+    }
+  } catch { /* skip */ }
+
+  // 5. Colony states from ontology graph
+  try {
+    const colonies = o.findEntities('Colony');
+    for (const col of colonies) {
+      const states = o.currentState(col.entity_id);
+      const active = states.filter((s: any) => s.state_class && s.confidence < 0.8);
+      if (active.length > 0) {
+        const s = active[0];
+        insights.push({
+          id: `colony-${col.entity_id}`,
+          type: 'colony',
+          emoji: '👑',
+          color: 'amber',
+          title: `${col.name} — ${s.state_class}`,
+          summary: `Confidence: ${Math.round((s.confidence ?? 0) * 100)}% — ${s.rationale ?? 'inferred state'}`,
+          detail: s.rationale ?? 'Verify at next inspection.',
+          priority: s.confidence < 0.5 ? 'warning' : 'info',
+        });
+      }
+    }
+  } catch { /* skip */ }
+
+  // 6. Weather window
+  try {
+    const weather = await getWeatherData(33.5049, -83.6997);
+    const w = weather.inspectionWindow;
+    if (w.status !== 'go') {
+      insights.push({
+        id: 'weather-window',
+        type: 'weather',
+        emoji: '🌤️',
+        color: w.status === 'caution' ? 'amber' : 'red',
+        title: 'Weather Window',
+        summary: `${w.status.toUpperCase()} — ${w.summary}`,
+        detail: `Currently ${weather.current.temperature}°F, humidity ${weather.current.humidity}%, wind ${weather.current.windSpeed} mph.`,
+        priority: w.status === 'no-go' ? 'warning' : 'info',
+      });
+    } else {
+      insights.push({
+        id: 'weather-window',
+        type: 'weather',
+        emoji: '☀️',
+        color: 'emerald',
+        title: 'Inspection Weather — GO',
+        summary: `${weather.current.temperature}°F, ${weather.current.humidity}% RH`,
+        detail: w.summary,
+        priority: 'info',
+      });
+    }
+  } catch { /* skip */ }
+
+  // 7. Sensor anomalies → ontology threat correlation
+  try {
+    const sensors = db.prepare('SELECT * FROM sensors WHERE superseded_by IS NULL').all() as any[];
+    const highTemp = sensors.filter((s: any) => {
+      const r = s.latestReading ? JSON.parse(s.latestReading) : null;
+      return r && r.temperature > 99;
+    });
+    const stale = sensors.filter((s: any) => {
+      const r = s.latestReading ? JSON.parse(s.latestReading) : null;
+      if (!r || !r.timestamp) return false;
+      return (Date.now() - new Date(r.timestamp).getTime()) / (60 * 60 * 1000) > 6;
+    });
+    if (highTemp.length > 0) {
+      insights.push({
+        id: 'sensor-heat',
+        type: 'sensor',
+        emoji: '🌡️',
+        color: 'red',
+        title: 'Elevated Hive Temp',
+        summary: highTemp.map((s: any) => s.name).join(', '),
+        detail: 'Temp >99°F — possible swarm prep or ventilation issue. Check for swarm cells.',
+        priority: 'urgent',
+      });
+    }
+    if (stale.length > 0) {
+      insights.push({
+        id: 'sensor-stale',
+        type: 'sensor',
+        emoji: '📵',
+        color: 'amber',
+        title: 'Sensor Offline',
+        summary: stale.map((s: any) => {
+          const r = JSON.parse(s.latestReading);
+          const hrs = Math.round((Date.now() - new Date(r.timestamp).getTime()) / (60 * 60 * 1000));
+          return `${s.name} (${hrs}h)`;
+        }).join(', '),
+        detail: 'No readings in 6+ hours. Check sensor battery or connectivity.',
+        priority: 'warning',
+      });
+    }
+  } catch { /* skip */ }
+
+  // 8. Treatment recommendations
+  try {
+    const recs = getAllTreatmentRecommendations();
+    const urgent = recs.filter((r: any) => r.treatments.some((t: any) => t.priority === 'high'));
+    if (urgent.length > 0) {
+      const first = urgent[0];
+      const highTreat = first.treatments.find((t: any) => t.priority === 'high');
+      insights.push({
+        id: 'treatment-urgent',
+        type: 'treatment',
+        emoji: '💊',
+        color: 'red',
+        title: 'Treatment Needed',
+        summary: urgent.map((r: any) => r.hiveName).join(', '),
+        detail: highTreat ? `${highTreat.type} — ${highTreat.reason}` : 'Check treatment recommendations.',
+        priority: 'urgent',
+      });
+    }
+  } catch { /* skip */ }
+
+  // Sort by priority: urgent > warning > info
+  const priorityOrder: Record<string, number> = { urgent: 0, warning: 1, info: 2 };
+  insights.sort((a, b) => (priorityOrder[a.priority] ?? 3) - (priorityOrder[b.priority] ?? 3));
+
+  res.json({ insights, generatedAt: now.toISOString(), season: (o.getSeasonPhaseFor(now.toISOString()) as any)?.phase });
+});
+
+// Serve built frontend (production mode)
 const distPath = path.resolve(import.meta.dirname, '..', 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
