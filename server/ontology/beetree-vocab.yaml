@@ -22,7 +22,7 @@ classes:
   Colony:
     headed_by: [Queen]
     description: the living colony — persists across re-queening and hive moves.
-    inferred_states: [Queenright, Queenless, SwarmPrep, Dwindling, Robbing, Starving]
+    inferred_states: [Queenright, Queenless, SwarmPrep, Dwindling, Robbing, Starving, DroneLayer, LayingWorkers]
   Queen: { events: [Swarm, Supersedure, MatingFlight] }
   SwarmEvent: { observed_via: [Reading, Inspection] }
   SeasonWindow:
@@ -32,6 +32,52 @@ classes:
     vector_of: [ThreatSpecies]
   TreatmentPlan: {}
   Intervention: {}
+  BroodPattern:
+    description: >
+      Frame-face observation of brood layout. The primary diagnostic a
+      beekeeper reads during inspection. Maps to colony-state inferences
+      via brood_inference rules below.
+    kind: { enum: [solid_capped, solid_scattered_uncapped, spotty_mixed,
+                   spotty_drone_dominant, center_cluster_only,
+                   peripheral_brood, absent, drone_only_pupal] }
+  CombCondition:
+    description: >
+      Frame comb state — color, cell size, structural integrity. Drives
+      the frame rotation cadence and detects pesticide/wax accumulation.
+      Comb darkens with each brood cycle as cocoons and propolis build up;
+      cells also shrink slightly each generation. Old dark comb should be
+      rotated out every 3-4 years (12-16 brood cycles).
+    kind: { enum: [white_new, light_cream, golden_light, golden_medium,
+                   dark_brown, black_old, distorted_cells,
+                   drone_comb_in_worker_area, wax_moth_damage,
+                   burr_comb, cross_comb, brace_comb] }
+  QueenStatus:
+    description: >
+      Queen and egg observations during inspection. The highest-stakes
+      diagnostic after brood pattern — distinguishes swarm prep, supersedure,
+      emergency queen raising, queen failure, and laying workers.
+    kind: { enum: [eggs_present_single, eggs_present_multiple_per_cell,
+                   queen_spotted_marked, queen_spotted_unmarked,
+                   queen_not_found_eggs_present, queen_not_found_no_eggs,
+                   virgin_queen, swarm_cells, supersedure_cells,
+                   emergency_cells, queen_capped, queen_cups_empty,
+                   no_queen_no_eggs_no_cells] }
+  VarroaIndicator:
+    description: >
+      Visible symptoms of varroa/virus pressure without requiring a mite
+      wash. Lets the agent do triage from a description or photo. DWV
+      prevalence is a proxy for mite burden.
+    kind: { enum: [deformed_wings, k_wing, hairless_black_bees,
+                   phoretic_mites_visible, no_visible_symptoms,
+                   parasitic_mite_syndrome] }
+  DeadOutPattern:
+    description: >
+      Forensic signs found when opening a dead or dying colony. The pattern
+      of death indicates the cause. This is where the model becomes a teacher.
+    kind: { enum: [starved_headfirst, pesticide_tongues_out,
+                   nosema_dysentery, chilled_brood,
+                   dead_queen_only, absconded,
+                   mice_damage, robbing_destroyed] }
 
 relations:
   heads:            { inverse: headedBy }
@@ -42,6 +88,8 @@ relations:
   precedes:         {}
   vectorOf:         { inverse: vectoredBy }
   resolvedBy:       {}
+  observedDuring:   { inverse: observedFrom }  # BroodPattern → Inspection
+  indicates:        { inverse: indicatedBy }   # BroodPattern → Colony state inference
 
 season_phase_inference:
   # middle-GA defaults — site overrideable
@@ -49,6 +97,478 @@ season_phase_inference:
   HoneyFlow:      { months: [3, 4, 5, 6],   mean_temp_band_c: [15, 28] }
   Dearth:         { months: [7, 8, 9],      mean_temp_band_c: [26, 38] }
   WinterCluster:  { months: [10, 11, 12, 1], mean_temp_band_c: [-5, 10] }
+
+# Brood pattern → colony state inference rules.
+# Each rule: pattern → candidate states with confidence + differential notes.
+# The agent uses these to narrow from observation to diagnosis, asking
+# follow-up questions when confidence is low or multiple states match.
+brood_inference:
+  solid_capped:
+    description: "Frame fully capped, tight pattern edge to edge."
+    indicates: [{ state: Queenright, confidence: 0.90 }]
+    notes: "Healthy brood. Good queen, good nutrition. Note as positive finding."
+
+  solid_scattered_uncapped:
+    description: "Mostly solid pattern with scattered uncapped or empty cells throughout."
+    indicates: [{ state: Queenright, confidence: 0.70 }]
+    notes: >
+      Normal age-cohort variation in active season. If widespread across many
+      frames, could signal minor nutritional stress or the queen slowing down.
+      Monitor — compare to last inspection.
+
+  spotty_mixed:
+    description: "Irregular brood with empty cells scattered among capped and uncapped — no clear drone dominance."
+    indicates:
+      - { state: Queenright,  confidence: 0.25, reason: "failing queen" }
+      - { state: Queenless,   confidence: 0.20, reason: "queen died or failed" }
+      - { state: Dwindling,  confidence: 0.15, reason: "varroa/virus load suppressing brood" }
+    notes: >
+      Differential diagnosis — do NOT jump to a conclusion. Check:
+      (1) Varroa: alcohol wash or sugar shake. High mite load + spotty brood = virus.
+      (2) Queen: look for eggs. No eggs + spotty = queen failing or gone.
+      (3) Disease: smell (AFB = rotten), rope test, check for chalkbrood mummies.
+      (4) Pesticide: ask about recent spraying in area.
+      (5) Cold snap: if recent dip below 10°C during brood rearing, cold-damaged brood.
+
+  spotty_drone_dominant:
+    description: "Spotty brood with mostly drone cells — bullet-shaped cappings raised above the frame surface."
+    indicates:
+      - { state: DroneLayer,     confidence: 0.85, reason: "drone-laying queen (lost queen, failed to mate, or queen too old)" }
+      - { state: LayingWorkers,  confidence: 0.60, reason: "if no queen cells seen and colony has been queenless >3 weeks" }
+    notes: >
+      High-confidence diagnosis. Bullet-shaped drone cappings = drones being
+      raised in worker cells. Means only unfertilized eggs are being laid.
+      Distinguish drone-laying queen vs laying workers:
+        - Single egg per cell, orderly pattern → drone-laying queen
+        - Multiple eggs per cell, eggs on cell walls → laying workers
+      Drone-laying queen: requeen immediately.
+      Laying workers: combine with another colony — requeening almost always fails.
+
+  center_cluster_only:
+    description: "Brood tightly clustered in the center of the frame, empty cells at the periphery."
+    indicates:
+      - { state: Queenright,  confidence: 0.40, reason: "small colony or cold-weather contraction" }
+      - { state: Dwindling,   confidence: 0.25, reason: "if colony is shrinking across inspections" }
+    notes: >
+      Season-dependent. In winter/early spring: normal — the colony is
+      clustered tight and only rearing brood where they can keep it warm.
+      In active season with good temperatures: suggests the colony is small
+      or stressed. Check: colony size vs neighbors, food stores, varroa load.
+
+  peripheral_brood:
+    description: "Brood on the frame edges but not center — unusual, center cells empty."
+    indicates: [{ state: Queenright, confidence: 0.20 }]
+    notes: >
+      Uncommon. Can indicate the queen was interrupted mid-lay (cold snap,
+      hive disturbance) and resumed on available cells. Check for recent
+      weather events or disturbance. Monitor next inspection.
+
+  absent:
+    description: "No brood of any kind on the frame."
+    indicates:
+      - { state: Queenless,   confidence: 0.30, reason: "if off-season, may be normal; if in-season, queen issue" }
+      - { state: WinterCluster, confidence: 0.30, reason: "if winter, normal brood break" }
+    notes: >
+      Season-dependent. Winter brood break is normal in GA (Dec–Jan). If
+      active season and no brood: check for queen (can you spot her?), check
+      for laying workers, check stores. Could also be a post-swarm colony.
+
+  drone_only_pupal:
+    description: "Only drone pupal brood visible — no worker larvae or eggs."
+    indicates:
+      - { state: DroneLayer,     confidence: 0.75 }
+      - { state: LayingWorkers,  confidence: 0.50 }
+    notes: >
+      Similar to spotty_drone_dominant but at the pupal stage — means the
+      colony has been drone-laying for at least 24 days (drone development
+      time). More likely laying workers if it's been this way for a while.
+      Check for multiple eggs per cell to distinguish.
+
+# Comb condition → age, rotation, and health inference.
+# Color is the primary signal: each brood cycle leaves a silk cocoon lining,
+# darkening the cell. After ~12-16 cycles (3-4 years) comb is black, cells are
+# smaller, and pesticide/acaricide residues accumulate to concerning levels.
+comb_inference:
+  white_new:
+    description: "Freshly drawn white wax — never had brood raised in it."
+    age_cycles: 0
+    action: "No action. New comb is cleanest — ideal for honey supers."
+    notes: "If bees are drawing new comb during a flow, they're productive and well-fed."
+
+  light_cream:
+    description: "Slightly off-white — one or two brood cycles."
+    age_cycles: "1-2"
+    action: "No action needed. Comb is young and healthy."
+    notes: ""
+
+  golden_light:
+    description: "Light golden color — several brood cycles."
+    age_cycles: "3-6"
+    action: "No action. Healthy comb in its prime."
+    notes: "This is the sweet spot — experienced comb, clean cells, good queen acceptance."
+
+  golden_medium:
+    description: "Medium golden-brown — mid-life comb."
+    age_cycles: "7-11"
+    action: "Note age. Plan to rotate in the next 1-2 seasons."
+    notes: "Comb is still functional but approaching rotation age. Track which frames are oldest."
+
+  dark_brown:
+    description: "Dark brown comb — many brood cycles, cocoons built up, cells slightly smaller."
+    age_cycles: "12-16"
+    action: "Rotate out this season. Move to the outside of the brood box or replace with new foundation/frame."
+    notes: >
+      Old dark comb: cells are smaller (bees raised in them are slightly smaller),
+      cocoon layers have built up, and pesticide/acaricide residues (including
+      any treatments you applied) are concentrated in the wax. Rotate by moving
+      dark frames to the outside position so the queen stops laying in them, then
+      remove when empty of brood. Replace with fresh foundation or let bees draw
+      new comb on starter strips.
+
+  black_old:
+    description: "Black comb — very old, cells significantly narrowed, heavy cocoon and propolis buildup."
+    age_cycles: ">16"
+    action: "Replace immediately. This comb is overdue and potentially harmful to colony health."
+    notes: >
+      Black comb should not be in the brood nest. Bees raised in old narrow cells
+      are smaller and potentially less healthy. Residue accumulation is at peak.
+      Remove the frame, render the wax (or discard if treated with acaricides),
+      and replace with new foundation or a clean drawn frame.
+
+  distorted_cells:
+    description: "Cells are irregular — uneven walls, mixed sizes, wavy pattern."
+    action: "Replace frame. Distorted comb makes inspection harder and can indicate foundation issues or wax moth damage early stages."
+    notes: "Can also result from bees being forced to draw comb during a dearth or on mismatched foundation."
+
+  drone_comb_in_worker_area:
+    description: "Drone comb (larger cells) appearing in the worker brood area."
+    action: "Monitor. Some drone comb is natural (~10-15% of comb). If excessive, the queen may be failing or the colony is crowded."
+    notes: >
+      Drone comb is not a problem in itself — drones are normal. But if you see
+      a lot of drone comb being drawn in worker areas, it can signal the queen
+      is out of space or the colony is preparing to swarm. Also: varroa prefer
+      drone cells, so large patches of drone comb are a varroa hotspot.
+
+  wax_moth_damage:
+    description: "Silken webbing, tunnels through comb, larvae visible. Comb is being destroyed."
+    action: "Remove affected frames immediately. If salvageable, freeze the frame for 48 hours to kill larvae, then clean out webbing. If too far gone, discard."
+    notes: >
+      Wax moths attack weak/stressed colonies and stored comb. A strong colony
+      will remove moth larvae themselves — wax moth damage inside a live hive
+      means the colony is too weak to defend. Address the underlying weakness.
+
+  burr_comb:
+    description: "Wax built in unwanted places — between frames, on top bars, on the inner cover, around feeders."
+    causes:
+      - { cause: "out of space", confidence: 0.50, notes: "colony has nowhere to store/lay and is filling gaps opportunistically" }
+      - { cause: "proactive genetics", confidence: 0.35, notes: "some lines are just comb-happy — they build wax constantly regardless of space" }
+      - { cause: "both", confidence: 0.15, notes: "proactive genetics + crowding = maximum burr comb" }
+    action: >
+      Scrape burr comb during inspection to keep frames separable and prevent
+      cross comb. Assess whether the colony needs more space (add a box, pull
+      honey frames). If the colony is a chronic comb-builder across seasons,
+      note the genetics — you may not want to raise queens from this line.
+    notes: >
+      Burr comb is not a disease or a problem by itself — it's the bees doing
+      what bees do: filling available space with comb. The question is WHY
+      they have available space. If frames are properly spaced and boxes are
+      adequate, burr comb means either (1) they need more room — add a super
+      or another brood box, or (2) they're genetically inclined to build
+      excess wax — some feral-derived lines do this persistently. Check:
+      Is the brood nest backfilled with nectar/honey (congested → give space)?
+      Is there an empty box on top they could be drawing instead (yes → they
+      chose to build in the gap, it's genetics)? If you're managing for
+      honey production, chronic burr comb lines are annoying but manageable
+      with frequent scraping. If you're breeding, you might not want to
+      propagate that trait.
+
+  cross_comb:
+    description: "Comb built across multiple frames or at right angles to the frame direction — frames stuck together."
+    action: >
+      Cut the cross comb out carefully during inspection. Realign frames to
+      proper spacing. If the colony persists, use foundation or starter strips
+      to guide comb direction. Cross comb makes inspections impossible and
+      should be corrected early.
+    notes: >
+      Cross comb usually happens when bees are drawing comb without a guide
+      (no foundation, no starter strip, or frames spaced too wide). Fix early
+      — the longer it goes, the more brood and honey are in the wrong places,
+      and the harder it is to fix without losing bees/brood. Some genetics
+      are more prone to it than others.
+
+  brace_comb:
+    description: "Small wax connections between frame top bars or between frames and the box wall — worker-built structural supports."
+    action: "Break brace comb gently during inspection to separate frames. Minor brace comb is normal and unavoidable."
+    notes: >
+      Brace comb (small connections between top bars) is different from burr
+      comb (free-standing comb in unwanted spaces). Minor brace comb is
+      normal — bees connect frames for structural stability. Excessive brace
+      comb that makes frames hard to separate may indicate the hive is
+      vibrating or shifting, or the bees are being particularly industrious.
+      Use a hive tool to break connections before pulling frames.
+
+# Queen status → diagnosis and action.
+# The distinction between swarm cells and supersedure cells is the
+# highest-stakes call a beekeeper makes: swarm = artificial swarm now,
+# supersedure = let her replace herself, emergency = they lost the queen.
+queen_inference:
+  eggs_present_single:
+    description: "Single egg per cell, upright at the base — mated queen recently active."
+    indicates: [{ state: Queenright, confidence: 0.95 }]
+    notes: "Colony has a laying queen. Eggs stand upright for ~3 days, so presence means she laid within the last 3 days."
+
+  eggs_present_multiple_per_cell:
+    description: "Multiple eggs per cell, eggs laid on cell walls, not at the base."
+    indicates:
+      - { state: LayingWorkers, confidence: 0.85, reason: "worker bees laying unfertilized eggs in absence of a queen" }
+    notes: >
+      Laying workers. Multiple eggs per cell and eggs on cell walls (not the
+      base) are diagnostic — a real queen lays one egg per cell, centered.
+      Requeening almost always fails (workers reject the queen). Combine
+      with a stronger colony or shake out and let them drift into other hives.
+
+  queen_spotted_marked:
+    description: "Queen located, marked with a color dot on her thorax."
+    indicates: [{ state: Queenright, confidence: 0.98 }]
+    notes: >
+      Mark color encodes year (white=years ending 1/6, yellow=2/7, red=3/8,
+      green=4/9, blue=5/0). Note the color in inspection records.
+
+  queen_spotted_unmarked:
+    description: "Queen located but unmarked."
+    indicates: [{ state: Queenright, confidence: 0.95 }]
+    notes: "Consider marking her next inspection — makes spotting faster and tracks year. Use a queen marking pen or paint marker."
+
+  queen_not_found_eggs_present:
+    description: "Couldn't spot the queen, but eggs are present and normal (single per cell)."
+    indicates: [{ state: Queenright, confidence: 0.80 }]
+    notes: >
+      Don't panic — queens are hard to spot, especially in a populous hive.
+      Eggs present = she was here within 3 days. Mark this frame so you know
+      where she was. Try again next inspection or don't worry — the eggs
+      confirm she's there.
+
+  queen_not_found_no_eggs:
+    description: "Couldn't find the queen and no eggs visible."
+    indicates:
+      - { state: Queenless,   confidence: 0.35, reason: "queen may have died or failed" }
+      - { state: Queenright,  confidence: 0.20, reason: "queen may be on a frame you didn't pull, or she stopped laying temporarily" }
+    notes: >
+      Check for queen cells — if present, the colony is requeening itself.
+      Look harder for the queen on frames you didn't fully inspect. If no
+      queen, no eggs, no cells: add a frame of eggs/young larvae from
+      another colony — if they build emergency cells, they're queenless.
+
+  virgin_queen:
+    description: "Small, fast-moving queen with no eggs laid yet — may not be mated."
+    indicates: [{ state: Queenright, confidence: 0.40 }]
+    notes: >
+      Virgin queens are hard to spot — smaller, run fast, don't move like a
+      mated queen. She needs 1-2 weeks to mate and start laying. Check back
+      in 14 days for eggs. Don't disturb her during mating flights.
+
+  swarm_cells:
+    description: "Queen cells along the bottom edge of frames — multiple, peanut-shaped."
+    indicates: [{ state: SwarmPrep, confidence: 0.85 }]
+    notes: >
+      Swarm cells. The colony is preparing to swarm. ACTION NEEDED:
+      Artificial swarm (split the colony) before they swarm naturally and
+      you lose half your bees. If cells are capped, you have ~days before
+      the swarm departs. Destroying cells does NOT stop swarming — they'll
+      build more. You must give them more space or split.
+
+  supersedure_cells:
+    description: "1-3 queen cells on the face of the frame (not bottom edge)."
+    indicates: [{ state: Queenright, confidence: 0.60, reason: "colony replacing its queen" }]
+    notes: >
+      Supersedure cells. The colony is replacing its queen — she may be old,
+      failing, or poorly mated. This is normal and healthy. DO NOT destroy
+      these cells. Let the new queen emerge, mate, and take over. Check
+      back in 2-3 weeks for eggs from the new queen.
+
+  emergency_cells:
+    description: "Queen cells raised from worker cells, scattered, rougher/shorter than swarm or supersedure cells."
+    indicates: [{ state: Queenless, confidence: 0.80, reason: "colony lost its queen and is raising an emergency replacement" }]
+    notes: >
+      Emergency cells. The queen died or was lost, and the colony is
+      raising a new one from worker larvae. If you have a mated queen
+      available, you can requeen directly (introduce her in a cage). If
+      not, let them raise their own — but check they have eggs/young larvae
+      to work with. Emergency queens from older larvae are lower quality
+      (shorter abdomen, fewer ovarioles).
+
+  queen_capped:
+    description: "A capped queen cell is present — the new queen is developing inside and will emerge soon."
+    indicates: [{ state: SwarmPrep, confidence: 0.40, reason: "if swarm cells" }, { state: Queenright, confidence: 0.40, reason: "if supersedure — new queen emerging" }]
+    notes: >
+      A capped queen cell means emergence is 7-8 days after capping.
+      Determine if these are swarm cells (bottom edge, multiple → act now)
+      or supersedure cells (face of frame, 1-3 → let nature run).
+
+  queen_cups_empty:
+    description: "Empty queen cups on the bottom bars of frames — no egg, no larva, no royal jelly. Just the cup."
+    indicates: [{ state: Queenright, confidence: 0.85 }]
+    notes: >
+      Queen cups are NOT queen cells. They are play cups — workers draw them
+      on the bottom bars as a normal spring behavior, essentially practicing
+      for swarm season. EMPTY queen cups are harmless. They do not mean the
+      colony is going to swarm. The key distinction: a queen cup becomes a
+      queen cell only when an egg is laid in it and royal jelly is added.
+      Check again at your next inspection — if the cups are still empty,
+      nothing has changed. If there's an egg or larva inside, NOW you have
+      a queen cell and need to assess swarm vs supersedure.
+      Do NOT destroy empty queen cups — the workers will just rebuild them
+      and you'll lose the signal of when they actually start using them.
+
+  no_queen_no_eggs_no_cells:
+    description: "No queen spotted, no eggs, no queen cells of any kind."
+    indicates:
+      - { state: Queenless,  confidence: 0.50, reason: "queen died and colony didn't raise cells" }
+      - { state: Queenright,  confidence: 0.15, reason: "temporary break, queen may resume" }
+    notes: >
+      This is the hard case. Introduce a test frame: take a frame with eggs
+      and young larvae from another colony and put it in this hive. Come
+      back in 3-5 days. If they built emergency cells → queenless. If the
+      larvae are being raised normally → you missed the queen. If there
+      are now eggs → the queen was there and just wasn't laying.
+
+# Varroa visible symptoms → triage without a mite wash.
+varroa_inference:
+  deformed_wings:
+    description: "Bees with shriveled, crumpled, or stunted wings emerging from cells."
+    indicates: [{ state: Dwindling, confidence: 0.85, reason: "Deformed Wing Virus (DWV) — vectored by varroa" }]
+    notes: >
+      DWV symptoms mean high varroa load has been present for weeks. The
+      virus causes wing deformity and reduced lifespan. ACTION: treat for
+      varroa immediately. If it's during the honey flow, use a treatment
+      that doesn't contaminate honey (formic acid = Mite Away Quick Strips,
+      or thymol after flow). Confirm with an alcohol wash or sugar shake.
+      If >2% mite load: treat. If >5%: colony is in crisis.
+
+  k_wing:
+    description: "Wings held at an unnatural angle (not folded flat over the abdomen), resembling a K shape."
+    indicates: [{ state: Dwindling, confidence: 0.70, reason: "DWV-B or Chronic Bee Paralysis Virus" }]
+    notes: >
+      K-wing can indicate DWV variant B or chronic paralysis. Both are
+      associated with high varroa loads. Check for varroa and treat if
+      indicated. If combined with hairless black bees, it's likely CBPV.
+
+  hairless_black_bees:
+    description: "Bees that appear hairless, dark/black, shiny — sometimes trembling on frames."
+    indicates: [{ state: Dwindling, confidence: 0.75, reason: "Chronic Bee Paralysis Virus (CBPV)" }]
+    notes: >
+      Hairless black syndrome = CBPV. Often seen in large colonies under
+      varroa pressure. The bees lose body hair, appear shiny and black,
+      and may tremble or be expelled by guard bees. Treat for varroa
+      (reduces the viral load). The colony may recover if mite pressure
+      is brought down quickly.
+
+  phoretic_mites_visible:
+    description: "Varroa mites visible on the backs of adult bees — small brown/red discs on the thorax or abdomen."
+    indicates: [{ state: Dwindling, confidence: 0.90, reason: "visible phoretic mites = very high mite load" }]
+    notes: >
+      Seeing mites on bee bodies means the colony is heavily infested —
+      by the time mites are phoretic and visible, the load is typically
+      >5%. Treat immediately. Do an alcohol wash to confirm the count and
+      document for your records.
+
+  no_visible_symptoms:
+    description: "Bees look healthy — no wing deformities, no hairless bees, no visible mites."
+    indicates: [{ state: Queenright, confidence: 0.40 }]
+    notes: >
+      Good sign, but visual symptoms appear late — by the time you see
+      DWV, the damage is done. Continue regular mite monitoring (alcohol
+      wash or sugar shake every 3-4 weeks during active season).
+
+  parasitic_mite_syndrome:
+    description: "Multiple symptoms: deformed wings + hairless bees + spotty brood + reduced population."
+    indicates: [{ state: Dwindling, confidence: 0.95, reason: "Parasitic Mite Syndrome — advanced varroa collapse" }]
+    notes: >
+      PMS = the colony is collapsing from varroa/virus pressure. Multiple
+      symptoms together means the infestation is severe and long-standing.
+      This colony may not recover even with treatment. Treat for varroa
+      to protect your other colonies, and consider combining this colony
+      with a stronger one if it's still viable.
+
+# Dead-out forensics → cause of death from the pattern.
+deadout_inference:
+  starved_headfirst:
+    description: "Dead bees head-first in empty cells, no honey stores remaining."
+    diagnosis: "Starvation. Bees crawled into cells looking for food and died there."
+    notes: >
+      The colony ran out of honey. This is preventable — either they
+      didn't have enough stores going into winter, or they consumed them
+      faster than expected (small cluster, cold spell). Check heft going
+      into winter; feed syrup (2:1) in fall until they won't take more.
+      Emergency fondant in winter if heft is light.
+
+  pesticide_tongues_out:
+    description: "Large pile of dead bees at the entrance, tongues sticking out, many dead outside the hive."
+    diagnosis: "Pesticide poisoning. Acute exposure — bees died returning from foraging."
+    notes: >
+      Tongues extended is classic pesticide kill. Check with neighbors
+      about recent spraying. Report to your state agricultural department
+      if warranted. Move hives if exposure is chronic. The colony may
+      recover if the queen survived and enough bees remain — check in
+      a few days for egg-laying and population recovery.
+
+  nosema_dysentery:
+    description: "Brown streaks (dysentery/feces) on the front of the hive, frames, and top bars."
+    diagnosis: "Nosema infection. Dysentery from gut pathogen (Nosema ceranae)."
+    notes: >
+      Nosema causes dysentery — brown streaks are bee feces. More common
+      in winter/early spring when bees can't fly to defecate. Treat with
+      Fumagillin (Fumidil-B) in syrup, or let the colony clear it naturally
+      once they can take cleansing flights. Check if colony is queenright
+      once they're flying.
+
+  chilled_brood:
+    description: "Grey or brown pupae/larvae on the bottom board, brood left uncovered and cold."
+    diagnosis: "Chilled brood. Colony was too small to cover the brood nest during a cold spell."
+    notes: >
+      The cluster contracted during cold weather and left brood on the
+      edges to chill. Reduce the hive volume (combine, remove empty boxes,
+      add a follower board) so the cluster can cover the remaining brood.
+      If the colony is very small, combine with a stronger one.
+
+  dead_queen_only:
+    description: "Only the queen is dead, rest of the colony appears normal."
+    diagnosis: "Queen died — possible supersedure failure, disease, or accident."
+    notes: >
+      Check for queen cells — if present, the colony may requeen itself.
+      If no cells and no eggs, introduce a frame of eggs/young larvae to
+      test if they build emergency cells (confirming queenless). Requeen
+      if you have a mated queen available.
+
+  absconded:
+    description: "Hive empty, no dead bees, some honey/pollen remaining, brood left behind."
+    diagnosis: "Absconding. The entire colony left — usually due to stress (mites, predators, disturbance, starvation)."
+    notes: >
+      Absconding is common with packages or small colonies under severe
+      stress (varroa, small hive beetle pressure, pesticide, or even
+      repeated disturbance). The brood left behind tells you they left in
+      a hurry. Clean the hive, check comb, and restart with a new package
+      or nuc. Address whatever drove them out first.
+
+  mice_damage:
+    description: "Chewed comb, nesting material (shredded wood/leaves), mouse droppings, foul smell."
+    diagnosis: "Mouse infestation during winter. Mouse entered through the entrance and nested in the hive."
+    notes: >
+      Mice enter in winter when the cluster is tight and can't defend the
+      entrance. Install mouse guards (entrance reducer or metal grid) in
+      fall. Clean out nesting material and droppings, assess comb damage,
+      replace destroyed frames. The colony usually survives but may be
+      weakened by the disturbance.
+
+  robbing_destroyed:
+    description: "Torn cappings, honey cells ripped open, dead bees, disorganized comb, no stores remaining."
+    diagnosis: "Robbing. Other bees entered and stripped the colony's honey, fighting killed the colony."
+    notes: >
+      Robbing happens during dearth or when a colony is weak and can't
+      defend itself. Prevent with entrance reducers during dearth. Never
+      spill honey or syrup near hives. Open feeding attracts robbers. If
+      you see robbing starting, reduce entrances immediately and cover
+      the hive with a wet sheet to confuse the robbers.
 
 # alias → canonical ThreatSpecies id — ingestion and agent lookup key.
 threat_aliases:
@@ -108,6 +628,8 @@ threat_species:
   - { id: stonebrood,     name: Stonebrood,                  scientific: Aspergillus flavus,         kind: disease }
   - { id: tsbv,           name: Thai sacbrood virus,         scientific: Thai sacbrood virus,        kind: disease, notes: "Exotic; monitor." }
   - { id: spiroplasma,    name: May disease (Spiroplasma),   scientific: "Spiroplasma apis / melliferum", kind: disease, notes: "Spring 'May disease'; GA-documented." }
+  - { id: ylh,            name: Yellow-legged hornet,        scientific: Vespa velutina,              kind: predator, severity: monitor, region: "Savannah GA (2023+)", notes: "Invasive. Predates foraging bees at hive entrance. Report sightings to GA Dept of Ag." }
+  - { id: ngh,            name: Northern giant hornet,        scientific: Vespa mandarinia,            kind: predator, severity: low, region: "Pacific Northwest (WA/BC)", notes: "Not present in GA. Media calls it 'murder hornet' — confused with yellow-legged hornet. No action needed for GA beekeepers." }
 
 # What the agent SHOULD do when it can't resolve to a defined entity:
 undefined_behavior:

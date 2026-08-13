@@ -1,0 +1,375 @@
+{
+  "model": "mlx-community/gemma-3-text-12b-it-4bit",
+  "adapter": "/Users/developer/beetree/training/adapters",
+  "total": 29,
+  "pass": 5,
+  "cases": [
+    {
+      "q": "What is kettlebeetle?",
+      "ok": false,
+      "hits": [],
+      "expect": [
+        "Small hive beetle",
+        "Aethina tumida",
+        "slime"
+      ],
+      "completion": "Kettlebeetle (Pyralidae) — family of moths in the order Lepidoptera. They are found worldwide, with over 1,500 species. Many species are agricultural pests."
+    },
+    {
+      "q": "Tell me about varroa.",
+      "ok": true,
+      "hits": [
+        "Varroa destructor",
+        "parasite",
+        "vector"
+      ],
+      "expect": [
+        "Varroa destructor",
+        "parasite",
+        "vector"
+      ],
+      "completion": "Varroa destructor (Varroa destructor) — parasite. Known vector of: Deformed wing virus, Black queen cell virus, Sacbrood virus, Acute bee paralysis virus. #1 managed-bee threat worldwide. #BeeThreats #BeeHealth"
+    },
+    {
+      "q": "What is foulbrood?",
+      "ok": true,
+      "hits": [
+        "foulbrood",
+        "notifiable"
+      ],
+      "expect": [
+        "foulbrood",
+        "notifiable"
+      ],
+      "completion": "Foulbrood is a disease of honey bee larvae and pupae — a brood disease. There are two main types: American foulbrood (Paenibacillus larvae) and European foulbrood (Melissococcus plutonius). Both are NOTIFIABLE diseases in many regions — meaning if you suspect you have it, you MUST report it to your state/provincial agricultural department.\n\nHere's a breakdown of each:\n\n**1. American Foulbrood (AFB) — *Paenibacillus larvae***\n\n*   **Severity:** This is the WORST. AFB is a regulated disease in many countries (including the US, Canada, and EU) — meaning it's illegal to move infected colonies or equipment across state/provincial lines.  It's highly contagious and devastating.\n*   **Cause:**  A bacterium (*Paenibacillus larvae*) that kills larvae and pupae.\n*   **Symptoms:**"
+    },
+    {
+      "q": "What is tropi?",
+      "ok": false,
+      "hits": [],
+      "expect": [
+        "Tropilaelaps"
+      ],
+      "completion": "Tropi is a beekeeper assistant inside BeeTree, with access to a vast ontology of the beekeeper's yard. Answer using ontology vocabulary and cite confidence when a state is inferred rather than observed.\n\nWhat does tropi do?\n  - identifies diseases from symptom descriptions\n  - suggests treatments based on diagnosis\n  - tracks season-long health with the Hive Alpha\n\nWhat's in the ontology?\n  - Pests: varroa, small hive beetle, wax moths\n  - Diseases: American foulbrood, European foulbrood, chalkbrood, nosema\n  - Treatments: thymol, formic acid, oxalyl acid\n\nHow do I cite confidence?\n  - When a state is inferred (rather than observed), I cite confidence when a state is inferred rather than observed. Confidence is a percentage in [0, 100]. A higher percentage means I'm more certain of the diagnosis.\n\nWhat's the"
+    },
+    {
+      "q": "What season phase is August?",
+      "ok": false,
+      "hits": [],
+      "expect": [
+        "Dearth"
+      ],
+      "completion": "August falls in the Doldrums phase (August 15 — September 15). This is the second phase of the Doldrums — the peak of the monsoon season. Expect frequent thunderstorms, heavy rain, and reduced visibility. Sail with caution and monitor weather forecasts closely."
+    },
+    {
+      "q": "What phase are hives in during March?",
+      "ok": false,
+      "hits": [
+        "Buildup"
+      ],
+      "expect": [
+        "HoneyFlow",
+        "Buildup"
+      ],
+      "completion": "March falls in the Buildup phase (months [1, 2, 3]). Typical mean temperature band: 4–18°C. Colonies are ramping brood production. Watch for early swarm signs as congestion builds; ensure feed through the gap before the flow."
+    },
+    {
+      "q": "What's on Hive Alpha?",
+      "ok": false,
+      "hits": [
+        "colony"
+      ],
+      "expect": [
+        "hive-1",
+        "BroodMinder",
+        "home-apiary",
+        "colony"
+      ],
+      "completion": "Hive Alpha is a beekeeper-grade sensor inside the Hive Alpha colony, which monitors:\n\n*   **Temperature:** Average brood nest temperature.\n*   **Humidity:** Brood nest humidity.\n*   **Vibration:** Detects varroa (through wing beat detection) and absconding.\n*   **Sound:** Detects queen cells, swarm prep, and queenrightness."
+    },
+    {
+      "q": "Is Hive Bravo queenright?",
+      "ok": false,
+      "hits": [
+        "Queenright"
+      ],
+      "expect": [
+        "Queenright",
+        "50%",
+        "inferred"
+      ],
+      "completion": "Hive Bravo is a queenright hive — confirmed by the Hive Bravo inspection report."
+    },
+    {
+      "q": "Should I worry about murder hornet?",
+      "ok": false,
+      "hits": [],
+      "expect": [
+        "don't have",
+        "catalog"
+      ],
+      "completion": "The Asian giant hornet (Vespa mandarinia), also known as the \"murder hornet,\" is a large wasp species native to East Asia. They are not established in the United States as of December 2023.\n\nHere's a breakdown of the situation:\n\n*   **2020-2021:** A small number of nests were detected in Washington state and British Columbia (Canada). These were eradicated through targeted nest destruction.\n*   **2022-2023:** No confirmed sightings or nests have been found in Washington state or British Columbia. This does not mean they are gone, but the established threat has subsided.\n*   **Current status:** The official term is \"dormant\" — meaning the threat is not active but the species remains a potential concern. Monitoring continues.\n\n**Should you worry?**\n\n*   **If you are in Washington state or British Columbia:** Be aware of the threat but don"
+    },
+    {
+      "q": "Assert that hive-1 marriedTo hive-2.",
+      "ok": false,
+      "hits": [],
+      "expect": [
+        "not a defined relation",
+        "Defined predicates"
+      ],
+      "completion": "This asserts that hive-1 is married to hive-2. This establishes a one-to-one relationship between the two hives."
+    },
+    {
+      "q": "Spotty brood and most of the capped cells are bullet-shaped drone cells.",
+      "ok": true,
+      "hits": [
+        "DroneLayer",
+        "drone"
+      ],
+      "expect": [
+        "DroneLayer",
+        "drone"
+      ],
+      "completion": "This points to several possibilities. Let's break down the likely causes and what you should do:\n\n**1. DroneLayer (DroneLayer is the most likely diagnosis)**\n\n*   **What it is:** The queen is failing or absent, and the colony is only able to lay unfertilized eggs, which develop into drones. DroneLayer is a common problem in failing colonies.\n*   **Why it happens:**\n    *   Queenright failing: The queen may be old, sick, or poorly mated.\n    *   Queenless: The colony has no queen at all.\n    *   Dwindling colony: If the colony is shrinking rapidly due to varroa/virus load or other stress, the queen may be too weak to mate or lay properly.\n*   **What to do:**\n    *   Check for queen: Can you spot her? Is she marked?\n    *   Queenright failing: Introduce a new queen (from a package"
+    },
+    {
+      "q": "The brood is solid and fully capped across the frame.",
+      "ok": false,
+      "hits": [
+        "Queenright"
+      ],
+      "expect": [
+        "Queenright",
+        "90"
+      ],
+      "completion": "This indicates Queenright. Healthy brood. Good queen, good nutrition. Note as positive finding."
+    },
+    {
+      "q": "The brood is spotty — lots of empty cells mixed with capped and uncapped.",
+      "ok": false,
+      "hits": [
+        "Varroa",
+        "queen"
+      ],
+      "expect": [
+        "differential",
+        "Varroa",
+        "queen"
+      ],
+      "completion": "This is a common one with several potential causes. Let's break down the possibilities:\n\n**1. Queenright (but slow/stressed):**\n   - **Queenright but slow:** The queen may be present but not laying at her normal rate. This could be due to:\n      - **Age:** Older queens are less productive.\n      - **Nutrition:** The colony may be malnourished (not enough food coming in, or the food is low quality).\n      - **Stress:** Varroa/mites, small hive beetle pressure, pesticide exposure, disturbance, or even just the weather (cold snap, heat wave) can stress the queen and colony.\n      - **Queen Health:** The queen may have a minor health issue (virus, parasite load).\n   - **What to do:**\n      - Check for varroa (alcohol wash or sugar shake). Treat if indicated.\n      - Assess food stores. Is there enough nectar/honey coming in? Is"
+    },
+    {
+      "q": "Brood is only in the center of the frame — tight cluster, nothing at the edges.",
+      "ok": false,
+      "hits": [
+        "Queenright"
+      ],
+      "expect": [
+        "center",
+        "Queenright",
+        "Dwindling"
+      ],
+      "completion": "This indicates Queenright. (90% confidence)\n  - Brood is tightly clustered, likely due to small hive volume, cold weather, or the queen being out of sync.\n  - This is normal in winter or during a cold snap. The cluster tightens to conserve heat.\n  - If it's winter and normal temperatures, the hive may be small or stressed. Check: food stores, varroa load, queen health."
+    },
+    {
+      "q": "This comb is black — really old.",
+      "ok": false,
+      "hits": [],
+      "expect": [
+        "Replace",
+        "old",
+        "narrow"
+      ],
+      "completion": "That's a cool find! Black comb from age — organic material (horn, wood, bone) being dyed by years of hair oils, dirt, and oxidation. This is normal and harmless. The comb is not ruined — it's just been well-loved. Clean gently with mild soap and water if desired, but don't soak."
+    },
+    {
+      "q": "The comb is dark brown — been in the hive a while.",
+      "ok": false,
+      "hits": [
+        "Rotate"
+      ],
+      "expect": [
+        "Rotate",
+        "dark_brown"
+      ],
+      "completion": "Dark brown comb — many brood cycles, cocoons built up, cells slightly smaller. Estimated age: 12-16 brood cycles. Rotate out this season. Move to the outside of the brood box or replace with new foundation/frame. Old dark comb: cells are smaller (bees raised in them are slightly smaller), cocoon layers have built up, and pesticide/acaricide residues (including any treatments you applied) are concentrated in the wax. Rotate by moving dark frames to the outside position so the queen stops laying in them, then remove when empty of brood. Replace with fresh foundation or let bees draw new comb on starter strips."
+    },
+    {
+      "q": "How often should I rotate my brood comb?",
+      "ok": false,
+      "hits": [
+        "cocoon"
+      ],
+      "expect": [
+        "3-4 years",
+        "12-16",
+        "cocoon"
+      ],
+      "completion": "Brood comb rotation is a key management practice for healthy hives. Here's a breakdown of how often to rotate and why:\n\n**Why Rotate?**\n\n*   **Cell Size:** Over time, brood cells are repeatedly drawn smaller by worker bees. Smaller cells mean the queen is laying in tighter spaces, potentially leading to drone comb (larger cells) being drawn in unwanted areas, or the queen being unable to mate.\n*   **Wax Quality:** Old dark comb is a sign of accumulated cocoon residue, pollen, propolis, and small hive beetle larvae. This makes the cells smaller and harder for bees to use, and can harbor disease.\n*   **Disease/Pest Control:** Rotating fresh foundation or new frames helps break disease cycles (like Chronic Bee Paralysis Virus or American foulbrood) and reduces the buildup of varroa mite populations.\n*   **Drone Comb:** If you're not managing for drone production, excess drone comb is a waste of worker"
+    },
+    {
+      "q": "There's webbing and tunnels in the comb — looks like wax moth.",
+      "ok": false,
+      "hits": [
+        "wax moth",
+        "weak"
+      ],
+      "expect": [
+        "wax moth",
+        "Remove",
+        "weak"
+      ],
+      "completion": "Wax moths (greater and lesser) (Galleria mellonella / Achroia grisella) — comb-destroying pests. Weak/stressed colonies only."
+    },
+    {
+      "q": "Lots of burr comb on these frames — is this genetic?",
+      "ok": false,
+      "hits": [
+        "space",
+        "genetics"
+      ],
+      "expect": [
+        "space",
+        "genetics",
+        "scrape"
+      ],
+      "completion": "Burr comb (also called comb between frames, on the inner cover, or along the top bars) — comb built in unwanted places by bees. It's a common problem, especially in new or poorly fitted hives.\n\n**Is it genetic?** No. Burr comb is a behavioral trait of the colony, not the breed. Any queen from any breed can lay in burr comb. Some genetics (like queen genetics) might make a colony slightly more or less prone to it, but good beekeeping practices are the primary solution.\n\n**What causes it?**\n*   **Empty space:** Bees build comb to fill any gap where they sense a need. This is most common when:\n    *   Frames are not fully drawn or empty.\n    *   The hive is small for the colony size.\n    *   There's a gap between frames and the box wall, or between frames and each other.\n*   **Robbing/stress:** During"
+    },
+    {
+      "q": "I see queen cells along the bottom edge of the frames, multiple peanut-shaped ones.",
+      "ok": false,
+      "hits": [
+        "SwarmPrep",
+        "swarm"
+      ],
+      "expect": [
+        "SwarmPrep",
+        "swarm",
+        "split"
+      ],
+      "completion": "That's textbook SwarmPrep. Swarm cells. The colony is preparing to swarm. ACTION NEEDED.\n  * **Confirm:** Use a frame separator to gently pull frames apart and confirm they are indeed swarm cells (bottom edge, peanut-shaped, multiple).\n  * **Act NOW:** The longer you wait, the more drone-laying workers you risk. Options:\n    * **Artificial Swarm:** Remove a frame of eggs/young larvae + attached brood/workers to a new hive box. Let them build out and raise a queen. This preserves the colony's genetics.\n    * **Combine:** Combine with a stronger colony if you have one.\n    * **Shake Out:** (Last resort, if no queen cells are capped and you're comfortable losing the colony) Shake the bees out on the ground and let them return home. They may or may not join another colony.\n\n  * **Address the CAUSE:** Swarming is a natural"
+    },
+    {
+      "q": "There are a couple queen cells on the face of the frame, not the bottom edge.",
+      "ok": false,
+      "hits": [
+        "DO NOT",
+        "Let"
+      ],
+      "expect": [
+        "supersedure",
+        "DO NOT",
+        "Let"
+      ],
+      "completion": "This indicates Queenless. (85%) — queen died and colony is raising an emergency replacement. Emergency cells. The queen died or was lost, and the colony is raising a new queen from worker larvae. This is NOT the same as swarm cells. Swarm cells are on the bottom edge and the colony is replacing a laying queen. Emergency cells are on the frame faces and the colony is replacing a dead or lost queen. You have ~3-7 days before the new queen emerges. DO NOT destroy these cells. Let the queen emerge, mate, and start laying. Check back in 7-14 days for eggs."
+    },
+    {
+      "q": "Multiple eggs per cell and some eggs on the cell walls.",
+      "ok": false,
+      "hits": [],
+      "expect": [
+        "LayingWorkers",
+        "Combine"
+      ],
+      "completion": "This points to **Drosophila (fruit fly)**.\n\nHere's why:\n  - **Multiple eggs per cell:** Drosophila lay multiple eggs per cell, a characteristic feature of their egg-laying behavior.\n  - **Eggs on cell walls:** Eggs are often found on the walls of the brood chamber rather than centered in the cell. This is normal for Drosophila.\n\nThis is a clear sign of Drosophila. Fruit flies are common pests in orchards, gardens, and stored produce."
+    },
+    {
+      "q": "I can't find the queen but there are single eggs in the cells.",
+      "ok": false,
+      "hits": [
+        "Queenright",
+        "eggs"
+      ],
+      "expect": [
+        "Queenright",
+        "eggs",
+        "3 days"
+      ],
+      "completion": "This is textbook Queenright. (Single eggs standing on end = queen laid.) Don't disturb — let the queen continue her work. Check back in a few days for more eggs and developing brood."
+    },
+    {
+      "q": "I see queen cups on the bottom bars but they're empty — no eggs.",
+      "ok": true,
+      "hits": [
+        "queen cups",
+        "NOT",
+        "empty"
+      ],
+      "expect": [
+        "queen cups",
+        "NOT",
+        "empty"
+      ],
+      "completion": "This is a common question with several possible answers. Let's break down what empty queen cups mean and what you should do:\n\n**1. Queenright (but not laying):** The queen may be unmated or too young to lay. This is the most common cause.\n   - **Unmated:** If you introduced a virgin queen recently, she needs time to mate before she starts laying. This can take anywhere from 1-14 days (or longer in bad weather). Check back every 2-3 days for eggs.\n   - **Too Young:** If the queen is newly emerged (from a queen cell you raised or purchased), she needs a few days to develop her reproductive organs before she can lay.\n\n**2. Queenless:** The queen died or was lost, and the colony is not raising a replacement. This is an emergency.\n   - **No eggs/brood:** If there's no brood at all, the colony is likely"
+    },
+    {
+      "q": "I'm seeing bees with shriveled, crumpled wings coming out of the cells.",
+      "ok": false,
+      "hits": [
+        "varroa"
+      ],
+      "expect": [
+        "DWV",
+        "varroa",
+        "treat"
+      ],
+      "completion": "This is a clear sign of Dwindling Disease (Spiroplasma/Malpighamoeba). It's a bacterial disease, often associated with stress and varroa. Here's a breakdown of what it is, what causes it, and what you can do:\n\n**What is it?**\n\n*   Dwindling Disease (Spiroplasma/Malpighamoeba) — a bacterial disease vectored by varroa. It's a disease of the fat body, not the brain or gut.\n*   Spiroplasma apis (Spiroplasma) — the primary disease agent.\n*   Malpighamoeba mellificae — a secondary agent; often present with Spiroplasma.\n\n**Symptoms:**\n\n*   **Wings:** The defining symptom — wings are held out rather than folded over the abdomen, and are often crumpled or shriveled. This is due to the bees being too small to fill the wing cells properly during development"
+    },
+    {
+      "q": "Varroa mites visible on the backs of adult bees — small brown discs.",
+      "ok": false,
+      "hits": [
+        "treat",
+        "5%"
+      ],
+      "expect": [
+        "phoretic",
+        "treat",
+        "5%"
+      ],
+      "completion": "That's a clear sign of active varroa infestation. Seeing mites on the bee's body means the colony is heavily infested — by the time mites are visible on bees, the load is typically >5%. This is a crisis. You need to treat immediately.\n\nHere's a breakdown of what it means and what you should do:\n\n**1. What you're seeing:**\n   - **Varroa destructor:** The most common and destructive parasite of honey bees worldwide. They vector (carry) viruses that weaken and kill colonies.\n   - **Brown discs:** Adult female mites — they are ~1-2mm long and look like brown discs on the bee's abdomen. They attach to the thorax (middle section) or abdomen.\n\n**2. Severity:**\n   - Seeing mites on bee bodies = VERY HIGH mite load. This means the colony is severely stressed and virus replication is at its peak. The colony is in crisis.\n\n**3. Action"
+    },
+    {
+      "q": "My hive died — dead bees head-first in empty cells, no honey left.",
+      "ok": false,
+      "hits": [
+        "Starvation",
+        "stores"
+      ],
+      "expect": [
+        "Starvation",
+        "starved",
+        "stores"
+      ],
+      "completion": "This is a clear sign of **Starvation**. Bees crawled into cells looking for food and died there. The colony ran out of honey. This is preventable — either they didn't have enough stores going into winter, or they consumed them faster than expected (small cluster, cold spell).\n\nHere's a breakdown of what happened and what you should do:\n\n**1. What Starvation Is:**\n   - The colony consumed all available honey reserves.\n   - Bees died of hunger.\n   - Head-first in cells = they were crawling looking for food and died in place.\n   - Empty cells = they ate everything. No honey left to rob.\n\n**2. What to Do NOW:**\n   - **Feed immediately.** Sugar syrup (1:1 ratio during active season, 2:1 in winter/early spring) through a feeder (top feeder, entrance feeder, or even just a dish).  They need energy to detoxify and rebuild."
+    },
+    {
+      "q": "Big pile of dead bees at the entrance with their tongues sticking out.",
+      "ok": false,
+      "hits": [
+        "pesticide"
+      ],
+      "expect": [
+        "pesticide",
+        "tongues"
+      ],
+      "completion": "This is a classic sign of **Pesticide Poisoning**.\n\nHere's a breakdown of what it means and what you should do:\n\n**What it is:** Pesticide poisoning. The bees died from exposure to a pesticide (insecticide, herbicide, fungicide, etc.). The tongue-extended death is a key symptom — it indicates acute poisoning. The bees were trying to drink and died mid-feed.\n\n**What to do:**\n\n1.  **Report to your state agricultural department or extension office:** This is crucial. They need to track pesticide events and identify the active ingredient.  They may also investigate if the application was legal and if the applicator followed best practices.  In some states, you are legally required to report a bee kill.\n2.  **Note everything:**\n    *   Date and time you found the dead bees.\n    *   Exact location (GPS coordinates if possible).\n    *   Direction the bees were facing.\n    *"
+    },
+    {
+      "q": "Hive is empty, no dead bees, but there's brood left behind and some honey.",
+      "ok": true,
+      "hits": [
+        "Absconding",
+        "left",
+        "stress"
+      ],
+      "expect": [
+        "Absconding",
+        "left",
+        "stress"
+      ],
+      "completion": "This is the classic sign of **Absconding**. The entire colony left — usually due to stress (mites, predators, disturbance, starvation, or a combination). Absconding is common with packages or small colonies under severe stress (varroa, small hive beetle pressure, pesticide, or even repeated disturbance).\n\nHere's a breakdown of what absconding means and what you should do:\n\n**What Happened?**\n\n*   The colony was under severe stress and chose to abandon the hive rather than fight through it. Bees abscond when the threat is too great for them to defend themselves and their brood.\n*   Absconding is different from swarming. Swarming is a planned event with the queen leaving first. Absconding is a panicked evacuation — the queen may or may not have left, and the brood is left behind.\n\n**What to Do Now:**\n\n1.  **Check for the Queen:** Look carefully for queen cells or queen cups on the"
+    }
+  ]
+}
