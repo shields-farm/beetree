@@ -2122,7 +2122,10 @@ import { getWeather as getWeatherData, wmoDescription } from './weather.js';
 
 const HERMES_API_URL = process.env.HERMES_API_URL || 'http://127.0.0.1:8642/v1/chat/completions';
 const HERMES_API_KEY = process.env.HERMES_API_KEY || 'dev-hermes-api-key-replace-me';
-const HERMES_MODEL = process.env.HERMES_MODEL || 'syn:small:text';
+// Model for the Buzz chat lane. Pinned explicitly rather than left to the
+// gateway default so a Hermes-side model change doesn't silently reshape this
+// lane; override with HERMES_MODEL when you want to test another model.
+const HERMES_MODEL = process.env.HERMES_MODEL || 'deepseek-v4.1-flash';
 const MAX_TOOL_ROUNDS = 5; // Prevent infinite loops
 
 /** Load the Buzz persona reference (untrusted tone/voice guide). */
@@ -3304,8 +3307,11 @@ app.post('/api/buzz/thread', (req, res) => {
      VALUES (?, ?, 'user', ?, NULL, NULL, NULL, 'buzz-thread', ?)`
   ).run(id, sess.id, content, now);
   db.prepare('UPDATE chat_sessions SET updated_at = ? WHERE id = ?').run(now, sess.id);
-  // cursor: monotonic sequence so the relay can ask for "since N" cheaply
-  const seq = (db.prepare('SELECT COUNT(*) AS c FROM chat_messages WHERE session_id = ?').get(sess.id) as any).c;
+  // Cursor space is USER messages only — that is what /pending paginates over.
+  // (Counting all messages here would return a cursor the relay can't use.)
+  const seq = (db.prepare(
+    `SELECT COUNT(*) AS c FROM chat_messages WHERE session_id = ? AND role = 'user'`
+  ).get(sess.id) as any).c;
   res.json({ ...chatRowToMessage(db.prepare('SELECT * FROM chat_messages WHERE id = ?').get(id)), cursor: seq });
 });
 
