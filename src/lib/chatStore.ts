@@ -2,6 +2,12 @@
  * Global chat store that lives outside React component lifecycle.
  * This allows chat requests to continue loading when the user navigates
  * away from the chat page and comes back.
+ *
+ * Server-backed (Sept 2026): sessions + messages persist in SQLite via
+ * /api/chat/* endpoints, so history roams across devices (phone via Tailscale
+ * ↔ desktop). localStorage is only used for the active-session pointer and
+ * the one-time legacy-history migration. Messages are synced optimistically:
+ * local echo immediately, server POST in the background.
  */
 
 import { API_BASE, apiFetch } from './apiBase';
@@ -16,6 +22,7 @@ export interface ChatMessage {
   followUps?: string[];
   a2uiMessages?: any[];
   sensorCards?: any[];
+  pending?: boolean;
 }
 
 export interface ChatSession {
@@ -26,31 +33,18 @@ export interface ChatSession {
   updatedAt: string;
 }
 
-const SESSIONS_KEY = 'beetree-chat-sessions';
 const ACTIVE_KEY = 'beetree-chat-active';
+const MIGRATED_KEY = 'beetree-chat-migrated';
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
 
-let sessions: ChatSession[] = loadSessions();
-let activeSessionId: string | null = localStorage.getItem(ACTIVE_KEY) || null;
+let sessions: ChatSession[] = [];
+let activeSessionId: string | null = (() => {
+  try { return localStorage.getItem(ACTIVE_KEY); } catch { return null; }
+})();
 let loading = false;
-
-function loadSessions(): ChatSession[] {
-  try {
-    const raw = localStorage.getItem(SESSIONS_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return [];
-}
-
-function persist() {
-  try {
-    const trimmed = sessions.slice(0, 10).map(s => ({ ...s, messages: s.messages.slice(-50) }));
-    localStorage.setItem(SESSIONS_KEY, JSON.stringify(trimmed));
-  } catch {}
-  if (activeSessionId) localStorage.setItem(ACTIVE_KEY, activeSessionId);
-}
+let hydrated = false;
 
 function notify() {
   listeners.forEach(l => l());
@@ -64,40 +58,157 @@ export function subscribe(listener: Listener): () => void {
 export function getSessions() { return sessions; }
 export function getActiveSessionId() { return activeSessionId; }
 export function getLoading() { return loading; }
+export function isHydrated() { return hydrated; }
 
 export function setActiveSession(id: string) {
   activeSessionId = id;
-  persist();
+  try { localStorage.setItem(ACTIVE_KEY, id); } catch { /* ignore */ }
   notify();
 }
 
+// ---------- hydrate from server ----------
+
+export async function hydrate(): Promise<void> {
+  if (hydrated) return;
+  hydrated = true;
+  try {
+    const res = await apiFetch(API_BASE + '/api/chat/sessions');
+    if (res.ok) {
+      sessions = (await res.json()) as ChatSession[];
+      sessions = sessions.map(s => ({ ...s, messages: [] }));
+      if (!activeSessionId || !sessions.some(s => s.id === activeSessionId)) {
+        activeSessionId = sessions[0]?.id ?? null;
+        if (activeSessionId) {
+          try { localStorage.setItem(ACTIVE_KEY, activeSessionId); } catch { /* ignore */ }
+        }
+      }
+      // Lazy-load messages for the active session only; others load on switch.
+      if (activeSessionId) await loadMessages(activeSessionId);
+      notify();
+    }
+  } catch { /* server unreachable — start empty, retry on next action */ }
+  void migrateLegacyLocal();
+}
+
+export async function loadMessages(sessionId: string): Promise<void> {
+  const sess = sessions.find(s => s.id === sessionId);
+  if (!sess || sess.messages.length > 0) return;
+  try {
+    const res = await apiFetch(API_BASE + '/api/chat/sessions/' + sessionId + '/messages');
+    if (res.ok) {
+      sess.messages = (await res.json()) as ChatMessage[];
+      notify();
+    }
+  } catch { /* ignore */ }
+}
+
+/** One-time: push legacy localStorage history to the server, then clear it. */
+async function migrateLegacyLocal(): Promise<void> {
+  try {
+    if (localStorage.getItem(MIGRATED_KEY)) return;
+    const raw = localStorage.getItem('beetree-chat-sessions');
+    if (!raw) { localStorage.setItem(MIGRATED_KEY, '1'); return; }
+    const legacy = JSON.parse(raw) as ChatSession[];
+    const rich = [...legacy].sort((a, b) => (b.messages?.length ?? 0) - (a.messages?.length ?? 0)).slice(0, 10);
+    if (rich.length === 0) { localStorage.setItem(MIGRATED_KEY, '1'); return; }
+    const res = await apiFetch(API_BASE + '/api/chat/migrate-local', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessions: rich }),
+    });
+    if (res.ok) {
+      localStorage.setItem(MIGRATED_KEY, '1');
+      localStorage.removeItem('beetree-chat-sessions');
+      sessions = [];
+      activeSessionId = null;
+      hydrated = false;
+      await hydrate();
+    }
+  } catch { /* migration is best-effort; retried next load until it succeeds */ }
+}
+
+// ---------- session ops (server-backed) ----------
+
 export function newSession(welcomeMessage: ChatMessage): string {
+  const tempId = `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const now = new Date().toISOString();
   const session: ChatSession = {
-    id: `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    id: tempId,
     title: 'New Chat',
     messages: [welcomeMessage],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: now,
+    updatedAt: now,
   };
   sessions = [session, ...sessions];
-  activeSessionId = session.id;
-  persist();
+  activeSessionId = tempId;
+  try { localStorage.setItem(ACTIVE_KEY, tempId); } catch { /* ignore */ }
   notify();
-  return session.id;
+  // Create server-side; adopt the real id when it returns.
+  apiFetch(API_BASE + '/api/chat/sessions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: 'New Chat' }),
+  }).then(async res => {
+    if (!res.ok) return;
+    const created = await res.json();
+    const createdId = created.id as string;
+    // Re-point the temp session: keep local id stable in memory, remember server id for persistence.
+    (session as any).serverId = createdId;
+    void persistMessage(tempId, createdId, welcomeMessage, now);
+    notify();
+  }).catch(() => { /* offline — local-only for now */ });
+  return tempId;
 }
 
 export function deleteSession(id: string) {
   sessions = sessions.filter(s => s.id !== id);
   if (activeSessionId === id) {
     activeSessionId = sessions[0]?.id ?? null;
+    if (activeSessionId) { try { localStorage.setItem(ACTIVE_KEY, activeSessionId); } catch { /* ignore */ } }
   }
-  persist();
   notify();
+  const target = sessions.find(s => s.id === activeSessionId);
+  if (target && target.messages.length === 0) void loadMessages(target.id);
+  apiFetch(API_BASE + '/api/chat/sessions/' + id, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ deleted: true }),
+  }).catch(() => { /* ignore */ });
+}
+
+/** Resolve the durable server id for a (possibly still temp-id) session. */
+function serverIdFor(id: string): string | null {
+  const sess = sessions.find(s => s.id === id);
+  if (!sess) return null;
+  return (sess as any).serverId ?? (/^chat-/.test(id) ? id : null);
+}
+
+/** Persist a single message to the server (fire-and-forget). */
+async function persistMessage(sessionLocalId: string, knownServerId: string | null, m: ChatMessage, ts: string): Promise<void> {
+  let serverId = knownServerId ?? serverIdFor(sessionLocalId);
+  // Wait briefly for session creation to round-trip if it hasn't yet.
+  for (let i = 0; !serverId && i < 10; i++) {
+    await new Promise(r => setTimeout(r, 300));
+    serverId = serverIdFor(sessionLocalId);
+  }
+  if (!serverId) return; // offline — message stays local only
+  apiFetch(API_BASE + '/api/chat/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sessionId: serverId,
+      role: m.role,
+      content: m.content,
+      toolCalls: m.toolCalls,
+      followUps: m.followUps,
+      thinking: m.thinking,
+      timestamp: ts,
+    }),
+  }).catch(() => { /* ignore */ });
 }
 
 export function updateSession(id: string, updater: (s: ChatSession) => ChatSession) {
   sessions = sessions.map(s => s.id === id ? updater(s) : s);
-  persist();
   notify();
 }
 
@@ -116,7 +227,7 @@ export function buildMessagesPayload(
 /**
  * Send a chat message. This runs OUTSIDE React's lifecycle — it continues
  * even if the ChatPage component unmounts. Results are stored in the session
- * and listeners are notified.
+ * and listeners are notified. Every message is persisted server-side.
  */
 export async function sendChat(
   sessionId: string,
@@ -124,19 +235,21 @@ export async function sendChat(
   currentMessages: ChatMessage[],
   userText: string,
 ): Promise<void> {
+  const now = new Date().toISOString();
   const userMsg: ChatMessage = {
     id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     role: 'user',
     content: userText.trim(),
-    timestamp: new Date().toISOString(),
+    timestamp: now,
   };
 
   updateSession(sessionId, s => ({
     ...s,
     title: s.messages.length <= 1 ? userText.trim().slice(0, 40) : s.title,
     messages: [...s.messages, userMsg],
-    updatedAt: new Date().toISOString(),
+    updatedAt: now,
   }));
+  void persistMessage(sessionId, null, userMsg, now);
 
   loading = true;
   notify();
@@ -176,6 +289,7 @@ export async function sendChat(
     const sensorCards = (data.sensorCards as any[]) || undefined;
     const toolCalls = data.toolCalls;
     const thinking = data.thinking;
+    const assistantTs = new Date().toISOString();
 
     updateSession(sessionId, s => ({
       ...s,
@@ -183,16 +297,23 @@ export async function sendChat(
         id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         role: 'assistant',
         content: cleanContent,
-        timestamp: new Date().toISOString(),
+        timestamp: assistantTs,
         thinking, toolCalls,
         followUps: followUps.length > 0 ? followUps : undefined,
         a2uiMessages: a2uiMessages.length > 0 ? a2uiMessages : undefined,
         sensorCards,
       }],
-      updatedAt: new Date().toISOString(),
+      updatedAt: assistantTs,
     }));
+    void persistMessage(sessionId, null, {
+      role: 'assistant',
+      content: cleanContent,
+      thinking, toolCalls,
+      followUps: followUps.length > 0 ? followUps : undefined,
+    } as ChatMessage, assistantTs);
   } catch (err) {
     const isAbort = err instanceof DOMException && err.name === 'AbortError';
+    const errTs = new Date().toISOString();
     updateSession(sessionId, s => ({
       ...s,
       messages: [...s.messages, {
@@ -201,7 +322,7 @@ export async function sendChat(
         content: isAbort
           ? '⏱️ That took too long. The AI might be busy — try asking again.'
           : `Sorry, I couldn't reach the AI backend.\n\nError: ${err instanceof Error ? err.message : 'Unknown error'}`,
-        timestamp: new Date().toISOString(),
+        timestamp: errTs,
       }],
     }));
   } finally {
