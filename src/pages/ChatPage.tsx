@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, MessageCircle, AlertCircle, Sparkles, Brain, Wrench, CheckCircle2, Plus, Trash2, Clock, ChevronLeft } from 'lucide-react';
+import { Send, MessageCircle, AlertCircle, Sparkles, Brain, Wrench, CheckCircle2, Plus, Trash2, Clock, ChevronLeft, RefreshCw } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { generateAlerts } from '../lib/alerts';
@@ -130,6 +130,13 @@ export function ChatPage() {
     chatStore.sendChat(activeSessionId, context, currentMessages, text);
   }, [input, loading, activeSessionId, activeSession, apiaries, hives, inspections, sensors, tasks]);
 
+  // Retry the last question after a failed turn. The context is rebuilt for
+  // the same reason send() does it: hive/task state may have moved on.
+  const retry = useCallback(() => {
+    if (!activeSessionId || loading) return;
+    chatStore.retryLast(activeSessionId, buildContext(apiaries, hives, inspections, sensors, tasks));
+  }, [activeSessionId, loading, apiaries, hives, inspections, sensors, tasks]);
+
   const quickQuestions = ["Which hive needs attention?", "What's the temp trend on my hives?", "What should I do this week?", "Any swarm risk?"];
 
   // Session list sidebar
@@ -211,6 +218,15 @@ export function ChatPage() {
                 <div dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) }} className="prose-chat" />
               ) : (
                 <div className="whitespace-pre-wrap">{m.content}</div>
+              )}
+              {m.failed && (
+                <button
+                  onClick={retry}
+                  disabled={loading}
+                  className="mt-2 flex items-center gap-1.5 text-xs font-medium text-honey-700 dark:text-honey-300 bg-honey-50 dark:bg-honey-950 border border-honey-200 dark:border-honey-800 px-3 py-1.5 rounded-lg hover:bg-honey-100 disabled:opacity-40"
+                >
+                  <RefreshCw size={12} /> Retry
+                </button>
               )}
               {m.sensorCards && m.sensorCards.length > 0 && (
                 <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
