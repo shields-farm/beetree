@@ -23,6 +23,8 @@ export interface ChatMessage {
   a2uiMessages?: any[];
   sensorCards?: any[];
   pending?: boolean;
+  /** The turn failed to deliver a reply — offer a one-tap retry. */
+  failed?: boolean;
 }
 
 export interface ChatSession {
@@ -72,7 +74,9 @@ export async function hydrate(): Promise<void> {
   if (hydrated) return;
   hydrated = true;
   try {
-    const res = await apiFetch(API_BASE + '/api/chat/sessions');
+    // Lane-scoped: this store drives the Buzz chat (Hermes lane) only. The Buzz Thread
+    // page has its own lane; crossing them sends messages somewhere nothing answers.
+    const res = await apiFetch(API_BASE + '/api/chat/sessions?lane=chat');
     if (res.ok) {
       sessions = (await res.json()) as ChatSession[];
       sessions = sessions.map(s => ({ ...s, messages: [] }));
@@ -228,6 +232,13 @@ export function buildMessagesPayload(
  * Send a chat message. This runs OUTSIDE React's lifecycle — it continues
  * even if the ChatPage component unmounts. Results are stored in the session
  * and listeners are notified. Every message is persisted server-side.
+ *
+ * No client-side abort timeout: a Buzz answer that calls tools takes 60-100s
+ * end to end (up to 5 tool rounds, each a separate LLM call plus local
+ * dispatch), so a 120s abort raced that work — the request kept running
+ * server-side and the answer was logged, but the UI showed "that took too
+ * long" and the reply never arrived. The server's SSE keep-alive pings keep
+ * the connection warm through Tailscale, so waiting is safe.
  */
 export async function sendChat(
   sessionId: string,
@@ -253,17 +264,78 @@ export async function sendChat(
 
   loading = true;
   notify();
+  try {
+    await requestReply(sessionId, context, currentMessages, userText);
+  } finally {
+    loading = false;
+    notify();
+  }
+}
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 120_000);
+/**
+ * Re-ask the last question after a failed turn.
+ *
+ * The failed turn's bubble is dropped from the history *and* from the UI, so
+ * the retry is a clean re-ask rather than a nested "retry" message the model
+ * has to interpret — and Mark is left with one question and one answer, not a
+ * stack of error bubbles.
+ */
+export async function retryLast(
+  sessionId: string,
+  context: string,
+): Promise<void> {
+  if (loading) return;
+  const session = sessions.find(s => s.id === sessionId);
+  if (!session) return;
 
+  const userMsg = [...session.messages].reverse().find(m => m.role === 'user');
+  if (!userMsg) return;
+
+  // History as it stood before the question — the question is appended by
+  // buildMessagesPayload inside requestReply.
+  const userIndex = session.messages.findIndex(m => m.id === userMsg.id);
+  const history = session.messages
+    .slice(0, userIndex)
+    .filter(m => !m.failed)
+    .map(m => ({ role: m.role, content: m.content })) as ChatMessage[];
+
+  // Drop the failed bubble but keep the question on screen. Sending the
+  // history from before the question is what avoids duplicating it: the
+  // payload appends userText, so the model sees it once while the UI still
+  // shows the single bubble the retry is replacing.
+  updateSession(sessionId, s => ({
+    ...s,
+    messages: s.messages.filter(m => !m.failed),
+  }));
+
+  loading = true;
+  notify();
+  try {
+    await requestReply(sessionId, context, history, userMsg.content);
+  } finally {
+    loading = false;
+    notify();
+  }
+}
+
+/**
+ * Build the conversation payload and ask Buzz, storing the reply in the session.
+ *
+ * Shared by the first attempt and by `retryLast`. `currentMessages` is the
+ * history to send — the caller decides whether that includes the failed turn.
+ */
+async function requestReply(
+  sessionId: string,
+  context: string,
+  currentMessages: ChatMessage[],
+  userText: string,
+): Promise<void> {
   try {
     const payload = buildMessagesPayload(context, currentMessages, userText);
     const response = await apiFetch(API_BASE + '/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messages: payload, stream: true }),
-      signal: controller.signal,
     });
 
     if (!response.ok) throw new Error(`BeeTree API returned ${response.status}`);
@@ -277,8 +349,13 @@ export async function sendChat(
       const dataLine = lines.find(l => l.startsWith('data: '));
       if (!dataLine) throw new Error('No data in SSE response');
       data = JSON.parse(dataLine.slice(6));
+      // The server delivers errors on the same channel as answers. Without
+      // this the UI showed "No response from AI." and the real reason — an
+      // upstream 503, a missing tool — was swallowed.
+      if (data.error) throw new Error(String(data.error));
     } else {
       data = await response.json();
+      if (data.error) throw new Error(String(data.error));
     }
     const rawContent = data.content ?? 'No response from AI.';
     const cleanContent = rawContent
@@ -312,21 +389,22 @@ export async function sendChat(
       followUps: followUps.length > 0 ? followUps : undefined,
     } as ChatMessage, assistantTs);
   } catch (err) {
-    const isAbort = err instanceof DOMException && err.name === 'AbortError';
+    // A failure here means the reply never reached the UI. Say so once, in
+    // plain language, and mark the turn as retryable rather than only
+    // advertising the error text — the answer exists (or existed) server-side
+    // and Mark's question is still the last thing he said.
     const errTs = new Date().toISOString();
     updateSession(sessionId, s => ({
       ...s,
       messages: [...s.messages, {
         id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         role: 'assistant',
-        content: isAbort
-          ? '⏱️ That took too long. The AI might be busy — try asking again.'
-          : `Sorry, I couldn't reach the AI backend.\n\nError: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        content: `I didn't get an answer back — ${err instanceof Error ? err.message : 'unknown error'}. Tap retry and I'll pick it up from here.`,
         timestamp: errTs,
+        failed: true,
       }],
     }));
   } finally {
-    clearTimeout(timeout);
     loading = false;
     notify();
   }
