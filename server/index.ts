@@ -3260,6 +3260,125 @@ app.post('/api/chat/migrate-local', (req, res) => {
   res.json({ imported, skipped });
 });
 
+// ============================================================================
+// Buzz Thread — async correspondence lane with the headlong buzz identity
+// Lane is a chat session with lane='buzz-thread'. Relay (host) is the only
+// writer for buzz replies; Mark is the only writer for user messages.
+// ============================================================================
+
+// Synthetic pinned session holds the thread. Created lazily on first access.
+function getBuzzThreadSession(): any {
+  let sess = db.prepare(
+    `SELECT * FROM chat_sessions WHERE lane = 'buzz-thread' AND deleted_at IS NULL ORDER BY created_at ASC LIMIT 1`
+  ).get() as any;
+  if (!sess) {
+    const now = new Date().toISOString();
+    const id = genId('chat');
+    db.prepare(
+      `INSERT INTO chat_sessions (id, title, lane, pinned, created_at, updated_at)
+       VALUES (?, 'Buzz Thread', 'buzz-thread', 1, ?, ?)`
+    ).run(id, now, now);
+    sess = db.prepare('SELECT * FROM chat_sessions WHERE id = ?').get(id);
+  }
+  return sess;
+}
+
+app.get('/api/buzz/thread', (req, res) => {
+  const sess = getBuzzThreadSession();
+  const limit = Math.min(Number(req.query.limit) || 200, 500);
+  const rows = db.prepare(
+    `SELECT * FROM chat_messages WHERE session_id = ? ORDER BY created_at DESC LIMIT ?`
+  ).all(sess.id, limit) as any[];
+  rows.reverse();
+  res.json(rows.map(chatRowToMessage));
+});
+
+app.post('/api/buzz/thread', (req, res) => {
+  const sess = getBuzzThreadSession();
+  const content = String((req.body || {}).content || '').trim();
+  if (!content) return res.status(400).json({ error: 'content required' });
+  const now = new Date().toISOString();
+  const id = genId('msg');
+  db.prepare(
+    `INSERT INTO chat_messages (id, session_id, role, content, tool_calls_json, thinking, follow_ups_json, lane, created_at)
+     VALUES (?, ?, 'user', ?, NULL, NULL, NULL, 'buzz-thread', ?)`
+  ).run(id, sess.id, content, now);
+  db.prepare('UPDATE chat_sessions SET updated_at = ? WHERE id = ?').run(now, sess.id);
+  // cursor: monotonic sequence so the relay can ask for "since N" cheaply
+  const seq = (db.prepare('SELECT COUNT(*) AS c FROM chat_messages WHERE session_id = ?').get(sess.id) as any).c;
+  res.json({ ...chatRowToMessage(db.prepare('SELECT * FROM chat_messages WHERE id = ?').get(id)), cursor: seq });
+});
+
+// Relay-only: buzz's replies land here.
+app.post('/api/buzz/thread/inbound', (req, res) => {
+  const sess = getBuzzThreadSession();
+  const b = req.body || {};
+  const content = String(b.content || '').trim();
+  if (!content) return res.status(400).json({ error: 'content required' });
+  const now = new Date().toISOString();
+  const id = genId('msg');
+  db.prepare(
+    `INSERT INTO chat_messages (id, session_id, role, content, tool_calls_json, thinking, follow_ups_json, lane, created_at)
+     VALUES (?, ?, 'assistant', ?, NULL, NULL, NULL, 'buzz-thread', ?)`
+  ).run(id, sess.id, content, b.timestamp || now);
+  db.prepare('UPDATE chat_sessions SET updated_at = ? WHERE id = ?').run(now, sess.id);
+  res.json(chatRowToMessage(db.prepare('SELECT * FROM chat_messages WHERE id = ?').get(id)));
+});
+
+// Relay-only: user messages newer than `since` (cursor = per-thread message count).
+app.get('/api/buzz/thread/pending', (req, res) => {
+  const sess = getBuzzThreadSession();
+  const since = Math.max(Number(req.query.since) || 0, 0);
+  const rows = db.prepare(
+    `SELECT * FROM chat_messages WHERE session_id = ? AND role = 'user' ORDER BY created_at ASC`
+  ).all(sess.id) as any[];
+  const total = rows.length;
+  const pending = rows.slice(since).map((r: any, i: number) => ({
+    ...chatRowToMessage(r),
+    cursor: since + i + 1,
+  }));
+  res.json(pending);
+  void total;
+});
+
+// Presence: proof of life from trajectory mtime (never `persona status`).
+app.get('/api/buzz/presence', async (_req, res) => {
+  try {
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const execFileAsync = promisify(execFile);
+    const container = 'headlong';
+    const idDir = '/root/.headlong/app/.identities/buzz';
+    const running = (await execFileAsync('docker', ['inspect', '-f', '{{.State.Running}}', container], { timeout: 10_000 })).stdout.trim() === 'true';
+    if (!running) {
+      return res.json({ alive: false, state: 'offline', lastCycleAgeMin: null, source: 'container-down' });
+    }
+    // monolith log tick = alive in-run hold (same gate as the watchdogs)
+    let logTs = 0;
+    try {
+      logTs = Number((await execFileAsync('docker', ['exec', container, 'stat', '-c', '%Y', idDir + '/run/logs/monolith.log'], { timeout: 10_000 })).stdout.trim()) || 0;
+    } catch { /* fall through to trajectory */ }
+    let trajTs = 0;
+    try {
+      trajTs = Number((await execFileAsync('docker', ['exec', container, 'sh', '-c',
+        "find " + idDir + "/trajectories -name trajectory.jsonl -newermt '-7 days' -exec stat -c %Y {} \\; | sort -n | tail -1"],
+        { timeout: 15_000 })).stdout.trim()) || 0;
+    } catch { /* ignore */ }
+    const now = Math.floor(Date.now() / 1000);
+    const freshest = Math.max(logTs, trajTs);
+    const ageMin = freshest > 0 ? Math.floor((now - freshest) / 60) : null;
+    const alive = freshest > 0 && (now - freshest) < 900; // <15m tick
+    res.json({
+      alive,
+      state: alive ? 'active' : (freshest > 0 ? 'stale' : 'unknown'),
+      lastCycleAgeMin: ageMin,
+      source: logTs > trajTs ? 'monolith-log' : 'trajectory-mtime',
+    });
+  } catch (e: any) {
+    res.json({ alive: false, state: 'unknown', lastCycleAgeMin: null, source: 'error', error: String(e?.message || e) });
+  }
+});
+
 // Serve built frontend (production mode)
 const distPath = path.resolve(import.meta.dirname, '..', 'dist');
 if (fs.existsSync(distPath)) {
