@@ -3103,6 +3103,163 @@ app.get('/api/ontology/insights', async (_req, res) => {
   res.json({ insights, generatedAt: now.toISOString(), season: (o.getSeasonPhaseFor(now.toISOString()) as any)?.phase });
 });
 
+// ============================================================================
+// Chat history — server-side sessions + messages (all lanes)
+// ============================================================================
+
+const CHAT_SESSION_MAX = 200;
+const CHAT_MSG_MAX = 200;
+
+function chatRowToSession(row: any): any {
+  return {
+    id: row.id,
+    title: row.title,
+    lane: row.lane,
+    pinned: !!row.pinned,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function chatRowToMessage(row: any): any {
+  return {
+    id: row.id,
+    sessionId: row.session_id,
+    role: row.role,
+    content: row.content,
+    thinking: row.thinking || undefined,
+    toolCalls: row.tool_calls_json ? JSON.parse(row.tool_calls_json) : undefined,
+    followUps: row.follow_ups_json ? JSON.parse(row.follow_ups_json) : undefined,
+    lane: row.lane,
+    timestamp: row.created_at,
+  };
+}
+
+app.get('/api/chat/sessions', (_req, res) => {
+  const rows = db.prepare(
+    `SELECT * FROM chat_sessions WHERE deleted_at IS NULL ORDER BY pinned DESC, updated_at DESC LIMIT ?`
+  ).all(CHAT_SESSION_MAX) as any[];
+  res.json(rows.map(chatRowToSession));
+});
+
+app.post('/api/chat/sessions', (req, res) => {
+  const b = req.body || {};
+  const now = new Date().toISOString();
+  const id = genId('chat');
+  db.prepare(
+    `INSERT INTO chat_sessions (id, title, lane, pinned, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(id, b.title || 'New Chat', b.lane === 'buzz-thread' ? 'buzz-thread' : 'chat', b.pinned ? 1 : 0, now, now);
+  res.json(chatRowToSession(db.prepare('SELECT * FROM chat_sessions WHERE id = ?').get(id)));
+});
+
+app.patch('/api/chat/sessions/:id', (req, res) => {
+  const sess = db.prepare('SELECT * FROM chat_sessions WHERE id = ?').get(req.params.id) as any;
+  if (!sess) return res.status(404).json({ error: 'session not found' });
+  const b = req.body || {};
+  if (b.deleted === true) {
+    db.prepare('UPDATE chat_sessions SET deleted_at = ? WHERE id = ?').run(new Date().toISOString(), sess.id);
+  } else {
+    const title = b.title !== undefined ? String(b.title).slice(0, 200) : sess.title;
+    const pinned = b.pinned !== undefined ? (b.pinned ? 1 : 0) : sess.pinned;
+    db.prepare('UPDATE chat_sessions SET title = ?, pinned = ?, updated_at = ? WHERE id = ?')
+      .run(title, pinned, new Date().toISOString(), sess.id);
+  }
+  const row = db.prepare('SELECT * FROM chat_sessions WHERE id = ?').get(sess.id);
+  res.json(chatRowToSession(row));
+});
+
+app.get('/api/chat/sessions/:id/messages', (req, res) => {
+  const sess = db.prepare('SELECT * FROM chat_sessions WHERE id = ? AND deleted_at IS NULL').get(req.params.id) as any;
+  if (!sess) return res.status(404).json({ error: 'session not found' });
+  const before = typeof req.query.before === 'string' ? req.query.before : null;
+  const rows = (before
+    ? db.prepare('SELECT * FROM chat_messages WHERE session_id = ? AND created_at < ? ORDER BY created_at DESC LIMIT ?').all(sess.id, before, CHAT_MSG_MAX)
+    : db.prepare('SELECT * FROM chat_messages WHERE session_id = ? ORDER BY created_at DESC LIMIT ?').all(sess.id, CHAT_MSG_MAX)
+  ) as any[];
+  rows.reverse(); // oldest → newest for rendering
+  res.json(rows.map(chatRowToMessage));
+});
+
+app.post('/api/chat/messages', (req, res) => {
+  const b = req.body || {};
+  if (!b.sessionId || !b.role || typeof b.content !== 'string') {
+    return res.status(400).json({ error: 'sessionId, role, content required' });
+  }
+  const sess = db.prepare('SELECT * FROM chat_sessions WHERE id = ? AND deleted_at IS NULL').get(b.sessionId) as any;
+  if (!sess) return res.status(404).json({ error: 'session not found' });
+  const role = b.role === 'assistant' ? 'assistant' : 'user';
+  const lane = sess.lane; // lane inherits from session — client never sets it
+  const now = new Date().toISOString();
+  const id = genId('msg');
+  db.prepare(
+    `INSERT INTO chat_messages (id, session_id, role, content, tool_calls_json, thinking, follow_ups_json, lane, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    id, b.sessionId, role, b.content,
+    b.toolCalls ? JSON.stringify(b.toolCalls) : null,
+    b.thinking || null,
+    b.followUps ? JSON.stringify(b.followUps) : null,
+    lane, b.timestamp || now
+  );
+  // Server-side trim: keep newest CHAT_MSG_MAX per session
+  db.prepare(
+    `DELETE FROM chat_messages WHERE session_id = ? AND id NOT IN (
+       SELECT id FROM chat_messages WHERE session_id = ? ORDER BY created_at DESC LIMIT ?)`
+  ).run(b.sessionId, b.sessionId, CHAT_MSG_MAX);
+  // Auto-title from first user message (matches previous client behavior)
+  const count = (db.prepare('SELECT COUNT(*) AS c FROM chat_messages WHERE session_id = ? AND role = ?').get(b.sessionId, 'user') as any).c;
+  if (role === 'user' && count === 1 && (sess.title === 'New Chat' || !sess.title)) {
+    db.prepare('UPDATE chat_sessions SET title = ?, updated_at = ? WHERE id = ?').run(b.content.trim().slice(0, 40), now, b.sessionId);
+  } else {
+    db.prepare('UPDATE chat_sessions SET updated_at = ? WHERE id = ?').run(now, b.sessionId);
+  }
+  res.json(chatRowToMessage(db.prepare('SELECT * FROM chat_messages WHERE id = ?').get(id)));
+});
+
+// One-time migration: pull localStorage chat history into the server.
+// Idempotent-ish: dedupes on (content, timestamp). Client clears its key after 200 OK.
+app.post('/api/chat/migrate-local', (req, res) => {
+  const sessionsIn = (req.body || {}).sessions as any[];
+  if (!Array.isArray(sessionsIn)) return res.status(400).json({ error: 'sessions[] required' });
+  let imported = 0, skipped = 0;
+  const now = new Date().toISOString();
+  for (const s of sessionsIn.slice(0, 50)) {
+    if (!s || !Array.isArray(s.messages) || s.messages.length === 0) { skipped++; continue; }
+    const existing = db.prepare(
+      `SELECT id FROM chat_sessions WHERE title = ? AND created_at = ?`
+    ).get(String(s.title || 'New Chat').slice(0, 200), String(s.createdAt || now)) as any;
+    let sessionId: string;
+    if (existing) {
+      sessionId = existing.id;
+    } else {
+      sessionId = genId('chat');
+      db.prepare(
+        `INSERT INTO chat_sessions (id, title, lane, pinned, created_at, updated_at) VALUES (?, ?, 'chat', 0, ?, ?)`
+      ).run(sessionId, String(s.title || 'New Chat').slice(0, 200), String(s.createdAt || now), String(s.updatedAt || now));
+    }
+    for (const m of s.messages.slice(-CHAT_MSG_MAX)) {
+      if (!m || typeof m.content !== 'string' || !m.role) { skipped++; continue; }
+      if (m.role === 'system') { skipped++; continue; }
+      const dup = db.prepare(
+        `SELECT id FROM chat_messages WHERE session_id = ? AND content = ? AND created_at = ?`
+      ).get(sessionId, m.content, String(m.timestamp || now)) as any;
+      if (dup) { skipped++; continue; }
+      db.prepare(
+        `INSERT INTO chat_messages (id, session_id, role, content, tool_calls_json, thinking, follow_ups_json, lane, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'chat', ?)`
+      ).run(
+        genId('msg'), sessionId, m.role === 'assistant' ? 'assistant' : 'user', m.content,
+        m.toolCalls ? JSON.stringify(m.toolCalls) : null,
+        m.thinking || null,
+        m.followUps ? JSON.stringify(m.followUps) : null,
+        String(m.timestamp || now)
+      );
+      imported++;
+    }
+  }
+  res.json({ imported, skipped });
+});
+
 // Serve built frontend (production mode)
 const distPath = path.resolve(import.meta.dirname, '..', 'dist');
 if (fs.existsSync(distPath)) {

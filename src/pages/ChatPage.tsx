@@ -62,6 +62,14 @@ export function ChatPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  // Hydrate sessions from server on first mount (roaming history)
+  useEffect(() => { void chatStore.hydrate(); }, []);
+
+  // Load messages when the active session changes (lazy per-session)
+  useEffect(() => {
+    if (activeSessionId) void chatStore.loadMessages(activeSessionId);
+  }, [activeSessionId]);
+
   // Auto-scroll
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -81,14 +89,15 @@ export function ChatPage() {
     setShowSessionList(false);
   }, [apiaries, hives, inspections, sensors, tasks]);
 
-  // Auto-create first session if none exists
+  // Auto-create first session if none exists (after server hydration settles)
   useEffect(() => {
+    if (!chatStore.isHydrated()) return;
     if (sessions.length === 0 && !activeSessionId) {
       newSession();
     } else if (!activeSessionId && sessions.length > 0) {
       chatStore.setActiveSession(sessions[0].id);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sessions.length, activeSessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Consume initialPrompt from navigation
   const locationState = location.state as { initialPrompt?: string } | null;
