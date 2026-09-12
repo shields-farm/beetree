@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Boxes, ClipboardList, Thermometer, CheckSquare, MoreHorizontal, X, Flower2, Bug, ShoppingBag, Settings as SettingsIcon, Cpu, MessageCircle, Activity, RefreshCw, Globe } from 'lucide-react';
+import { Boxes, ClipboardList, Thermometer, CheckSquare, MoreHorizontal, X, Flower2, Bug, ShoppingBag, Settings as SettingsIcon, Cpu, MessageCircle, Activity, RefreshCw, Globe, Radio } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 
@@ -32,6 +32,7 @@ const PRIMARY_NAV = [
 
 // Secondary nav — accessible via the "More" button
 const SECONDARY_NAV = [
+  { to: '/buzz', label: 'Buzz Thread', icon: Radio },
   { to: '/tasks', label: 'Tasks', icon: CheckSquare },
   { to: '/pests', label: 'Pests', icon: Bug },
   { to: '/forage', label: 'Forage', icon: Flower2 },

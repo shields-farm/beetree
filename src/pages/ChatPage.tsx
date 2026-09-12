@@ -6,6 +6,7 @@ import { generateAlerts } from '../lib/alerts';
 import { HEALTH_META } from '../lib/health';
 import { HIVE_TYPES } from '../lib/hiveTypes';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { SensorCard } from '../components/SensorCard';
 import { useChatStore } from '../lib/useChatStore';
@@ -17,8 +18,17 @@ function uid() {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/**
+ * Render assistant markdown to HTML, sanitized.
+ *
+ * Model output is treated as untrusted — sanitize before injecting so a
+ * crafted response can't inject script into the dashboard.
+ */
 function renderMarkdown(text: string): string {
-  try { return marked.parse(text, { async: false }) as string; } catch { return text; }
+  try {
+    const html = marked.parse(text, { async: false }) as string;
+    return DOMPurify.sanitize(html);
+  } catch { return text; }
 }
 
 function buildContext(
