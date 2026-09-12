@@ -1,8 +1,10 @@
 // server/omi.ts — Omi voice transcript → structured inspection parser
-// Uses Ollama (glm-5.2:cloud) directly with the Buzz beekeeper system prompt.
+// Uses Ollama directly with the Buzz beekeeper system prompt.
 
 const BUZZ_URL = 'http://localhost:11434/v1/chat/completions';
-const BUZZ_MODEL = 'glm-5.2:cloud';
+// Cloud model id on the direct Ollama endpoint needs the :cloud suffix
+// (the bare "deepseek-v4.1-flash" that the Hermes gateway accepts is a 404 here).
+const BUZZ_MODEL = process.env.BUZZ_MODEL || 'deepseek-v4.1-flash:cloud';
 // No API key needed — Ollama runs locally
 
 /** Fields Buzz may return (all optional — omit what can't be determined). */
