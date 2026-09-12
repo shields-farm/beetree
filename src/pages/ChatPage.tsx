@@ -109,14 +109,15 @@ export function ChatPage() {
     }
   }, [sessions.length, activeSessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Consume initialPrompt from navigation
+  // Consume initialPrompt from navigation. Runs again once a session exists, so a prompt
+  // arriving before hydration isn't silently dropped (it would otherwise strand unseen).
   const locationState = location.state as { initialPrompt?: string } | null;
   useEffect(() => {
-    if (locationState?.initialPrompt && !input) {
-      setInput(locationState.initialPrompt);
-      navigate('/chat', { replace: true, state: {} });
-    }
-  }, [locationState, navigate, input]);
+    if (!locationState?.initialPrompt || input) return;
+    setInput(locationState.initialPrompt);
+    // Only clear the nav state once a session can actually hold the message.
+    if (activeSessionId) navigate('/chat', { replace: true, state: {} });
+  }, [locationState, navigate, input, activeSessionId]);
 
   const send = useCallback(async (overrideText?: string) => {
     const text = overrideText ?? input;
