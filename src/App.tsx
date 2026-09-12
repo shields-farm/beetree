@@ -23,6 +23,7 @@ const ForageForecast = lazy(() => import('./pages/ForageForecast').then(m => ({ 
 const Equipment = lazy(() => import('./pages/Equipment').then(m => ({ default: m.Equipment })));
 const Hardware = lazy(() => import('./pages/Hardware').then(m => ({ default: m.Hardware })));
 const ChatPage = lazy(() => import('./pages/ChatPage').then(m => ({ default: m.ChatPage })));
+const BuzzThreadPage = lazy(() => import('./pages/BuzzThreadPage').then(m => ({ default: m.BuzzThreadPage })));
 const ActivityLog = lazy(() => import('./pages/ActivityLog').then(m => ({ default: m.ActivityLog })));
 const World = lazy(() => import('./pages/World').then(m => ({ default: m.World })));
 
@@ -105,6 +106,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/chat" element={<ChatPage />} />
+            <Route path="/buzz" element={<BuzzThreadPage />} />
             <Route path="/inspections" element={<InspectionsHub />} />
             <Route path="/inspections/new" element={<InspectionFormPage />} />
             <Route path="/inspections/:id" element={<InspectionDetailPage />} />
