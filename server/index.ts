@@ -2359,10 +2359,12 @@ app.post('/api/chat', async (req, res) => {
       };
       // Replace res.json with sendSSE for this request
       (res as any).json = sendSSE;
-      (res as any).status = (code: number) => { 
-        if (code !== 200) { clearInterval(keepAlive); try { res.write('data: ' + JSON.stringify({ error: 'HTTP ' + code }) + '\n\n'); res.end(); } catch {} }
-        return res; 
-      };
+      // Status is a passthrough: res.json is already sendSSE, so every error
+      // exit below delivers its payload as a single `data:` line on the SSE
+      // channel. The old version wrote its own "HTTP <code>" line here AND
+      // let the subsequent res.json() call write a second one — whichever the
+      // client's `find()` picked, the real error message was dropped.
+      (res as any).status = (_code: number) => res;
     }
 
     // Inject seasonal context as a system message before the frontend's context
