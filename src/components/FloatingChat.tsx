@@ -1,15 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { MessageCircle, Send, X, Sparkles, AlertCircle } from 'lucide-react';
-import { marked } from 'marked';
 import { useStore } from '../store/useStore';
 import { useChat } from './ChatContext';
 import { generateAlerts } from '../lib/alerts';
 import { HEALTH_META } from '../lib/health';
 import { HIVE_TYPES } from '../lib/hiveTypes';
 import { API_BASE, apiFetch } from '../lib/apiBase';
-
-// Configure marked for compact output
-marked.setOptions({ breaks: true, gfm: true });
+import { renderMarkdown } from '../lib/markdown';
 
 /** Extract the last italic line as a follow-up question, remove it from content */
 function extractFollowUp(content: string): { body: string; followUp: string | null } {
@@ -21,11 +18,6 @@ function extractFollowUp(content: string): { body: string; followUp: string | nu
     };
   }
   return { body: content, followUp: null };
-}
-
-/** Render markdown as HTML (sanitized — we control the input) */
-function renderMarkdown(text: string): string {
-  return marked.parse(text) as string;
 }
 
 interface ChatMessage {
