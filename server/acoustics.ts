@@ -1,7 +1,9 @@
-// server/acoustics.ts — Hive acoustics analysis via Ollama (glm-5.2:cloud) + heuristics
+// server/acoustics.ts — Hive acoustics analysis via Ollama + heuristics
 
 const BUZZ_URL = 'http://localhost:11434/v1/chat/completions';
-const BUZZ_MODEL = 'glm-5.2:cloud';
+// Cloud model id on the direct Ollama endpoint needs the :cloud suffix
+// (the bare "deepseek-v4.1-flash" that the Hermes gateway accepts is a 404 here).
+const BUZZ_MODEL = process.env.BUZZ_MODEL || 'deepseek-v4.1-flash:cloud';
 
 export interface AcousticAnalysis {
   hiveId: string;
