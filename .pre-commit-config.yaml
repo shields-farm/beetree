@@ -9,7 +9,7 @@ repos:
         always_run: true
       - id: lint
         name: 🧹 lint (oxlint)
-        entry: npx oxlint
+        entry: npx oxlint --ignore-pattern node_modules --ignore-pattern training --ignore-pattern dist --ignore-pattern public
         language: system
         pass_filenames: false
         always_run: true
