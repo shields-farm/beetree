@@ -9,7 +9,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { PageHeader } from '../components/Layout';
+import { EmbeddedPageHeader } from '../components/EmbeddedPageHeader';
 import { Card } from '../components/Card';
 
 import { API_BASE, apiFetch, statusToMessage } from '../lib/apiBase';
@@ -76,7 +76,7 @@ export function HealthTrends() {
     const TrendIcon = TREND_META[selected.trend].icon;
     return (
       <div className="animate-fade-in space-y-5">
-        <PageHeader
+        <EmbeddedPageHeader
           title={selected.hiveName}
           subtitle="Health trend detail"
           action={
@@ -128,7 +128,7 @@ export function HealthTrends() {
 
   return (
     <div className="animate-fade-in space-y-5">
-      <PageHeader title="Health Trends" subtitle="AI health trending for all hives" />
+      <EmbeddedPageHeader title="Health Trends" subtitle="AI health trending for all hives" />
 
       {loading && (
         <Card>

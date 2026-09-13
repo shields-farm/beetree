@@ -8,7 +8,7 @@ import {
   Camera,
   X,
 } from 'lucide-react';
-import { PageHeader } from '../components/Layout';
+import { EmbeddedPageHeader } from '../components/EmbeddedPageHeader';
 import { Card } from '../components/Card';
 
 import { API_BASE, apiFetch, statusToMessage } from '../lib/apiBase';
@@ -162,7 +162,7 @@ export function QueenTracking() {
   if (loading) {
     return (
       <div className="animate-fade-in space-y-5">
-        <PageHeader title="Queen Tracking" subtitle="Track marked queens & detect supersedure" />
+        <EmbeddedPageHeader title="Queen Tracking" subtitle="Track marked queens & detect supersedure" />
         <Card>
           <div className="flex items-center justify-center py-8 text-stone-400 dark:text-stone-500 text-sm">
             <Loader2 size={20} className="animate-spin mr-2" /> Loading queen data…
@@ -175,7 +175,7 @@ export function QueenTracking() {
   if (error && statuses.length === 0) {
     return (
       <div className="animate-fade-in space-y-5">
-        <PageHeader title="Queen Tracking" subtitle="Track marked queens & detect supersedure" />
+        <EmbeddedPageHeader title="Queen Tracking" subtitle="Track marked queens & detect supersedure" />
         <Card>
           <div className="flex items-start gap-2 text-red-600 dark:text-red-400">
             <AlertTriangle size={20} className="shrink-0 mt-0.5" />
@@ -198,14 +198,14 @@ export function QueenTracking() {
           <button onClick={backToList} className="p-1.5 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-700">
             <ChevronLeft size={20} className="text-stone-500 dark:text-stone-400" />
           </button>
-          <PageHeader title={selectedHive.hiveName} subtitle="Queen history & tracking" />
+          <EmbeddedPageHeader title={selectedHive.hiveName} subtitle="Queen history & tracking" />
         </div>
 
         {selectedHive.supersedureSuspected && (
-          <div className="rounded-2xl bg-amber-50 dark:bg-amber-950 border border-amber-200 p-4 flex items-start gap-3">
+          <div className="rounded-2xl bg-amber-50 dark:bg-amber-950 border border-amber-200 p-4 flex items-start gap-3 dark:border-amber-800">
             <AlertTriangle size={20} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             <div>
-              <p className="font-medium text-sm text-amber-800">Supersedure Suspected</p>
+              <p className="font-medium text-sm text-amber-800 dark:text-amber-200">Supersedure Suspected</p>
               <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">{selectedHive.notes}</p>
             </div>
           </div>
@@ -385,7 +385,7 @@ export function QueenTracking() {
   // List view
   return (
     <div className="animate-fade-in space-y-5">
-      <PageHeader title="Queen Tracking" subtitle="Track marked queens & detect supersedure" />
+      <EmbeddedPageHeader title="Queen Tracking" subtitle="Track marked queens & detect supersedure" />
 
       {error && (
         <Card>
@@ -421,7 +421,7 @@ export function QueenTracking() {
                 </div>
               </div>
               {s.supersedureSuspected && (
-                <span className="shrink-0 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 dark:bg-amber-900 text-amber-800">
+                <span className="shrink-0 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200">
                   Supersedure?
                 </span>
               )}
