@@ -155,7 +155,8 @@ export function Equipment() {
       })}
 
       <p className="text-xs text-stone-400 dark:text-stone-500 text-center pt-2">
-        Equipment recommendations are based on Mark's kit. Update in <code className="text-stone-500 dark:text-stone-400">src/pages/Equipment.tsx</code>.
+        Recommendations reflect the gear in your kit. Turn items on or off under
+        Settings → Pest Control Preferences.
       </p>
     </div>
   );
