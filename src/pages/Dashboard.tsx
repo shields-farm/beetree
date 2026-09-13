@@ -1,18 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Clock, ChevronRight, Thermometer,
-  Flower2, Crown, Bug, AlertTriangle, CheckCircle2, Activity, Boxes,
+  Clock, ChevronRight, Thermometer, Flower2, Crown, Bug,
+  CheckCircle2, Activity, Boxes,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useChat, AskAIButton } from '../components/ChatContext';
-import { generateAlerts, ALERT_META, type Alert } from '../lib/alerts';
+import { generateAlerts } from '../lib/alerts';
 import { HEALTH_META } from '../lib/health';
 import { API_BASE, apiFetch } from '../lib/apiBase';
 import { TelemetryTab } from '../components/TelemetryTab';
 import { getPestPrefs, filterTreatments } from '../lib/pestPrefs';
 import { useAnomalies } from '../lib/useAnomalies';
-import { InsightCards } from '../components/InsightCards';
+import { AlertQueue } from '../components/AlertQueue';
+import { PageTabs } from '../components/PageTabs';
+import { DataFreshness } from '../components/DataFreshness';
 
 // ─── Types (mirror server modules) ───────────────────────────────────────────
 interface ForageFlow {
@@ -94,13 +96,6 @@ function checkLowStores(hives: any[], inspections: any[]): { hiveName: string; h
 // ─── Tabs ────────────────────────────────────────────────────────────────────
 type TabId = 'now' | 'alerts' | 'telemetry' | 'hives';
 
-const TABS: { id: TabId; label: string; icon: typeof Activity }[] = [
-  { id: 'now', label: 'Now', icon: Clock },
-  { id: 'alerts', label: 'Alerts', icon: AlertTriangle },
-  { id: 'telemetry', label: 'Telemetry', icon: Thermometer },
-  { id: 'hives', label: 'Hives', icon: Boxes },
-];
-
 // ============================================================================
 // DASHBOARD
 // ============================================================================
@@ -148,10 +143,6 @@ export function Dashboard() {
     return () => setQuickQuestions([]);
   }, [setQuickQuestions, urgentCount]);
 
-  // THE one most important thing
-  const topAlert = alerts[0];
-  const moreCount = alerts.length - 1;
-
   // Health distribution
   const healthBuckets = useMemo(() => {
     const buckets: Record<string, number> = { excellent: 0, good: 0, fair: 0, poor: 0, critical: 0 };
@@ -197,131 +188,47 @@ export function Dashboard() {
   // Swarm risk
   const elevatedSwarmRisks = swarmRisks.filter((s) => s.riskLevel === 'moderate' || s.riskLevel === 'high' || s.riskLevel === 'very-high');
 
-  // Tab badge counts
+  // Tab badge counts — both real, no hardcoded zero
   const telemetryBadge = anomalies.total > 0 ? anomalies.total : 0;
-  const hiveBadge = 0;
+  const alertsBadge = alerts.filter((a) => a.severity === 'urgent' || a.severity === 'warning').length;
+
+  const TABS = [
+    { id: 'now' as const, label: 'Now', icon: <Clock size={15} /> },
+    { id: 'alerts' as const, label: 'Alerts', icon: <Activity size={15} />, badge: alertsBadge },
+    { id: 'telemetry' as const, label: 'Telemetry', icon: <Thermometer size={15} />, badge: telemetryBadge },
+    { id: 'hives' as const, label: 'Hives', icon: <Boxes size={15} /> },
+  ];
 
   return (
     <div className="animate-fade-in">
-      {/* Tab bar */}
-      <div className="-mx-4 px-4 mb-4 overflow-x-auto">
-        <div className="inline-flex gap-2 w-max">
-          {TABS.map((t) => {
-            const Icon = t.icon;
-            const badge = t.id === 'telemetry' ? telemetryBadge : t.id === 'hives' ? hiveBadge : 0;
-            return (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center gap-1.5 ${
-                  tab === t.id
-                    ? 'bg-honey-500 text-white'
-                    : 'bg-stone-200 dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-300 dark:hover:bg-stone-700'
-                }`}
-              >
-                <Icon size={15} />
-                {t.label}
-                {badge > 0 && (
-                  <span className="ml-0.5 bg-amber-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                    {badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+      {/* Header with global freshness — the app previously had no app-wide
+          "when did we last hear from the hives" signal anywhere. */}
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <h1 className="text-xl sm:text-2xl font-bold text-stone-800 dark:text-stone-100">Dashboard</h1>
+        <DataFreshness />
       </div>
 
-      {/* ── NOW tab — AI insights only ─────────────────────────────────── */}
+      <PageTabs tabs={TABS} value={tab} onChange={setTab} />
+
+      {/* ── NOW tab — prioritized queue ────────────────────────────────── */}
       {tab === 'now' && (
         <div className="space-y-5">
-          <InsightCards />
+          <AlertQueue />
           <div className="pt-1">
             <AskAIButton prompt="What should I focus on right now? Give me the short version." label="Ask Buzz" />
           </div>
         </div>
       )}
 
-      {/* ── ALERTS tab — heuristic alerts + pillar cards ────────────────── */}
+      {/* ── ALERTS tab — pillar cards ──────────────────────────────────── */}
       {tab === 'alerts' && (
         <div className="space-y-5">
-          {/* It's Time To... */}
-          <div className="space-y-3">
-            {topAlert ? (
-              <>
-                <BigAlertCard alert={topAlert} />
-                {moreCount > 0 && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {alerts.slice(1, 4).map((a) => (
-                      <Link
-                        key={a.id}
-                        to={a.actionRoute ?? '/tasks'}
-                        className="inline-flex items-center gap-1 text-xs bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-lg px-2.5 py-1.5 hover:border-honey-400 transition-colors"
-                      >
-                        <span className={`w-1.5 h-1.5 rounded-full ${ALERT_META[a.severity].dot}`} />
-                        <span className="text-stone-600 dark:text-stone-300 truncate max-w-[180px]">{a.title}</span>
-                      </Link>
-                    ))}
-                    {moreCount > 3 && (
-                      <Link to="/tasks" className="text-xs text-stone-400 hover:text-honey-600">
-                        +{moreCount - 3} more →
-                      </Link>
-                    )}
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-6 text-center">
-                <p className="text-base text-emerald-700 dark:text-emerald-300 font-semibold">All caught up 🐝</p>
-                <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">Nothing urgent right now. Go enjoy your bees.</p>
-              </div>
-            )}
-
-            {/* Swarm risk inline alert */}
-            {elevatedSwarmRisks.length > 0 && (
-              <Link to="/swarm" className="block bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-xl p-3 hover:border-amber-400 transition-colors">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle size={16} className="text-amber-500 shrink-0" />
-                  <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                    {elevatedSwarmRisks.length} hive{elevatedSwarmRisks.length !== 1 ? 's' : ''} with elevated swarm risk
-                  </span>
-                  <ChevronRight size={14} className="text-amber-400 ml-auto" />
-                </div>
-              </Link>
-            )}
-
-            {/* Anomalies inline alert */}
-            {!anomalies.allClear && (
-              <Link
-                to="/sensors"
-                onClick={() => setTab('telemetry')}
-                className="block bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-xl p-3 hover:border-amber-400 transition-colors"
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <AlertTriangle size={16} className="text-amber-500 shrink-0" />
-                  <span className="text-sm font-semibold text-amber-800 dark:text-amber-200">
-                    {anomalies.total} {anomalies.total === 1 ? 'sensor anomaly' : 'sensor anomalies'}
-                  </span>
-                  <ChevronRight size={14} className="text-amber-400 ml-auto" />
-                </div>
-                <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-                  {anomalies.items.slice(0, 3).map((item, i) => (
-                    <span key={i} className="text-[11px] text-amber-700 dark:text-amber-300">
-                      <span className="font-medium">{item.count}</span> {item.label}
-                    </span>
-                  ))}
-                </div>
-              </Link>
-            )}
-          </div>
-
-          {/* 3 Pillars */}
           <div className="space-y-3">
             <PillarCard
               icon={Crown}
               title="Queen"
               status={queenIssues.length === 0 && hivesWithoutQueenRecords === 0 ? 'good' : queenIssues.length > 0 ? 'warning' : 'info'}
-              linkTo="/queen"
+              linkTo="/hives?tab=queen"
             >
               {queenStatuses.length === 0 ? (
                 <PillarLine text="No queen records yet" muted />
@@ -382,7 +289,7 @@ export function Dashboard() {
               icon={Bug}
               title="Pests & Disease"
               status={highPriorityTreatments.length > 0 ? 'warning' : 'good'}
-              linkTo="/treatments"
+              linkTo="/hives?tab=treatments"
             >
               {highPriorityTreatments.length > 0 ? (
                 highPriorityTreatments.slice(0, 2).map((t) => (
@@ -397,6 +304,28 @@ export function Dashboard() {
                 <PillarLine text={`${filteredTreatments.length} hive${filteredTreatments.length !== 1 ? 's' : ''} with treatments queued`} muted />
               ) : (
                 <PillarLine text="No active pest concerns" check />
+              )}
+            </PillarCard>
+
+            <PillarCard
+              icon={Activity}
+              title="Swarm Risk"
+              status={elevatedSwarmRisks.length > 0 ? 'warning' : 'good'}
+              linkTo="/hives?tab=swarm"
+            >
+              {elevatedSwarmRisks.length > 0 ? (
+                elevatedSwarmRisks.slice(0, 2).map((s) => (
+                  <PillarLine
+                    key={s.hiveId}
+                    text={hives.find((h) => h.id === s.hiveId)?.name ?? s.hiveId}
+                    detail={`${s.riskLevel.replace('-', ' ')} risk (${s.riskScore}/100)`}
+                    warning
+                  />
+                ))
+              ) : swarmRisks.length > 0 ? (
+                <PillarLine text="No hives at elevated swarm risk" check />
+              ) : (
+                <PillarLine text="No swarm assessment yet" muted />
               )}
             </PillarCard>
           </div>
@@ -526,7 +455,7 @@ function PillarLine({
       {check ? (
         <CheckCircle2 size={12} className="text-green-500 mt-0.5 shrink-0" />
       ) : warning ? (
-        <AlertTriangle size={12} className="text-amber-500 mt-0.5 shrink-0" />
+        <Activity size={12} className="text-amber-500 mt-0.5 shrink-0" />
       ) : muted ? (
         <span className="w-3 h-3 shrink-0" />
       ) : (
@@ -540,31 +469,6 @@ function PillarLine({
           <span className="text-stone-400 dark:text-stone-500 ml-1">— {detail}</span>
         )}
       </div>
-    </div>
-  );
-}
-
-// ─── THE big alert card ───
-function BigAlertCard({ alert }: { alert: Alert }) {
-  const meta = ALERT_META[alert.severity];
-  return (
-    <div className={`rounded-2xl border-2 ${meta.border} ${meta.bg} p-5`}>
-      <div className="flex items-start gap-3">
-        <span className={`w-3.5 h-3.5 rounded-full ${meta.dot} mt-1.5 shrink-0 animate-pulse`} />
-        <div className="min-w-0 flex-1">
-          <div className={`text-base font-bold ${meta.text}`}>{alert.title}</div>
-          <div className="text-sm text-stone-700 dark:text-stone-200 mt-1 leading-relaxed">{alert.message}</div>
-        </div>
-      </div>
-      {alert.actionRoute && (
-        <Link
-          to={alert.actionRoute}
-          className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-honey-700 dark:text-honey-300 bg-white/80 dark:bg-stone-900/80 px-4 py-2 rounded-xl hover:bg-white transition-colors"
-        >
-          {alert.actionLabel ?? 'Go'}
-          <ChevronRight size={16} />
-        </Link>
-      )}
     </div>
   );
 }
