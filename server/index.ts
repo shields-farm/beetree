@@ -109,9 +109,11 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Simple rate limiting (in-memory, per-IP, 100 requests per minute)
+// Simple rate limiting (in-memory, per-IP, 100 requests per minute).
+// Overridable so a browser test suite loading many routes in parallel doesn't
+// trip the limiter and report app failures that are really harness throttling.
 const rateMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT = 100;
+const RATE_LIMIT = Number(process.env.BEETREE_RATE_LIMIT ?? 100);
 const RATE_WINDOW = 60_000; // 1 minute
 
 app.use((req, _res, next) => {
@@ -452,21 +454,33 @@ app.put('/api/hives/:id', (req, res) => {
   const entityId = req.params.id;
   const exists = db.prepare('SELECT 1 FROM hives WHERE entity_id = ? AND superseded_by IS NULL').get(entityId);
   if (!exists) return res.status(404).json({ error: 'not found' });
-  const loc = b.location || {};
+  // Partial updates must preserve what the caller didn't send. This handler
+  // required apiaryId on every PUT (NOT NULL constraint) and defaulted name to
+  // '', so saving just the boxes array — which is exactly what the box editor
+  // and the GPS pin send — returned a 500 and a box edit could never persist.
+  const cur = db.prepare('SELECT * FROM hives WHERE entity_id = ? AND superseded_by IS NULL').get(entityId) as any;
+  const loc = b.location === undefined
+    ? {
+        lat: cur.location_lat, lng: cur.location_lng, accuracy: cur.location_accuracy,
+        pinnedAt: cur.location_pinnedAt, label: cur.location_label,
+      }
+    : (b.location || {});
 
   const newRowId = cowSupersede('hives', entityId, () => ({
-    apiaryId: b.apiaryId,
-    name: b.name ?? '',
-    type: b.type ?? 'langstroth-10',
-    healthStatus: b.healthStatus ?? 'good',
-    notes: b.notes ?? null,
-    createdAt: b.createdAt ?? new Date().toISOString(),
+    apiaryId: b.apiaryId ?? cur.apiaryId,
+    name: b.name ?? cur.name ?? '',
+    type: b.type ?? cur.type ?? 'langstroth-10',
+    healthStatus: b.healthStatus ?? cur.healthStatus ?? 'good',
+    notes: b.notes ?? cur.notes ?? null,
+    createdAt: b.createdAt ?? cur.createdAt ?? new Date().toISOString(),
     location_lat: loc.lat ?? null,
     location_lng: loc.lng ?? null,
     location_accuracy: loc.accuracy ?? null,
     location_pinnedAt: loc.pinnedAt ?? null,
     location_label: loc.label ?? null,
-    sensorIds: JSON.stringify(b.sensorIds || []),
+    sensorIds: b.sensorIds === undefined
+      ? (cur.sensorIds ?? '[]')
+      : JSON.stringify(b.sensorIds || []),
   }));
 
   // Replace boxes + frame_slots if provided
@@ -484,13 +498,15 @@ app.put('/api/hives/:id', (req, res) => {
       db.prepare('UPDATE boxes SET superseded_by = ?, superseded_at = ? WHERE entity_id = ? AND superseded_by IS NULL').run(genId('box'), ts, ob.entity_id);
     }
     // Insert new boxes + frame_slots
-    const insBox = db.prepare(`INSERT INTO boxes (id, entity_id, version, superseded_by, superseded_at, hiveId, type, "index", sensorIds) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?)`);
+    const insBox = db.prepare(`INSERT INTO boxes (id, entity_id, version, superseded_by, superseded_at, hiveId, type, "index", sensorIds, content) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?, ?)`);
     const insSlot = db.prepare(`INSERT INTO frame_slots (id, entity_id, version, superseded_by, superseded_at, boxId, position, content) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?)`);
     for (let i = 0; i < b.boxes.length; i++) {
       const box = b.boxes[i];
       const boxEntityId = box.id || `${entityId}-box-${i}`;
       const boxRowId = genId('box');
-      insBox.run(boxRowId, boxEntityId, entityId, box.type, i, JSON.stringify(box.sensorIds || []));
+      // Box-level majority content ('brood' | 'honey' | ...) — persisted so a
+      // classification survives the next sync instead of reverting.
+      insBox.run(boxRowId, boxEntityId, entityId, box.type, i, JSON.stringify(box.sensorIds || []), box.content ?? null);
       const frames = box.frames || [];
       for (const f of frames) {
         insSlot.run(genId('fs'), genId('fs'), boxEntityId, f.position, f.content || 'empty');
