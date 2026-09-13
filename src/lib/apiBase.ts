@@ -73,3 +73,17 @@ export function apiFetch(input: string, init?: RequestInit): Promise<Response> {
     return res;
   });
 }
+/** Optional display name for the beekeeper. Used in Buzz's greeting instead of
+ *  a hardcoded name — this ships to other people's hives. */
+const USER_NAME_KEY = 'beetree-user-name';
+
+export function getUserName(): string {
+  try { return localStorage.getItem(USER_NAME_KEY) ?? ''; } catch { return ''; }
+}
+
+export function setUserName(name: string): void {
+  try {
+    if (name.trim()) localStorage.setItem(USER_NAME_KEY, name.trim());
+    else localStorage.removeItem(USER_NAME_KEY);
+  } catch { /* ignore */ }
+}
