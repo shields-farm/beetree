@@ -53,6 +53,23 @@ function seasonalThreshold(date: Date): number {
 }
 
 /** Syrup type recommendation by season for Georgia. */
+/**
+ * Human-readable feed name.
+ *
+ * `type` is a stored identifier ('syrup-2:1', 'dry-sugar') and callers were
+ * interpolating it straight into prose, producing "Consider feeding 2:1
+ * syrup-2:1". Anything that renders a feed recommendation to a user should go
+ * through this instead of using `type` directly.
+ */
+export function feedTypeLabel(type: string): string {
+  if (type === 'none') return 'nothing';
+  if (type === 'fondant') return 'fondant';
+  if (type === 'dry-sugar') return 'dry sugar';
+  const m = /^syrup-(.+)$/.exec(type);
+  if (m) return `${m[1]} syrup`;
+  return type.replace(/-/g, ' ');
+}
+
 export function syrupTypeForSeason(date?: Date): { type: string; ratio: string; reason: string } {
   const d = date ?? new Date();
   const m = d.getMonth();
