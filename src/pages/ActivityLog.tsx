@@ -32,15 +32,15 @@ const SEVERITY_META: Record<string, { icon: typeof Info; color: string; bg: stri
 };
 
 const TYPE_LABELS: Record<string, string> = {
-  'briefing': '🌅 Briefing',
-  'weekly-review': '📊 Weekly Review',
-  'post-inspection': '📋 Post-Inspection',
-  'nudge': '🔔 Nudge',
-  'alert': '⚠️ Alert',
-  'tool-call': '🔧 Tool Call',
-  'buzz-chat': '💬 Chat',
-  'feeding-nudge': '🍯 Feeding Nudge',
-  'weight-alert': '⚖️ Weight Alert',
+  'briefing': 'Briefing',
+  'weekly-review': 'Weekly Review',
+  'post-inspection': 'Post-Inspection',
+  'nudge': 'Nudge',
+  'alert': 'Alert',
+  'tool-call': 'Tool Call',
+  'buzz-chat': 'Chat',
+  'feeding-nudge': 'Feeding Nudge',
+  'weight-alert': 'Weight Alert',
 };
 
 function timeAgo(ts: string): string {

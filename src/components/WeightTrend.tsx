@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { apiFetch } from '../lib/apiBase';
 import { TrendingUp, TrendingDown, Minus, Scale } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 
 interface WeightData {
   hiveId?: string;
@@ -78,7 +79,7 @@ export function WeightTrend({ hiveId }: { hiveId: string }) {
         </svg>
       )}
       {data.alert && (
-        <p className="text-xs text-red-500 dark:text-red-400 mt-2">⚠️ {data.alert}</p>
+        <p className="text-xs text-red-500 dark:text-red-400 mt-2 flex items-start gap-1.5"><AlertTriangle size={12} className="shrink-0 mt-0.5" /> {data.alert}</p>
       )}
     </div>
   );

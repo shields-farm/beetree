@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, MessageCircle, AlertCircle, Sparkles, Brain, Wrench, CheckCircle2, Plus, Trash2, Clock, ChevronLeft, RefreshCw } from 'lucide-react';
+import { Send, MessageCircle, AlertCircle, Sparkles, Brain, Wrench, CheckCircle2, Plus, Trash2, Clock, ChevronLeft, RefreshCw, Hexagon } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { generateAlerts } from '../lib/alerts';
@@ -92,7 +92,7 @@ export function ChatPage() {
     const welcome: chatStore.ChatMessage = {
       id: uid(),
       role: 'assistant',
-      content: `🐝 Hi Mark! I'm Buzz, your beekeeping assistant. I can see your ${apiaries.length} apiaries, ${hives.length} hives, and ${sensors.length} sensors.\n\n${urgentCount > 0 ? `⚠️ You have **${urgentCount} urgent alert${urgentCount !== 1 ? 's' : ''}** that need attention.` : 'Everything looks good right now! 🎉'}\n\nAsk me about any hive, sensor trends, what needs attention, or what to do next.`,
+      content: `Hi Mark — I'm Buzz, your beekeeping assistant. I can see your ${apiaries.length} apiaries, ${hives.length} hives, and ${sensors.length} sensors.\n\n${urgentCount > 0 ? `You have **${urgentCount} urgent alert${urgentCount !== 1 ? 's' : ''}** that need attention.` : 'Everything looks good right now.'}\n\nAsk me about any hive, sensor trends, what needs attention, or what to do next.`,
       timestamp: new Date().toISOString(),
     };
     chatStore.newSession(welcome);
@@ -185,7 +185,7 @@ export function ChatPage() {
           <h1 className="text-lg font-bold text-stone-800 dark:text-stone-100 truncate">{activeSession?.title ?? 'Buzz'}</h1>
           <p className="text-[11px] text-stone-400 dark:text-stone-500">Your beekeeping assistant — knows your hives</p>
         </div>
-        <button onClick={newSession} className="flex items-center gap-1 text-xs bg-honey-50 dark:bg-honey-950 border border-honey-200 text-honey-700 dark:text-honey-300 px-2.5 py-1.5 rounded-lg hover:bg-honey-100">
+        <button onClick={newSession} className="flex items-center gap-1 text-xs bg-honey-50 dark:bg-honey-950 border border-honey-200 text-honey-700 dark:text-honey-300 px-2.5 py-1.5 rounded-lg hover:bg-honey-100 dark:border-honey-800">
           <Plus size={14} /> New
         </button>
       </div>
@@ -207,7 +207,7 @@ export function ChatPage() {
                   <div className="mt-1.5 space-y-1.5">
                     {m.toolCalls.map((tc, i) => (
                       <div key={i} className="text-stone-400">
-                        <div className="flex items-center gap-1 text-sky-600 font-medium"><CheckCircle2 size={10} /> {tc.name}</div>
+                        <div className="flex items-center gap-1 text-sky-600 font-medium dark:text-sky-400"><CheckCircle2 size={10} /> {tc.name}</div>
                         <div className="ml-4 text-[10px] whitespace-pre-wrap">{tc.result.slice(0, 200)}</div>
                       </div>
                     ))}
@@ -255,7 +255,7 @@ export function ChatPage() {
         {loading && (
           <div className="flex justify-start">
             <div className="bg-white dark:bg-stone-900 border border-stone-100 dark:border-stone-800 rounded-2xl rounded-bl-md shadow-sm px-4 py-3">
-              <span className="text-xl animate-bounce inline-block">🐝</span>
+              <Hexagon size={22} className="animate-bounce text-honey-500" fill="currentColor" />
             </div>
           </div>
         )}
@@ -270,7 +270,7 @@ export function ChatPage() {
           </div>
           <div className="flex flex-wrap gap-1.5">
             {quickQuestions.map((q) => (
-              <button key={q} onClick={() => send(q)} className="text-xs bg-honey-50 dark:bg-honey-950 border border-honey-200 text-honey-700 dark:text-honey-300 px-2.5 py-1.5 rounded-full hover:bg-honey-100">{q}</button>
+              <button key={q} onClick={() => send(q)} className="text-xs bg-honey-50 dark:bg-honey-950 border border-honey-200 text-honey-700 dark:text-honey-300 px-2.5 py-1.5 rounded-full hover:bg-honey-100 dark:border-honey-800">{q}</button>
             ))}
           </div>
         </div>

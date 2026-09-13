@@ -25,6 +25,7 @@ import {
 import type { Concern, PopulationSize, QueenLayingPattern, StoreLevel, Temperament } from '../types';
 
 import { API_BASE, apiFetch, statusToMessage } from '../lib/apiBase';
+import { Hexagon } from 'lucide-react';
 
 interface ParsedInspection {
   hiveName?: string;
@@ -187,11 +188,11 @@ export function QuickInspect() {
 
       {/* Created success banner */}
       {created && (
-        <Card className="bg-green-50 dark:bg-green-950 border-green-200">
+        <Card className="bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
           <div className="flex items-center gap-3">
             <Check size={22} className="text-green-600 dark:text-green-400" />
             <div className="flex-1">
-              <p className="text-sm font-semibold text-green-800">Inspection created!</p>
+              <p className="text-sm font-semibold text-green-800 dark:text-green-200">Inspection created!</p>
               <p className="text-xs text-green-600 dark:text-green-400">Buzz parsed your notes into a saved inspection.</p>
             </div>
             <button
@@ -236,7 +237,7 @@ export function QuickInspect() {
 
       {/* Parse error */}
       {parseError && (
-        <Card className="bg-red-50 dark:bg-red-950 border-red-200">
+        <Card className="bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800">
           <div className="flex items-start gap-2 text-red-700 dark:text-red-300">
             <AlertTriangle size={18} className="shrink-0 mt-0.5" />
             <div>
@@ -249,7 +250,7 @@ export function QuickInspect() {
 
       {/* Confirm error */}
       {confirmError && (
-        <Card className="bg-red-50 dark:bg-red-950 border-red-200">
+        <Card className="bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800">
           <div className="flex items-start gap-2 text-red-700 dark:text-red-300">
             <AlertTriangle size={18} className="shrink-0 mt-0.5" />
             <div>
@@ -264,7 +265,7 @@ export function QuickInspect() {
       {parsed && (
         <Card>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-lg">🐝</span>
+            <Hexagon size={18} className="text-honey-500" fill="currentColor" />
             <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200">Buzz parsed:</h3>
           </div>
           <p className="text-xs text-stone-400 dark:text-stone-500 mb-3">
