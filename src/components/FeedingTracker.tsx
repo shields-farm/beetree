@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Droplets, Plus, Loader2, AlertTriangle, X } from 'lucide-react';
 import { Card } from './Card';
 import { API_BASE, apiFetch, statusToMessage } from '../lib/apiBase';
+import { describeFeed } from '../lib/format';
 
 // ── Types (mirrors server/feeding.ts) ──────────────────────────────────────
 
@@ -322,7 +323,7 @@ export function FeedingTracker({ hiveId }: { hiveId: string }) {
         <div className="mb-3 rounded-xl border border-honey-200 dark:border-honey-800 bg-honey-50 dark:bg-honey-950 px-3.5 py-2.5 text-sm text-honey-800 dark:text-honey-200 flex items-center gap-2">
           <Droplets size={14} className="shrink-0" />
           <span>
-            Recommended: <strong>{status.recommendedFeedType.ratio} {status.recommendedFeedType.type}</strong>
+            Recommended: <strong>{describeFeed(status.recommendedFeedType.ratio, status.recommendedFeedType.type)}</strong>
             {' — '}{status.recommendedFeedType.reason}
           </span>
         </div>

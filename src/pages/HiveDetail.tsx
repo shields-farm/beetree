@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Pencil, Thermometer, ClipboardList, ChevronRight, Boxes, Activity, Settings, Droplets } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Pencil, Thermometer, ClipboardList, ChevronRight, Boxes, Activity, Settings, Droplets, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { useStore } from '../store/useStore';
 import { useChat, AskAIButton } from '../components/ChatContext';
@@ -116,7 +116,7 @@ export function HiveDetail({ id }: { id: string }) {
         <span className={`text-xs px-2.5 py-1 rounded-full ${meta!.bg} ${meta!.text} font-medium`}>Health: {meta!.label}</span>
         <span className="text-xs px-2.5 py-1 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300">{hive.boxes.length} box{hive.boxes.length !== 1 ? 'es' : ''}</span>
         {hiveSensors.length > 0 && (
-          <span className="text-xs px-2.5 py-1 rounded-full bg-sky-50 text-sky-700 flex items-center gap-1">
+          <span className="text-xs px-2.5 py-1 rounded-full bg-sky-50 text-sky-700 flex items-center gap-1 dark:bg-sky-950 dark:text-sky-300">
             <Thermometer size={11} /> {hiveSensors.length} sensor{hiveSensors.length !== 1 ? 's' : ''}
           </span>
         )}
@@ -149,13 +149,15 @@ export function HiveDetail({ id }: { id: string }) {
       {/* ── Overview tab ────────────────────────────────────────── */}
       {tab === 'overview' && (
         <div className="space-y-4">
-          {/* Live sensors */}
+          {/* Sensors on this hive. Deliberately not called "Live" — a sensor
+              whose last reading is weeks old is not live, and the card itself
+              now labels staleness. */}
           <div>
             <div className="flex items-center justify-between mb-2 px-1">
               <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 flex items-center gap-1.5">
-                <Thermometer size={16} className="text-sky-600" /> Live Sensors
+                <Thermometer size={16} className="text-sky-600 dark:text-sky-400" /> Sensors
               </h3>
-              <button onClick={refreshSensorReadings} className="text-xs text-sky-600 font-medium">Refresh</button>
+              <button onClick={refreshSensorReadings} className="text-xs text-sky-600 font-medium dark:text-sky-400">Refresh</button>
             </div>
             {hiveSensors.length > 0 ? (
               <div className="grid sm:grid-cols-2 gap-3">
@@ -232,7 +234,7 @@ export function HiveDetail({ id }: { id: string }) {
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium text-stone-700 dark:text-stone-200">{format(new Date(i.date), 'MMM d, yyyy')}</div>
                         <div className="text-xs text-stone-400 dark:text-stone-500 truncate">
-                          {i.queenPresent ? 'Queen ✓' : 'No queen'} · {i.notes.slice(0, 40) || '—'}
+                          {i.queenPresent ? 'Queen present' : 'No queen'} · {i.notes.slice(0, 40) || '—'}
                         </div>
                       </div>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full ${im.bg} ${im.text}`}>{im.label}</span>
@@ -335,7 +337,7 @@ export function HiveDetail({ id }: { id: string }) {
                       navigate('/hives');
                     }
                   }}
-                  className="w-full py-2 rounded-xl border border-red-200 text-red-600 dark:text-red-400 text-sm flex items-center justify-center gap-1.5"
+                  className="w-full py-2 rounded-xl border border-red-200 text-red-600 dark:text-red-400 text-sm flex items-center justify-center gap-1.5 dark:border-red-800"
                 >
                   <Trash2 size={14} /> Delete hive
                 </button>
@@ -423,7 +425,7 @@ function FeedingSummary({ hiveId, onViewHistory }: { hiveId: string; onViewHisto
 
       {status.alert && (
         <div className="mb-3 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 px-3 py-2 text-xs text-amber-800 dark:text-amber-200 flex items-start gap-2">
-          <span>⚠️</span>
+          <AlertTriangle size={13} className="shrink-0 mt-0.5" />
           <span>{status.alert}</span>
         </div>
       )}

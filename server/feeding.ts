@@ -6,7 +6,7 @@
 // we compare actual consumption to our estimate and adjust per-hive calibration.
 
 import { db, genId } from './db.js';
-import { estimateConsumptionRate, syrupTypeForSeason } from './weightTracking.js';
+import { estimateConsumptionRate, syrupTypeForSeason, feedTypeLabel } from './weightTracking.js';
 
 export type RefillState = 'empty' | 'partial' | 'full' | null;
 
@@ -268,15 +268,15 @@ export function getFeedingStatus(hiveId: string): FeedingStatus {
     const daysSince = daysSinceLastFeeding ?? 0;
     const daysRemaining = estimatedDaysUntilEmpty - daysSince;
     if (daysRemaining <= 0) {
-      alert = `${hiveName} syrup feeder likely empty (was filled ${daysSince}d ago, estimated ${estimatedDaysUntilEmpty}d supply). Refill with ${recommendedFeed.ratio} ${recommendedFeed.type}. ${recommendedFeed.reason}`;
+      alert = `${hiveName} syrup feeder likely empty (was filled ${daysSince}d ago, estimated ${estimatedDaysUntilEmpty}d supply). Refill with ${feedTypeLabel(recommendedFeed.type)}. ${recommendedFeed.reason}`;
     } else if (daysRemaining <= 2) {
-      alert = `${hiveName} syrup feeder will need refill in ~${daysRemaining}d. Next: ${recommendedFeed.ratio} ${recommendedFeed.type}.`;
+      alert = `${hiveName} syrup feeder will need refill in ~${daysRemaining}d. Next: ${feedTypeLabel(recommendedFeed.type)}.`;
     } else if (daysRemaining <= 5) {
       alert = `${hiveName} syrup feeder has ~${daysRemaining}d supply left.`;
     }
   } else if (!lastFeeding && populationSize !== 'none') {
     if (month === 2 || month === 3 || month === 8 || month === 9) {
-      alert = `${hiveName} has no feeding record. Consider feeding ${recommendedFeed.ratio} ${recommendedFeed.type}. ${recommendedFeed.reason}`;
+      alert = `${hiveName} has no feeding record. Consider feeding ${feedTypeLabel(recommendedFeed.type)}. ${recommendedFeed.reason}`;
     }
   }
 
