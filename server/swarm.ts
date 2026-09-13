@@ -60,7 +60,7 @@ function riskLevelFromScore(score: number): SwarmRiskAssessment['riskLevel'] {
  */
 export async function calculateSwarmRisk(hiveId: string): Promise<SwarmRiskAssessment> {
   const rows = db
-    .prepare('SELECT * FROM inspections WHERE hiveId = ? ORDER BY date DESC LIMIT 3')
+    .prepare('SELECT * FROM inspections WHERE hiveId = ? AND superseded_by IS NULL ORDER BY date DESC LIMIT 3')
     .all(hiveId) as InspectionRow[];
 
   const factors: SwarmRiskAssessment['factors'] = [];
@@ -97,7 +97,7 @@ export async function calculateSwarmRisk(hiveId: string): Promise<SwarmRiskAsses
     let detail = 'Queen cells present in the most recent inspection.';
     // Check if sealed cells were noted in concerns
     const concerns = db
-      .prepare('SELECT * FROM concerns WHERE inspectionId = ?')
+      .prepare('SELECT * FROM concerns WHERE inspectionId = ? AND superseded_by IS NULL')
       .all(latest.id) as ConcernRow[];
     const cellConcerns = concerns.filter(
       (c) => c.type.toLowerCase().includes('queen cell') || c.type.toLowerCase().includes('queen-cell'),
@@ -319,7 +319,7 @@ function finalize(
  * Returns an array of assessments sorted by risk score (highest first).
  */
 export async function calculateSwarmRiskAll(): Promise<SwarmRiskAssessment[]> {
-  const hives = db.prepare('SELECT id FROM hives').all() as { id: string }[];
+  const hives = db.prepare('SELECT entity_id AS id FROM hives WHERE superseded_by IS NULL').all() as { id: string }[];
   const assessments: SwarmRiskAssessment[] = [];
   for (const h of hives) {
     try {
