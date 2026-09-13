@@ -59,7 +59,7 @@ function seasonalInterval(date: Date): { interval: number; detail: string } {
  * swarm risk, health status, and the current season.
  */
 export async function getHiveSchedule(hiveId: string): Promise<InspectionRecommendation> {
-  const hive = db.prepare('SELECT * FROM hives WHERE id = ?').get(hiveId) as HiveRow | undefined;
+  const hive = db.prepare('SELECT * FROM hives WHERE entity_id = ? AND superseded_by IS NULL').get(hiveId) as HiveRow | undefined;
   if (!hive) {
     throw new Error('hive not found: ' + hiveId);
   }
@@ -71,7 +71,7 @@ export async function getHiveSchedule(hiveId: string): Promise<InspectionRecomme
  * then by daysUntil (soonest first).
  */
 export async function getInspectionSchedule(): Promise<InspectionRecommendation[]> {
-  const hives = db.prepare('SELECT * FROM hives').all() as HiveRow[];
+  const hives = db.prepare('SELECT * FROM hives WHERE superseded_by IS NULL').all() as HiveRow[];
   const recs: InspectionRecommendation[] = [];
   for (const h of hives) {
     try {
@@ -103,7 +103,7 @@ async function buildRecommendation(hive: HiveRow): Promise<InspectionRecommendat
 
   // --- Latest inspection ---
   const rows = db
-    .prepare('SELECT * FROM inspections WHERE hiveId = ? ORDER BY date DESC LIMIT 1')
+    .prepare('SELECT * FROM inspections WHERE hiveId = ? AND superseded_by IS NULL ORDER BY date DESC LIMIT 1')
     .all(hive.id) as InspectionRow[];
 
   const season = seasonalInterval(now);
@@ -199,7 +199,7 @@ async function buildRecommendation(hive: HiveRow): Promise<InspectionRecommendat
 
   // --- Concerns in last inspection (varroa, disease) ---
   const concerns = db
-    .prepare('SELECT * FROM concerns WHERE inspectionId = ?')
+    .prepare('SELECT * FROM concerns WHERE inspectionId = ? AND superseded_by IS NULL')
     .all(latest.id) as ConcernRow[];
   const concernTypes = concerns.map((c) => c.type.toLowerCase());
   const hasVarroa = concernTypes.some((t) => t.includes('varroa') || t.includes('mite'));
@@ -270,7 +270,7 @@ function finalize(
   factors: InspectionRecommendation['factors'],
 ): InspectionRecommendation {
   return {
-    hiveId: hive.id,
+    hiveId: hive.entity_id,
     hiveName: hive.name,
     recommendedDate: recommendedDate.toISOString(),
     daysUntil,
