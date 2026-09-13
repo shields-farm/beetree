@@ -9,13 +9,22 @@ repos:
         always_run: true
       - id: lint
         name: 🧹 lint (oxlint)
-        entry: npx oxlint --ignore-pattern node_modules --ignore-pattern training --ignore-pattern dist --ignore-pattern public
+        entry: npx oxlint --ignore-pattern node_modules --ignore-pattern training --ignore-pattern dist --ignore-pattern public src e2e
         language: system
         pass_filenames: false
         always_run: true
       - id: test
         name: 🧪 tests (vitest)
         entry: npx vitest run
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: e2e
+        name: 🎭 e2e (playwright)
+        # Runs the browser suite against a throwaway DB copy on its own port.
+        # Skipped when RUN_E2E is not set, so a quick commit doesn't pay 30s and
+        # a machine without browsers installed isn't blocked.
+        entry: bash -c 'if [ "$RUN_E2E" = "1" ]; then npm run test:e2e; else echo "skipped (set RUN_E2E=1 to run)"; fi'
         language: system
         pass_filenames: false
         always_run: true
