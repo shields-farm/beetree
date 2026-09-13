@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Boxes, ClipboardList, Thermometer, CheckSquare, MoreHorizontal, X, Flower2, Bug, ShoppingBag, Settings as SettingsIcon, Cpu, MessageCircle, Activity, RefreshCw, Globe, Radio } from 'lucide-react';
+import { Boxes, ClipboardList, Thermometer, CheckSquare, MoreHorizontal, X, Globe, Cpu, Activity, Settings as SettingsIcon, MessageCircle, RefreshCw } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 
@@ -21,24 +21,28 @@ function HiveBoxIcon({ size = 22, strokeWidth = 2 }: { size?: number; strokeWidt
   );
 }
 
-// Primary nav — always visible in the bottom bar
-const PRIMARY_NAV = [
+type NavItem = { to: string; label: string; icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>; end?: boolean };
+
+// Primary nav — always visible in the bottom bar.
+// Tasks used to be absent from both navs entirely, so the highlight dropped to
+// zero on /tasks even though two dashboard alerts route there.
+const PRIMARY_NAV: NavItem[] = [
   { to: '/', label: 'Home', icon: HiveBoxIcon, end: true },
   { to: '/chat', label: 'Buzz', icon: MessageCircle },
   { to: '/inspections', label: 'Inspect', icon: ClipboardList },
   { to: '/hives', label: 'Hives', icon: Boxes },
-  { to: '/sensors', label: 'Sensors', icon: Thermometer },
+  { to: '/tasks', label: 'Tasks', icon: CheckSquare },
 ];
 
-// Secondary nav — accessible via the "More" button
-const SECONDARY_NAV = [
-  { to: '/buzz', label: 'Buzz Thread', icon: Radio },
-  { to: '/tasks', label: 'Tasks', icon: CheckSquare },
-  { to: '/pests', label: 'Pests', icon: Bug },
-  { to: '/forage', label: 'Forage', icon: Flower2 },
-  { to: '/equipment', label: 'Equipment', icon: ShoppingBag },
+// Secondary nav — behind "More". Everything here is a destination with its own
+// page; hub-embedded modules (pests, acoustics, swarm, queen, treatments,
+// trends) are reachable from their hub's tab row instead of from this sheet,
+// which is what let this list shrink from 10 to 5.
+const SECONDARY_NAV: NavItem[] = [
+  { to: '/sensors', label: 'Sensors', icon: Thermometer },
+  { to: '/forage', label: 'Forage', icon: Globe },
+  { to: '/equipment', label: 'Equipment', icon: Boxes },
   { to: '/hardware', label: 'Hardware', icon: Cpu },
-  { to: '/world', label: 'World', icon: Globe },
   { to: '/activity', label: 'Activity', icon: Activity },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ];
@@ -71,7 +75,7 @@ export function BottomNav() {
       {/* More menu sheet */}
       {moreOpen && (
         <div className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-white dark:bg-stone-900 rounded-t-2xl shadow-2xl border-t border-stone-200 dark:border-stone-800 animate-fade-in"
-          style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.5rem)' }}
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-stone-100 dark:border-stone-800">
             <span className="font-semibold text-stone-800 dark:text-stone-100 text-sm">More Pages</span>
@@ -127,7 +131,7 @@ export function BottomNav() {
                 end={item.end}
                 className={({ isActive }) =>
                   `flex flex-col items-center justify-center gap-0.5 flex-1 py-2 text-[10px] font-medium transition-colors ${
-                    isActive ? 'text-honey-600' : 'text-stone-400 dark:text-stone-500'
+                    isActive ? 'text-honey-600 dark:text-honey-400' : 'text-stone-400 dark:text-stone-500'
                   }`
                 }
               >
@@ -140,16 +144,24 @@ export function BottomNav() {
               </NavLink>
             );
           })}
-          {/* More button */}
-          <button
-            onClick={() => setMoreOpen(true)}
-            className="flex flex-col items-center justify-center gap-0.5 flex-1 py-2 text-[10px] font-medium text-stone-400 dark:text-stone-500"
-          >
-            <MoreHorizontal size={22} strokeWidth={2} />
-            <span>More</span>
-          </button>
+          {/* More button — highlighted when the current route is inside the sheet */}
+          <MoreButton active={SECONDARY_NAV.some((i) => i.to === window.location.hash.replace('#', ''))} onClick={() => setMoreOpen(true)} />
         </div>
       </nav>
     </>
+  );
+}
+
+function MoreButton({ active, onClick }: { active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex flex-col items-center justify-center gap-0.5 flex-1 py-2 text-[10px] font-medium transition-colors ${
+        active ? 'text-honey-600 dark:text-honey-400' : 'text-stone-400 dark:text-stone-500'
+      }`}
+    >
+      <MoreHorizontal size={22} strokeWidth={2} />
+      <span>More</span>
+    </button>
   );
 }

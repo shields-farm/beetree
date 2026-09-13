@@ -10,7 +10,7 @@ import {
   CloudRain,
   Thermometer,
 } from 'lucide-react';
-import { PageHeader } from '../components/Layout';
+import { EmbeddedPageHeader } from '../components/EmbeddedPageHeader';
 import { Card } from '../components/Card';
 
 import { API_BASE, apiFetch, statusToMessage } from '../lib/apiBase';
@@ -88,7 +88,7 @@ export function Treatments() {
   if (selected) {
     return (
       <div className="animate-fade-in space-y-5">
-        <PageHeader
+        <EmbeddedPageHeader
           title={selected.hiveName}
           subtitle="Treatment recommendations"
           action={
@@ -104,9 +104,9 @@ export function Treatments() {
         {selected.warnings.length > 0 && (
           <div className="space-y-2">
             {selected.warnings.map((w, i) => (
-              <div key={i} className="bg-red-50 dark:bg-red-950 border border-red-200 rounded-xl p-3 flex items-start gap-2">
+              <div key={i} className="bg-red-50 dark:bg-red-950 border border-red-200 rounded-xl p-3 flex items-start gap-2 dark:border-red-800">
                 <AlertTriangle size={18} className="shrink-0 mt-0.5 text-red-600 dark:text-red-400" />
-                <p className="text-sm text-red-800 font-medium">{w}</p>
+                <p className="text-sm text-red-800 font-medium dark:text-red-200">{w}</p>
               </div>
             ))}
           </div>
@@ -147,7 +147,7 @@ export function Treatments() {
 
   return (
     <div className="animate-fade-in space-y-5">
-      <PageHeader title="Treatments" subtitle="Recommended treatments based on inspection concerns" />
+      <EmbeddedPageHeader title="Treatments" subtitle="Recommended treatments based on inspection concerns" />
 
       {/* Season indicator */}
       {currentSeason && (
@@ -196,10 +196,10 @@ export function Treatments() {
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100">Warnings</h3>
           {recs.flatMap((r) => r.warnings.map((w, i) => ({ w, hiveName: r.hiveName, key: r.hiveId + '-' + i }))).map(({ w, hiveName, key }) => (
-            <div key={key} className="bg-red-50 dark:bg-red-950 border border-red-200 rounded-xl p-3 flex items-start gap-2">
+            <div key={key} className="bg-red-50 dark:bg-red-950 border border-red-200 rounded-xl p-3 flex items-start gap-2 dark:border-red-800">
               <AlertTriangle size={18} className="shrink-0 mt-0.5 text-red-600 dark:text-red-400" />
               <div>
-                <p className="text-sm text-red-800 font-medium">{w}</p>
+                <p className="text-sm text-red-800 font-medium dark:text-red-200">{w}</p>
                 <p className="text-xs text-red-400 mt-0.5">{hiveName}</p>
               </div>
             </div>
