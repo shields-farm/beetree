@@ -143,16 +143,16 @@ function computeScore(
  * Build the OutlierReport for a single apiary.
  */
 export function getOutlierReport(apiaryId: string): OutlierReport | null {
-  const apiary = db.prepare('SELECT id, name FROM apiaries WHERE id = ?').get(apiaryId) as ApiaryRow | undefined;
+  const apiary = db.prepare('SELECT entity_id AS id, name FROM apiaries WHERE entity_id = ? AND superseded_by IS NULL').get(apiaryId) as ApiaryRow | undefined;
   if (!apiary) return null;
 
-  const hives = db.prepare('SELECT id, apiaryId, name, healthStatus FROM hives WHERE apiaryId = ?').all(apiaryId) as HiveRow[];
+  const hives = db.prepare('SELECT entity_id AS id, apiaryId, name, healthStatus FROM hives WHERE apiaryId = ? AND superseded_by IS NULL').all(apiaryId) as HiveRow[];
 
   const stats: HiveStat[] = [];
 
   for (const hive of hives) {
     // Latest inspection
-    const insp = db.prepare('SELECT * FROM inspections WHERE hiveId = ? ORDER BY date DESC LIMIT 1').get(hive.id) as InspectionRow | undefined;
+    const insp = db.prepare('SELECT * FROM inspections WHERE hiveId = ? AND superseded_by IS NULL ORDER BY date DESC LIMIT 1').get(hive.id) as InspectionRow | undefined;
 
     let populationSize = 'none';
     let honeyStores = 'none';
@@ -165,7 +165,7 @@ export function getOutlierReport(apiaryId: string): OutlierReport | null {
       honeyStores = insp.honeyStores;
       lastInspectionDays = daysSince(insp.date);
       healthStatus = insp.healthStatus;
-      const concerns = db.prepare('SELECT * FROM concerns WHERE inspectionId = ?').all(insp.id) as ConcernRow[];
+      const concerns = db.prepare('SELECT * FROM concerns WHERE inspectionId = ? AND superseded_by IS NULL').all(insp.id) as ConcernRow[];
       concernsCount = concerns.length;
     }
 
@@ -265,7 +265,7 @@ export function getOutlierReport(apiaryId: string): OutlierReport | null {
  * Get OutlierReports for all apiaries.
  */
 export function getAllOutlierReports(): OutlierReport[] {
-  const apiaries = db.prepare('SELECT id, name FROM apiaries ORDER BY name').all() as ApiaryRow[];
+  const apiaries = db.prepare('SELECT entity_id AS id, name FROM apiaries WHERE superseded_by IS NULL ORDER BY name').all() as ApiaryRow[];
   const reports: OutlierReport[] = [];
   for (const a of apiaries) {
     const report = getOutlierReport(a.id);
