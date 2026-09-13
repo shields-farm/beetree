@@ -239,17 +239,17 @@ function treatmentsForConcern(
 /** Get the latest inspection for a hive, or null if none. */
 function getLatestInspection(hiveId: string): InspectionRow | null {
   const rows = db
-    .prepare('SELECT * FROM inspections WHERE hiveId = ? ORDER BY date DESC LIMIT 1')
+    .prepare('SELECT * FROM inspections WHERE hiveId = ? AND superseded_by IS NULL ORDER BY date DESC LIMIT 1')
     .all(hiveId) as InspectionRow[];
   return rows.length > 0 ? rows[0] : null;
 }
 
 function getConcernsFor(inspectionId: string): ConcernRow[] {
-  return db.prepare('SELECT * FROM concerns WHERE inspectionId = ?').all(inspectionId) as ConcernRow[];
+  return db.prepare('SELECT * FROM concerns WHERE inspectionId = ? AND superseded_by IS NULL').all(inspectionId) as ConcernRow[];
 }
 
 export function getTreatmentRecommendation(hiveId: string): TreatmentRecommendation {
-  const hive = db.prepare('SELECT * FROM hives WHERE id = ?').get(hiveId) as HiveRow | undefined;
+  const hive = db.prepare('SELECT * FROM hives WHERE entity_id = ? AND superseded_by IS NULL').get(hiveId) as HiveRow | undefined;
   if (!hive) {
     throw new Error('hive not found: ' + hiveId);
   }
@@ -262,7 +262,7 @@ export function getTreatmentRecommendation(hiveId: string): TreatmentRecommendat
 
   if (!latest) {
     return {
-      hiveId: hive.id,
+      hiveId: hiveId,
       hiveName: hive.name,
       treatments: [],
       season,
@@ -274,7 +274,7 @@ export function getTreatmentRecommendation(hiveId: string): TreatmentRecommendat
 
   if (concerns.length === 0) {
     return {
-      hiveId: hive.id,
+      hiveId: hiveId,
       hiveName: hive.name,
       treatments: [],
       season,
@@ -316,7 +316,7 @@ export function getTreatmentRecommendation(hiveId: string): TreatmentRecommendat
   }
 
   return {
-    hiveId: hive.id,
+    hiveId: hiveId,
     hiveName: hive.name,
     treatments,
     season,
@@ -325,7 +325,7 @@ export function getTreatmentRecommendation(hiveId: string): TreatmentRecommendat
 }
 
 export function getAllTreatmentRecommendations(): TreatmentRecommendation[] {
-  const hives = db.prepare('SELECT id FROM hives').all() as { id: string }[];
+  const hives = db.prepare('SELECT entity_id AS id FROM hives WHERE superseded_by IS NULL').all() as { id: string }[];
   const recs: TreatmentRecommendation[] = [];
   for (const h of hives) {
     try {

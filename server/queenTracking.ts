@@ -122,7 +122,7 @@ function buildStatus(hiveId: string, hiveName: string, records: QueenRecord[]): 
  * Get the QueenStatus for a single hive.
  */
 export function getQueenStatus(hiveId: string): QueenStatus | null {
-  const hiveRow = db.prepare('SELECT id, name FROM hives WHERE id = ?').get(hiveId) as HiveNameRow | undefined;
+  const hiveRow = db.prepare('SELECT entity_id AS id, name FROM hives WHERE entity_id = ? AND superseded_by IS NULL').get(hiveId) as HiveNameRow | undefined;
   if (!hiveRow) return null;
 
   const rows = db.prepare('SELECT * FROM queen_records WHERE hiveId = ? ORDER BY date DESC').all(hiveId) as QueenRecordRow[];
@@ -134,7 +134,7 @@ export function getQueenStatus(hiveId: string): QueenStatus | null {
  * Get QueenStatus for all hives (even those with no queen records).
  */
 export function getAllQueenStatuses(): QueenStatus[] {
-  const hives = db.prepare('SELECT id, name FROM hives ORDER BY name').all() as HiveNameRow[];
+  const hives = db.prepare('SELECT entity_id AS id, name FROM hives WHERE superseded_by IS NULL ORDER BY name').all() as HiveNameRow[];
   const allRecords = db.prepare('SELECT * FROM queen_records').all() as QueenRecordRow[];
 
   const byHive = new Map<string, QueenRecord[]>();
