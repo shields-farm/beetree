@@ -9,7 +9,7 @@
  * The SW versions its caches with CACHE_VERSION so a new deploy auto-invalidates.
  */
 
-const CACHE_VERSION = 'beetree-v2';
+const CACHE_VERSION = 'beetree-v3';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE = `${CACHE_VERSION}-api`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
