@@ -87,12 +87,12 @@ function computeDeclineRun(recent: string[]): number {
 }
 
 export function getHealthTrend(hiveId: string): HealthTrend {
-  const hive = db.prepare('SELECT * FROM hives WHERE id = ?').get(hiveId) as HiveRow | undefined;
+  const hive = db.prepare('SELECT * FROM hives WHERE entity_id = ? AND superseded_by IS NULL').get(hiveId) as HiveRow | undefined;
   if (!hive) {
     throw new Error('hive not found: ' + hiveId);
   }
   const rows = db
-    .prepare('SELECT id, date, healthStatus FROM inspections WHERE hiveId = ? ORDER BY date ASC')
+    .prepare('SELECT entity_id AS id, date, healthStatus FROM inspections WHERE hiveId = ? AND superseded_by IS NULL ORDER BY date ASC')
     .all(hiveId) as Pick<InspectionRow, 'id' | 'date' | 'healthStatus'>[];
 
   const history = rows.map((r) => ({
@@ -106,7 +106,7 @@ export function getHealthTrend(hiveId: string): HealthTrend {
   const commentary = buildCommentary(hive.name, statuses, trend);
 
   return {
-    hiveId: hive.id,
+    hiveId: hive.entity_id,
     hiveName: hive.name,
     history,
     trend,
@@ -115,7 +115,7 @@ export function getHealthTrend(hiveId: string): HealthTrend {
 }
 
 export function getAllHealthTrends(): HealthTrend[] {
-  const hives = db.prepare('SELECT id FROM hives').all() as { id: string }[];
+  const hives = db.prepare('SELECT entity_id AS id FROM hives WHERE superseded_by IS NULL').all() as { id: string }[];
   const trends: HealthTrend[] = [];
   for (const h of hives) {
     try {
