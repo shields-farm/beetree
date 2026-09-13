@@ -1,64 +1,35 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { MessageCircle } from 'lucide-react';
 
 interface ChatContextValue {
-  /** Open the chat panel */
-  openChat: () => void;
-  /** Open the chat with a pre-filled prompt (does not auto-send) */
-  openChatWithPrompt: (prompt: string) => void;
-  /** Open the chat and immediately send a prompt */
-  askAI: (prompt: string) => void;
-  /** The current pre-filled prompt (consumed by FloatingChat) */
-  pendingPrompt: string | null;
-  /** Called by FloatingChat when it consumes the prompt */
-  clearPendingPrompt: () => void;
   /** Page-specific quick questions for the current page */
   quickQuestions: string[];
   /** Set quick questions for the current page */
   setQuickQuestions: (questions: string[]) => void;
-  /** Is the chat currently open? */
-  isOpen: boolean;
-  /** Set by FloatingChat */
-  setIsOpen: (open: boolean) => void;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
 
+/**
+ * Holds only the page-scoped quick-question set now.
+ *
+ * This provider used to drive a FloatingChat popup: it carried `isOpen`,
+ * `pendingPrompt` and an `openChat()` that set it. The popup was removed in
+ * favour of the full-screen /chat route, but the context kept the whole dead
+ * surface — `openChat`, `openChatWithPrompt`, `askAI`, `pendingPrompt`,
+ * `clearPendingPrompt`, `isOpen` and `setIsOpen` had zero remaining consumers.
+ * Buzz is a route now, not a popup, so only the question set is still live.
+ */
 export function ChatProvider({ children }: { children: ReactNode }) {
-  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const [quickQuestions, setQuickQuestions] = useState<string[]>([]);
-  const [isOpen, setIsOpen] = useState(false);
 
-  const openChat = useCallback(() => {
-    setIsOpen(true);
-  }, []);
-
-  const openChatWithPrompt = useCallback((prompt: string) => {
-    setPendingPrompt(prompt);
-    setIsOpen(true);
-  }, []);
-
-  const askAI = useCallback((prompt: string) => {
-    setPendingPrompt(prompt);
-    setIsOpen(true);
-  }, []);
-
-  const clearPendingPrompt = useCallback(() => {
-    setPendingPrompt(null);
+  const setQuestions = useCallback((questions: string[]) => {
+    setQuickQuestions(questions);
   }, []);
 
   return (
-    <ChatContext.Provider value={{
-      openChat,
-      openChatWithPrompt,
-      askAI,
-      pendingPrompt,
-      clearPendingPrompt,
-      quickQuestions,
-      setQuickQuestions,
-      isOpen,
-      setIsOpen,
-    }}>
+    <ChatContext.Provider value={{ quickQuestions, setQuickQuestions: setQuestions }}>
       {children}
     </ChatContext.Provider>
   );
@@ -70,16 +41,16 @@ export function useChat() {
   return ctx;
 }
 
-/** Inline "Ask AI" button — navigates to full-screen chat with a pre-filled prompt */
+/** Inline "Ask Buzz" button — navigates to full-screen chat with a pre-filled prompt */
 export function AskAIButton({ prompt, label, className }: { prompt: string; label?: string; className?: string }) {
   const navigate = useNavigate();
   return (
     <button
       onClick={() => navigate('/chat', { state: { initialPrompt: prompt } })}
-      className={`inline-flex items-center gap-1.5 text-xs font-medium text-honey-700 bg-honey-50 border border-honey-200 px-2.5 py-1.5 rounded-full hover:bg-honey-100 transition-colors ${className ?? ''}`}
+      className={`inline-flex items-center gap-1.5 text-xs font-medium text-honey-700 dark:text-honey-300 bg-honey-50 dark:bg-honey-950 border border-honey-200 dark:border-honey-800 px-2.5 py-1.5 rounded-full hover:bg-honey-100 dark:hover:bg-honey-900 transition-colors ${className ?? ''}`}
     >
-      <span className="text-sm">🐝</span>
-      {label ?? 'Ask AI'}
+      <MessageCircle size={13} strokeWidth={2.2} />
+      {label ?? 'Ask Buzz'}
     </button>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Pencil, Trash2, Check, AlertTriangle, Mic, Loader2 } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2, Check, AlertTriangle, Mic, Loader2, Crown, Droplets, Tornado, Bug, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { useStore } from '../store/useStore';
 import { useChat, AskAIButton } from '../components/ChatContext';
@@ -163,7 +163,7 @@ export function InspectionDetail({ id }: { id: string }) {
 
       <div className="grid sm:grid-cols-2 gap-4">
         {/* Pillar 1: Queen Health */}
-        <SectionCard title="👑 Queen Health">
+        <SectionCard title="Queen Health" icon={<Crown size={16} className="text-amber-500" />}>
           <div className="divide-y divide-stone-50">
             <Field label="Queen present" value={active.queenPresent} />
             <Field label="Queen cells" value={active.queenCells} />
@@ -189,7 +189,7 @@ export function InspectionDetail({ id }: { id: string }) {
         </SectionCard>
 
         {/* Pillar 2: Nutrition */}
-        <SectionCard title="🍯 Nutrition">
+        <SectionCard title="Nutrition" icon={<Droplets size={16} className="text-honey-500" />}>
           <div className="divide-y divide-stone-50">
             <Field label="Honey stores" value={active.honeyStores} />
             <Field label="Pollen stores" value={active.pollenStores} />
@@ -213,7 +213,7 @@ export function InspectionDetail({ id }: { id: string }) {
       </div>
 
       {swarmConcerns.length > 0 && (
-        <SectionCard title="🌀 Swarm Risk" className="mt-4">
+        <SectionCard title="Swarm Risk" className="mt-4" icon={<Tornado size={16} className="text-sky-500" />}>
           <div className="space-y-1.5">
             {swarmConcerns.map((c) => (
               <div key={c.id} className="flex items-start justify-between text-sm py-1 gap-2">
@@ -229,7 +229,7 @@ export function InspectionDetail({ id }: { id: string }) {
       )}
 
       {pestDiseaseConcerns.length > 0 && (
-        <SectionCard title="🐝 Pests & Diseases" className="mt-4">
+        <SectionCard title="Pests & Diseases" className="mt-4" icon={<Bug size={16} className="text-orange-500" />}>
           <div className="space-y-1.5">
             {pestDiseaseConcerns.map((c) => (
               <div key={c.id} className="flex items-start justify-between text-sm py-1 gap-2">
@@ -245,7 +245,7 @@ export function InspectionDetail({ id }: { id: string }) {
       )}
 
       {otherConcerns.length > 0 && (
-        <SectionCard title="📝 Other Notes" className="mt-4">
+        <SectionCard title="Other Notes" className="mt-4" icon={<FileText size={16} className="text-stone-400" />}>
           <div className="space-y-1.5">
             {otherConcerns.map((c) => (
               <div key={c.id} className="flex items-start justify-between text-sm py-1 gap-2">
@@ -285,7 +285,7 @@ export function InspectionDetail({ id }: { id: string }) {
               </div>
             ))}
             {active.media.filter((m) => m.type === 'audio').map((a) => (
-              <div key={a.id} className="flex items-center gap-2 rounded-lg bg-purple-50 dark:bg-purple-950 border border-purple-100 p-2.5">
+              <div key={a.id} className="flex items-center gap-2 rounded-lg bg-purple-50 dark:bg-purple-950 border border-purple-100 p-2.5 dark:border-purple-800">
                 <Mic size={16} className="text-purple-600 dark:text-purple-400 shrink-0" />
                 <audio src={a.dataUrl} controls className="flex-1 h-8" />
               </div>
