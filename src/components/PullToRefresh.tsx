@@ -1,4 +1,5 @@
 import { useRef, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { Hexagon } from 'lucide-react';
 
 const PULL_THRESHOLD = 70;     // px to trigger refresh
 const MAX_PULL = 120;          // max visual pull distance
@@ -205,7 +206,7 @@ function BeeSpinner() {
         display: 'inline-block',
       }}
     >
-      🐝
+      <Hexagon size={18} className="text-honey-500" />
     </span>
   );
 }

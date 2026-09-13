@@ -34,7 +34,7 @@ export function SensorPicker({ hiveId, boxId, boxSensorIds }: SensorPickerProps)
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-stone-700 dark:text-stone-200 flex items-center gap-1.5">
-          <Thermometer size={13} className="text-sky-600" /> Sensors on this box
+          <Thermometer size={13} className="text-sky-600 dark:text-sky-400" /> Sensors on this box
         </span>
         <button
           type="button"
@@ -52,13 +52,13 @@ export function SensorPicker({ hiveId, boxId, boxSensorIds }: SensorPickerProps)
       {assigned.map((s) => (
         <div
           key={s.id}
-          className="flex items-center justify-between bg-sky-50 border border-sky-100 rounded-lg px-2.5 py-1.5"
+          className="flex items-center justify-between bg-sky-50 border border-sky-100 rounded-lg px-2.5 py-1.5 dark:bg-sky-950 dark:border-sky-800"
         >
           <div className="min-w-0">
             <div className="text-xs font-medium text-sky-900 truncate">
               {s.name} <span className="text-sky-500 font-normal">({s.deviceId})</span>
             </div>
-            <div className="text-[10px] text-sky-600">
+            <div className="text-[10px] text-sky-600 dark:text-sky-400">
               {s.model} {s.position ? `· ${s.position}` : ''}
             </div>
           </div>

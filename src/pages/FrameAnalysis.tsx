@@ -13,6 +13,10 @@ import {
   Sparkles,
   ClipboardCheck,
   Image as ImageIcon,
+  HelpCircle,
+  Activity,
+  Droplets,
+  Flower2,
   X,
 } from 'lucide-react';
 import { PageHeader } from '../components/Layout';
@@ -55,12 +59,12 @@ interface FrameAnalysis {
 }
 
 // ─── Brood pattern display config ─────────────────────────────────────────────
-const BROOD_PATTERN_META: Record<string, { label: string; color: string; bg: string; icon: string }> = {
-  solid: { label: 'Solid', color: 'text-green-700 dark:text-green-300', bg: 'bg-green-100 dark:bg-green-900', icon: '✓' },
-  spotty: { label: 'Spotty', color: 'text-orange-700', bg: 'bg-orange-100 dark:bg-orange-900', icon: '!' },
-  patchy: { label: 'Patchy', color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-100 dark:bg-amber-900', icon: '~' },
-  none: { label: 'None', color: 'text-red-700 dark:text-red-300', bg: 'bg-red-100 dark:bg-red-900', icon: '×' },
-  unknown: { label: 'Unknown', color: 'text-stone-500 dark:text-stone-400', bg: 'bg-stone-100 dark:bg-stone-800', icon: '?' },
+const BROOD_PATTERN_META: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
+  solid: { label: 'Solid', color: 'text-green-700 dark:text-green-300', bg: 'bg-green-100 dark:bg-green-900', icon: <Check size={13} /> },
+  spotty: { label: 'Spotty', color: 'text-orange-700 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-900', icon: <AlertTriangle size={13} /> },
+  patchy: { label: 'Patchy', color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-100 dark:bg-amber-900', icon: <AlertTriangle size={13} /> },
+  none: { label: 'None', color: 'text-red-700 dark:text-red-300', bg: 'bg-red-100 dark:bg-red-900', icon: <X size={13} /> },
+  unknown: { label: 'Unknown', color: 'text-stone-500 dark:text-stone-400', bg: 'bg-stone-100 dark:bg-stone-800', icon: <HelpCircle size={13} /> },
 };
 
 const CONFIDENCE_META: Record<string, { label: string; bg: string; text: string }> = {
@@ -70,13 +74,13 @@ const CONFIDENCE_META: Record<string, { label: string; bg: string; text: string 
 };
 
 // ─── Ratio bar component ──────────────────────────────────────────────────────
-function RatioBar({ label, value, color, icon }: { label: string; value: number; color: string; icon: string }) {
+function RatioBar({ label, value, color, icon }: { label: string; value: number; color: string; icon: React.ReactNode }) {
   const pct = Math.round(value * 100);
   return (
     <div className="py-2">
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-sm font-medium text-stone-700 dark:text-stone-200 flex items-center gap-1.5">
-          <span>{icon}</span>
+          {icon}
           {label}
         </span>
         <span className="text-xs font-semibold text-stone-500 dark:text-stone-400">{pct}%</span>
@@ -215,11 +219,11 @@ export function FrameAnalysisPage() {
 
       {/* Success banner after creating inspection */}
       {createdInspectionId && (
-        <Card className="mb-4 bg-green-50 dark:bg-green-950 border-green-200">
+        <Card className="mb-4 bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
           <div className="flex items-center gap-3">
             <Check size={22} className="text-green-600 dark:text-green-400" />
             <div className="flex-1">
-              <p className="text-sm font-semibold text-green-800">Inspection created!</p>
+              <p className="text-sm font-semibold text-green-800 dark:text-green-200">Inspection created!</p>
               <p className="text-xs text-green-600 dark:text-green-400">Saved to {selectedHive?.name ?? 'hive'} with AI analysis results.</p>
             </div>
             <button
@@ -234,7 +238,7 @@ export function FrameAnalysisPage() {
 
       {/* Error banner */}
       {error && (
-        <Card className="mb-4 bg-red-50 dark:bg-red-950 border-red-200">
+        <Card className="mb-4 bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800">
           <div className="flex items-start gap-2 text-sm text-red-700 dark:text-red-300">
             <AlertTriangle size={18} className="shrink-0 mt-0.5" />
             <div>
@@ -367,7 +371,7 @@ export function FrameAnalysisPage() {
       {analysis && broodMeta && (
         <div className="space-y-4">
           {/* Overall assessment */}
-          <Card className="bg-gradient-to-br from-honey-50 to-amber-50 border-honey-200">
+          <Card className="bg-gradient-to-br from-honey-50 to-amber-50 border-honey-200 dark:border-honey-800">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-xl bg-honey-500 flex items-center justify-center shrink-0">
                 <Sparkles size={20} className="text-white" />
@@ -391,7 +395,7 @@ export function FrameAnalysisPage() {
               {/* Brood pattern badge */}
               <div className="flex items-center justify-between py-2">
                 <span className="text-sm text-stone-600 dark:text-stone-300">Brood pattern</span>
-                <span className={'text-xs font-bold px-3 py-1 rounded-full ' + broodMeta.bg + ' ' + broodMeta.color}>
+                <span className={'text-xs font-bold px-3 py-1 rounded-full inline-flex items-center gap-1.5 ' + broodMeta.bg + ' ' + broodMeta.color}>
                   {broodMeta.icon} {broodMeta.label}
                 </span>
               </div>
@@ -404,11 +408,11 @@ export function FrameAnalysisPage() {
                 </span>
                 {analysis.queenSpotted ? (
                   <span className="text-xs font-bold px-3 py-1 rounded-full bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
-                    ✓ Yes
+                    <Check size={13} className="inline" /> Yes
                   </span>
                 ) : (
                   <span className="text-xs font-bold px-3 py-1 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400">
-                    ✗ No
+                    <X size={13} className="inline" /> No
                   </span>
                 )}
               </div>
@@ -426,9 +430,9 @@ export function FrameAnalysisPage() {
 
             {/* Ratios */}
             <SectionCard title="Frame Coverage" icon={<ImageIcon size={16} className="text-honey-600 dark:text-honey-400" />}>
-              <RatioBar label="Brood" value={analysis.broodRatio} color="bg-amber-500" icon="🐝" />
-              <RatioBar label="Honey" value={analysis.honeyRatio} color="bg-yellow-400" icon="🍯" />
-              <RatioBar label="Pollen" value={analysis.pollenRatio} color="bg-orange-400" icon="🌼" />
+              <RatioBar label="Brood" value={analysis.broodRatio} color="bg-amber-500" icon={<Activity size={14} className="text-amber-600 dark:text-amber-400" />} />
+              <RatioBar label="Honey" value={analysis.honeyRatio} color="bg-yellow-400" icon={<Droplets size={14} className="text-yellow-600 dark:text-yellow-400" />} />
+              <RatioBar label="Pollen" value={analysis.pollenRatio} color="bg-orange-400" icon={<Flower2 size={14} className="text-orange-500" />} />
             </SectionCard>
           </div>
 
@@ -439,7 +443,7 @@ export function FrameAnalysisPage() {
                 {analysis.diseases.map((d, i) => {
                   const cm = CONFIDENCE_META[d.confidence] ?? CONFIDENCE_META.low;
                   return (
-                    <div key={i} className="flex items-start gap-3 bg-red-50/50 rounded-lg p-3">
+                    <div key={i} className="flex items-start gap-3 bg-red-50/50 rounded-lg p-3 dark:bg-red-950">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-semibold text-stone-800 dark:text-stone-100">{d.type}</span>
@@ -461,12 +465,12 @@ export function FrameAnalysisPage() {
             <SectionCard title="Pests Detected" icon={<Bug size={16} className="text-orange-500 dark:text-orange-400" />}>
               <div className="space-y-2">
                 {analysis.pests.map((p, i) => (
-                  <div key={i} className="flex items-start gap-3 bg-orange-50/50 rounded-lg p-3">
+                  <div key={i} className="flex items-start gap-3 bg-orange-50/50 rounded-lg p-3 dark:bg-orange-950">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-semibold text-stone-800 dark:text-stone-100">{p.type}</span>
                         {typeof p.count === 'number' && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900 text-orange-700">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300">
                             Count: {p.count}
                           </span>
                         )}
@@ -484,7 +488,7 @@ export function FrameAnalysisPage() {
             <SectionCard title="Other Concerns" icon={<AlertTriangle size={16} className="text-amber-500" />}>
               <div className="space-y-2">
                 {analysis.concerns.map((c, i) => (
-                  <div key={i} className="flex items-start gap-3 bg-amber-50/50 rounded-lg p-3">
+                  <div key={i} className="flex items-start gap-3 bg-amber-50/50 rounded-lg p-3 dark:bg-amber-950">
                     <div className="flex-1 min-w-0">
                       <span className="text-sm font-semibold text-stone-800 dark:text-stone-100">{c.type}</span>
                       {c.note && <p className="text-xs text-stone-500 dark:text-stone-400 mt-1">{c.note}</p>}
@@ -564,7 +568,7 @@ export function FrameAnalysisPage() {
       {!imageDataUrl && !analyzing && !analysis && (
         <Card className="bg-stone-50/50 dark:bg-stone-950/50">
           <div className="text-center py-6">
-            <div className="w-12 h-12 rounded-2xl bg-honey-100 flex items-center justify-center mx-auto mb-3">
+            <div className="w-12 h-12 rounded-2xl bg-honey-100 flex items-center justify-center mx-auto mb-3 dark:bg-honey-900">
               <Sparkles size={24} className="text-honey-500" />
             </div>
             <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200">AI-Powered Frame Inspection</h3>

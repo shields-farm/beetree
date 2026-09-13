@@ -105,7 +105,7 @@ function BoxDiagram({
             </span>
           )}
           {boxSensors.length > 0 && (
-            <span className="inline-flex items-center gap-0.5 text-[10px] text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded-full">
+            <span className="inline-flex items-center gap-0.5 text-[10px] text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded-full dark:bg-sky-950 dark:text-sky-300">
               <Thermometer size={10} /> {boxSensors.length}
             </span>
           )}
@@ -130,7 +130,7 @@ function BoxDiagram({
         {contentMeta && !editable && (
           <div className="flex items-center justify-center gap-1.5 mb-2">
             <span className="text-xs font-medium px-3 py-1 rounded-full" style={{ background: contentMeta.color, color: contentMeta.textColor }}>
-              {contentMeta.icon} {contentMeta.label}
+              {contentMeta.label}
             </span>
           </div>
         )}
@@ -142,11 +142,10 @@ function BoxDiagram({
             {Array.from({ length: frameCount }, (_, i) => {
               // Color frames based on box content classification
               const frameColor = contentMeta ? contentMeta.color : '#e7e5e4';
-              const frameLabel = contentMeta ? contentMeta.icon : '';
               return (
                 <div
                   key={i}
-                  className="rounded-sm flex items-center justify-center text-[8px] transition-all"
+                  className="rounded-sm transition-all"
                   style={{
                     width: `${100 / frameCount}%`,
                     maxWidth: '28px',
@@ -157,9 +156,7 @@ function BoxDiagram({
                     border: '1px solid rgba(0,0,0,0.1)',
                   }}
                   title={`Frame ${i + 1}`}
-                >
-                  {frameLabel}
-                </div>
+                />
               );
             })}
           </div>
@@ -189,7 +186,7 @@ function BoxDiagram({
                     }`}
                     style={{ background: meta.color, color: meta.textColor }}
                   >
-                    {meta.icon} {meta.label}
+                    {meta.label}
                   </button>
                 );
               })}
@@ -201,7 +198,7 @@ function BoxDiagram({
         {showSensors && boxSensors.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {boxSensors.map((s) => (
-              <span key={s.id} className="inline-flex items-center gap-1 text-[10px] bg-sky-50 text-sky-700 px-2 py-0.5 rounded-full border border-sky-100">
+              <span key={s.id} className="inline-flex items-center gap-1 text-[10px] bg-sky-50 text-sky-700 px-2 py-0.5 rounded-full border border-sky-100 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800">
                 <Thermometer size={10} />
                 {s.name} {s.position ? `· ${s.position}` : ''}
               </span>

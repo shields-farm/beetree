@@ -14,6 +14,7 @@ import {
 import type { Concern, PopulationSize, QueenLayingPattern, StoreLevel, Temperament } from '../types';
 
 import { API_BASE, apiFetch, statusToMessage } from '../lib/apiBase';
+import { Hexagon } from 'lucide-react';
 
 interface TranscriptSummary {
   date: string;
@@ -218,11 +219,11 @@ export function OmiInspections() {
       />
 
       {createdId && (
-        <Card className="mb-4 bg-green-50 dark:bg-green-950 border-green-200">
+        <Card className="mb-4 bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
           <div className="flex items-center gap-3">
             <Check size={22} className="text-green-600 dark:text-green-400" />
             <div className="flex-1">
-              <p className="text-sm font-semibold text-green-800">Inspection created!</p>
+              <p className="text-sm font-semibold text-green-800 dark:text-green-200">Inspection created!</p>
               <p className="text-xs text-green-600 dark:text-green-400">Buzz parsed your voice notes into a saved inspection.</p>
             </div>
             <button
@@ -245,7 +246,7 @@ export function OmiInspections() {
           )}
 
           {listError && (
-            <Card className="bg-red-50 dark:bg-red-950 border-red-200">
+            <Card className="bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800">
               <div className="flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
                 <AlertTriangle size={18} />
                 {listError}
@@ -277,8 +278,8 @@ export function OmiInspections() {
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-stone-800 dark:text-stone-100 text-sm">{t.date}</span>
                       {t.hasBeeContent && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-honey-100 text-honey-700 dark:text-honey-300 font-medium">
-                          🐝 Bee-related
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-honey-100 text-honey-700 dark:text-honey-300 font-medium dark:bg-honey-900">
+                          Bee-related
                         </span>
                       )}
                     </div>
@@ -303,16 +304,16 @@ export function OmiInspections() {
 
           {/* Parsing state */}
           {parsing && (
-            <Card className="mb-4 bg-honey-50 dark:bg-honey-950 border-honey-200">
+            <Card className="mb-4 bg-honey-50 dark:bg-honey-950 border-honey-200 dark:border-honey-800">
               <div className="flex items-center gap-3">
                 <Loader2 size={20} className="animate-spin text-honey-600 dark:text-honey-400" />
-                <span className="text-sm text-honey-800">Buzz is listening to your transcript…</span>
+                <span className="text-sm text-honey-800 dark:text-honey-200">Buzz is listening to your transcript…</span>
               </div>
             </Card>
           )}
 
           {parseError && (
-            <Card className="mb-4 bg-red-50 dark:bg-red-950 border-red-200">
+            <Card className="mb-4 bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800">
               <div className="flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
                 <AlertTriangle size={18} />
                 {parseError}
@@ -324,7 +325,7 @@ export function OmiInspections() {
           {!parsing && !parseError && (
             <Card className="mb-4">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-lg">🐝</span>
+                <Hexagon size={18} className="text-honey-500" fill="currentColor" />
                 <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200">Buzz heard:</h3>
               </div>
               <p className="text-xs text-stone-400 dark:text-stone-500 mb-3">
@@ -457,7 +458,7 @@ export function OmiInspections() {
           {!parsing && !parseError && (
             <>
               {confirmError && (
-                <Card className="mb-3 bg-red-50 dark:bg-red-950 border-red-200">
+                <Card className="mb-3 bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800">
                   <div className="flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
                     <AlertTriangle size={18} />
                     {confirmError}

@@ -85,7 +85,7 @@ export function GpsPin({ hive, onPin, onClear, compact = false }: GpsPinProps) {
         <button
           onClick={get_location}
           disabled={loading}
-          className="w-full py-2.5 rounded-xl border-2 border-dashed border-honey-300 text-honey-700 dark:text-honey-300 text-sm font-medium flex items-center justify-center gap-2 hover:bg-honey-50 transition-colors disabled:opacity-50"
+          className="w-full py-2.5 rounded-xl border-2 border-dashed border-honey-300 text-honey-700 dark:text-honey-300 text-sm font-medium flex items-center justify-center gap-2 hover:bg-honey-50 transition-colors disabled:opacity-50 dark:border-honey-700"
         >
           {loading ? (
             <>
@@ -105,7 +105,7 @@ export function GpsPin({ hive, onPin, onClear, compact = false }: GpsPinProps) {
   }
 
   return (
-    <div className="rounded-xl bg-honey-50 dark:bg-honey-950 border border-honey-200 p-3 space-y-2.5">
+    <div className="rounded-xl bg-honey-50 dark:bg-honey-950 border border-honey-200 p-3 space-y-2.5 dark:border-honey-800">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <MapPin size={18} className="text-honey-600 dark:text-honey-400 shrink-0" />
@@ -127,7 +127,7 @@ export function GpsPin({ hive, onPin, onClear, compact = false }: GpsPinProps) {
 
       {loc.accuracy != null && (
         <div className="flex items-center gap-1.5 text-xs text-stone-500 dark:text-stone-400">
-          <span className="bg-honey-100 text-honey-800 px-1.5 py-0.5 rounded font-medium">
+          <span className="bg-honey-100 text-honey-800 px-1.5 py-0.5 rounded font-medium dark:bg-honey-900 dark:text-honey-200">
             ±{Math.round(loc.accuracy)}m accuracy
           </span>
           {loc.pinnedAt && (
@@ -173,7 +173,7 @@ export function GpsPin({ hive, onPin, onClear, compact = false }: GpsPinProps) {
               onClick={() => setEditingLabel(true)}
               className="text-xs text-stone-600 dark:text-stone-300 italic hover:text-honey-700"
             >
-              "{loc.label}" ✎
+              "{loc.label}"
             </button>
           ) : (
             <button
@@ -187,7 +187,7 @@ export function GpsPin({ hive, onPin, onClear, compact = false }: GpsPinProps) {
             href={`https://maps.apple.com/?ll=${loc.lat},${loc.lng}&q=Hive`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-sky-600 hover:underline font-medium"
+            className="text-xs text-sky-600 hover:underline font-medium dark:text-sky-400"
           >
             Open in Maps →
           </a>
@@ -196,7 +196,7 @@ export function GpsPin({ hive, onPin, onClear, compact = false }: GpsPinProps) {
 
       <button
         onClick={onClear}
-        className="w-full py-1.5 rounded-lg border border-red-200 text-red-600 dark:text-red-400 text-xs flex items-center justify-center gap-1.5 hover:bg-red-50"
+        className="w-full py-1.5 rounded-lg border border-red-200 text-red-600 dark:text-red-400 text-xs flex items-center justify-center gap-1.5 hover:bg-red-50 dark:border-red-800"
       >
         <Trash2 size={12} /> Remove pin
       </button>
