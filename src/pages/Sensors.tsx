@@ -110,7 +110,7 @@ export function Sensors() {
         action={
           <button
             onClick={refreshSensorReadings}
-            className="w-10 h-10 rounded-full bg-sky-50 text-sky-600 flex items-center justify-center"
+            className="w-10 h-10 rounded-full bg-sky-50 text-sky-600 flex items-center justify-center dark:bg-sky-950 dark:text-sky-400"
             title="Refresh readings"
           >
             <Thermometer size={20} />
@@ -216,7 +216,7 @@ export function Sensors() {
 
       <button
         onClick={() => setShowAdd(!showAdd)}
-        className="w-full mb-4 py-2.5 rounded-xl border-2 border-dashed border-sky-200 text-sky-600 text-sm font-medium hover:border-sky-400 flex items-center justify-center gap-1.5"
+        className="w-full mb-4 py-2.5 rounded-xl border-2 border-dashed border-sky-200 text-sky-600 text-sm font-medium hover:border-sky-400 flex items-center justify-center gap-1.5 dark:text-sky-400 dark:border-sky-800"
       >
         <Plus size={18} /> Register new sensor
       </button>
@@ -271,7 +271,7 @@ export function SensorDetail({ id }: { id: string }) {
     return (
       <div className="animate-fade-in">
         <p className="text-sm text-stone-400 dark:text-stone-500">Sensor not found.</p>
-        <Link to="/sensors" className="text-sky-600 text-sm underline mt-2 inline-block">Back to sensors</Link>
+        <Link to="/sensors" className="text-sky-600 text-sm underline mt-2 inline-block dark:text-sky-400">Back to sensors</Link>
       </div>
     );
   }
@@ -322,7 +322,7 @@ export function SensorDetail({ id }: { id: string }) {
                   navigate('/sensors');
                 }
               }}
-              className="w-full py-2 rounded-xl border border-red-200 text-red-600 dark:text-red-400 text-sm flex items-center justify-center gap-1.5"
+              className="w-full py-2 rounded-xl border border-red-200 text-red-600 dark:text-red-400 text-sm flex items-center justify-center gap-1.5 dark:border-red-800"
             >
               <Trash2 size={14} /> Delete sensor
             </button>
@@ -367,7 +367,7 @@ export function SensorDetail({ id }: { id: string }) {
         <Card className="mb-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200">Latest Reading</h3>
-            <button onClick={refreshSensorReadings} className="text-xs text-sky-600 font-medium">Refresh</button>
+            <button onClick={refreshSensorReadings} className="text-xs text-sky-600 font-medium dark:text-sky-400">Refresh</button>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <ReadingTile label="Temperature" value={`${r.temperature.toFixed(1)}°F`} color="bg-orange-50 dark:bg-orange-950 text-orange-700" />

@@ -176,7 +176,7 @@ export function MediaCapture({ media, onAdd, onRemove }: MediaCaptureProps) {
           <button
             type="button"
             onClick={() => photoCaptureRef.current?.click()}
-            className="w-full py-3 rounded-xl bg-honey-50 dark:bg-honey-950 border border-honey-200 text-honey-700 dark:text-honey-300 text-xs font-medium flex flex-col items-center gap-1 hover:bg-honey-100"
+            className="w-full py-3 rounded-xl bg-honey-50 dark:bg-honey-950 border border-honey-200 text-honey-700 dark:text-honey-300 text-xs font-medium flex flex-col items-center gap-1 hover:bg-honey-100 dark:border-honey-800"
           >
             <Camera size={20} />
             Take Photo
@@ -211,7 +211,7 @@ export function MediaCapture({ media, onAdd, onRemove }: MediaCaptureProps) {
           <button
             type="button"
             onClick={() => videoCaptureRef.current?.click()}
-            className="w-full py-3 rounded-xl bg-sky-50 border border-sky-200 text-sky-700 text-xs font-medium flex flex-col items-center gap-1 hover:bg-sky-100"
+            className="w-full py-3 rounded-xl bg-sky-50 border border-sky-200 text-sky-700 text-xs font-medium flex flex-col items-center gap-1 hover:bg-sky-100 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800"
           >
             <Video size={20} />
             Record Video
@@ -264,7 +264,7 @@ export function MediaCapture({ media, onAdd, onRemove }: MediaCaptureProps) {
             <button
               type="button"
               onClick={startVoiceRecording}
-              className="w-full py-3 rounded-xl bg-purple-50 dark:bg-purple-950 border border-purple-200 text-purple-700 dark:text-purple-300 text-xs font-medium flex flex-col items-center gap-1 hover:bg-purple-100"
+              className="w-full py-3 rounded-xl bg-purple-50 dark:bg-purple-950 border border-purple-200 text-purple-700 dark:text-purple-300 text-xs font-medium flex flex-col items-center gap-1 hover:bg-purple-100 dark:border-purple-800"
             >
               <Mic size={20} />
               Voice Note
@@ -331,7 +331,7 @@ export function MediaCapture({ media, onAdd, onRemove }: MediaCaptureProps) {
               <div className="text-xs text-stone-500 dark:text-stone-400 font-medium mb-1.5">Voice Notes ({audios.length})</div>
               <div className="space-y-2">
                 {audios.map((a) => (
-                  <div key={a.id} className="flex items-center gap-2 rounded-lg bg-purple-50 dark:bg-purple-950 border border-purple-100 p-2.5">
+                  <div key={a.id} className="flex items-center gap-2 rounded-lg bg-purple-50 dark:bg-purple-950 border border-purple-100 p-2.5 dark:border-purple-800">
                     <Mic size={16} className="text-purple-600 dark:text-purple-400 shrink-0" />
                     <audio src={a.dataUrl} controls className="flex-1 h-8" />
                     {a.duration && (

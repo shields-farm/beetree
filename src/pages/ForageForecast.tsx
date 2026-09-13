@@ -14,6 +14,7 @@ import { PageHeader } from '../components/Layout';
 import { Card } from '../components/Card';
 
 import { API_BASE, apiFetch, statusToMessage } from '../lib/apiBase';
+import { Star } from 'lucide-react';
 
 interface ForageFlow {
   plant: string;
@@ -336,7 +337,7 @@ function ForageSpeciesCalendar() {
               <div key={i} className="flex items-center py-1.5 border-b border-stone-50 dark:border-stone-900 last:border-0 group hover:bg-stone-50 dark:hover:bg-stone-900/50 rounded-lg px-1">
                 <div className="w-32 sm:w-40 shrink-0">
                   <div className="flex items-center gap-1.5">
-                    {s.significant && <span className="text-amber-500 text-xs" title="Significant nectar source">★</span>}
+                    {s.significant && <span title="Significant nectar source"><Star size={12} className="text-amber-500 fill-amber-500" /></span>}
                     <span className={'text-xs font-medium truncate ' + (s.significant ? 'text-stone-800 dark:text-stone-100' : 'text-stone-600 dark:text-stone-300')}>
                       {s.plant}
                     </span>
@@ -391,7 +392,7 @@ function ForageSpeciesCalendar() {
 
         {/* Legend */}
         <div className="mt-3 flex flex-wrap items-center gap-3 text-[10px] text-stone-400 dark:text-stone-500">
-          <span className="flex items-center gap-1"><span className="text-amber-500">★</span> Significant nectar source</span>
+          <span className="flex items-center gap-1"><Star size={12} className="text-amber-500 fill-amber-500" /> Significant nectar source</span>
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-honey-400" /> Active now</span>
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-honey-200 dark:bg-honey-800" /> Significant bloom</span>
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-stone-200 dark:bg-stone-700" /> Other bloom</span>

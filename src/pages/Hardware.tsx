@@ -13,18 +13,18 @@ import { apiFetch } from '../lib/apiBase';
 // ─── Mermaid Diagrams ──────────────────────────────────────────────────────
 
 const ARCH_DIAGRAM = `graph TB
-  subgraph Apiary["🐝 Apiary — Back Yard"]
+  subgraph Apiary["Apiary — Back Yard"]
     BM1["BroodMinder TH<br/>47:12:87"]
     BM2["BroodMinder TH-Pro<br/>47:12:C8"]
     BM3["BroodMinder TH-Pro2<br/>47:0B:AF"]
     BM4["3 more sensors<br/>TH / TH-Pro"]
   end
 
-  subgraph Garage["🏠 Garage — Mains Power"]
+  subgraph Garage["Garage — Mains Power"]
     PI["Raspberry Pi Zero W<br/>ARMv6 · 512MB<br/>btmon + hcitool"]
   end
 
-  subgraph MacMini["🖥️ Mac Mini — 192.0.2.10"]
+  subgraph MacMini["Mac Mini — 192.0.2.10"]
     HA["Home Assistant<br/>MQTT + REST API"]
     INFLUX["InfluxDB<br/>Time-series store"]
     OLLAMA["Ollama :11434<br/>LLM Inference"]
@@ -33,13 +33,13 @@ const ARCH_DIAGRAM = `graph TB
     BUZZ["Buzz Chat API<br/>Hermes profile :8642"]
   end
 
-  subgraph Telemetry["📊 Docker Telemetry"]
+  subgraph Telemetry["Docker Telemetry"]
     OTEL["OTel Collector :4318"]
     PROM["Prometheus :9090"]
     GRAFANA["Grafana :3000"]
   end
 
-  subgraph External["🌐 External Access"]
+  subgraph External["External Access"]
     FUNNEL["Tailscale Funnel<br/>beetree-host.ts.net"]
   end
 
@@ -117,11 +117,11 @@ const AI_DIAGRAM = `graph TB
 `;
 
 const LORA_DIAGRAM = `graph LR
-  subgraph Apiary["🐝 Far Apiary — Solar Powered"]
+  subgraph Apiary["Far Apiary — Solar Powered"]
     BLE["Any BLE device<br/>in range"]
     RAK["WisMesh Repeater Mini<br/>RAK4631 · SX1262 LoRa<br/>3200mAh LiPo + solar<br/>IP67 · SMA antenna"]
   end
-  subgraph House["🖥️ Mac Mini — 192.0.2.10"]
+  subgraph House["Mac Mini — 192.0.2.10"]
     USB["RAK4631 + RAK19009<br/>USB LoRa receiver<br/>/dev/cu.usbmodem*"]
     PY["Python decoder<br/>company ID routing"]
     HA["Home Assistant"]
