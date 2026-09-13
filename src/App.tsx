@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { lazy, Suspense, useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
 import { StoreProvider } from './store/useStore';
@@ -18,12 +18,10 @@ const SensorsHub = lazy(() => import('./pages/SensorsHub').then(m => ({ default:
 const SensorDetail = lazy(() => import('./pages/Sensors').then(m => ({ default: m.SensorDetail })));
 const Tasks = lazy(() => import('./pages/Tasks').then(m => ({ default: m.Tasks })));
 const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })));
-const Pests = lazy(() => import('./pages/Pests').then(m => ({ default: m.Pests })));
 const ForageForecast = lazy(() => import('./pages/ForageForecast').then(m => ({ default: m.ForageForecast })));
 const Equipment = lazy(() => import('./pages/Equipment').then(m => ({ default: m.Equipment })));
 const Hardware = lazy(() => import('./pages/Hardware').then(m => ({ default: m.Hardware })));
 const ChatPage = lazy(() => import('./pages/ChatPage').then(m => ({ default: m.ChatPage })));
-const BuzzThreadPage = lazy(() => import('./pages/BuzzThreadPage').then(m => ({ default: m.BuzzThreadPage })));
 const ActivityLog = lazy(() => import('./pages/ActivityLog').then(m => ({ default: m.ActivityLog })));
 const World = lazy(() => import('./pages/World').then(m => ({ default: m.World })));
 
@@ -106,7 +104,6 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/chat" element={<ChatPage />} />
-            <Route path="/buzz" element={<BuzzThreadPage />} />
             <Route path="/inspections" element={<InspectionsHub />} />
             <Route path="/inspections/new" element={<InspectionFormPage />} />
             <Route path="/inspections/:id" element={<InspectionDetailPage />} />
@@ -114,7 +111,6 @@ export default function App() {
             <Route path="/hives/:id" element={<HiveDetailPage />} />
             <Route path="/sensors" element={<SensorsHub />} />
             <Route path="/sensors/:id" element={<SensorDetailPage />} />
-            <Route path="/pests" element={<Pests />} />
             <Route path="/forage" element={<ForageForecast />} />
             <Route path="/tasks" element={<Tasks />} />
             <Route path="/equipment" element={<Equipment />} />
@@ -122,6 +118,29 @@ export default function App() {
             <Route path="/settings" element={<Settings />} />
             <Route path="/activity" element={<ActivityLog />} />
             <Route path="/world" element={<World />} />
+
+            {/* ── Legacy route redirects ──────────────────────────────────
+                These paths used to be separate routed pages. The modules are
+                now tabs inside their owning hub, so old links and bookmarks
+                land on the right tab instead of a blank screen. The dashboard
+                was previously emitting /swarm, /treatments and /queen links
+                for routes that were never registered — every one of them
+                rendered an empty page. */}
+            <Route path="/swarm" element={<Navigate to="/hives?tab=swarm" replace />} />
+            <Route path="/queen" element={<Navigate to="/hives?tab=queen" replace />} />
+            <Route path="/trends" element={<Navigate to="/hives?tab=trends" replace />} />
+            <Route path="/treatments" element={<Navigate to="/hives?tab=treatments" replace />} />
+            <Route path="/pests" element={<Navigate to="/hives?tab=pests" replace />} />
+            <Route path="/outliers" element={<Navigate to="/sensors?tab=anomalies" replace />} />
+            <Route path="/acoustics" element={<Navigate to="/sensors?tab=acoustics" replace />} />
+            <Route path="/buzz" element={<Navigate to="/chat" replace />} />
+            <Route path="/apiaries" element={<Navigate to="/hives?tab=apiaries" replace />} />
+            <Route path="/colony-map" element={<Navigate to="/hives?tab=map" replace />} />
+            <Route path="/schedule" element={<Navigate to="/inspections?tab=schedule" replace />} />
+            <Route path="/omi" element={<Navigate to="/inspections?tab=history" replace />} />
+
+            {/* Unknown paths land on the dashboard rather than a blank shell */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           </Suspense>
           </Layout>
