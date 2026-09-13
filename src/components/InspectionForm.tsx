@@ -13,6 +13,7 @@ import { calculateHealth, HEALTH_META } from '../lib/health';
 import { LabelSlider, Slider } from './Slider';
 import { MediaCapture } from './MediaCapture';
 import { uid } from '../store/useStore';
+import { Crown, Droplets, Activity, ClipboardList, Boxes } from 'lucide-react';
 
 export interface InspectionFormData {
   hiveId: string;
@@ -158,7 +159,7 @@ export function InspectionForm({ hiveId, initial, onSubmit, onCancel, submitLabe
       {/* ─── PILLAR 1: QUEEN HEALTH ─── */}
       <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-card border border-stone-100 dark:border-stone-800 p-4">
         <div className="flex items-center gap-2 mb-3">
-          <span className="text-lg">👑</span>
+          <Crown size={18} className="text-amber-500" />
           <div>
             <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 uppercase tracking-wide">Queen Health</h3>
             <p className="text-[10px] text-stone-400 dark:text-stone-500">Pillar 1 of 3 — Jamie Ellis</p>
@@ -194,7 +195,7 @@ export function InspectionForm({ hiveId, initial, onSubmit, onCancel, submitLabe
       {/* ─── PILLAR 2: NUTRITION ─── */}
       <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-card border border-stone-100 dark:border-stone-800 p-4 space-y-5">
         <div className="flex items-center gap-2 mb-1">
-          <span className="text-lg">🍯</span>
+          <Droplets size={18} className="text-honey-500" />
           <div>
             <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 uppercase tracking-wide">Nutrition</h3>
             <p className="text-[10px] text-stone-400 dark:text-stone-500">Pillar 2 of 3 — honey &amp; pollen stores, population</p>
@@ -233,13 +234,13 @@ export function InspectionForm({ hiveId, initial, onSubmit, onCancel, submitLabe
       <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-card border border-stone-100 dark:border-stone-800 p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <span className="text-lg">🐝</span>
+            <Activity size={18} className="text-honey-600 dark:text-honey-400" />
             <div>
               <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 uppercase tracking-wide">Pests &amp; Diseases</h3>
               <p className="text-[10px] text-stone-400 dark:text-stone-500">Pillar 3 of 3 — varroa, SHB, concerns</p>
             </div>
           </div>
-          <button type="button" onClick={addConcern} className="text-xs text-honey-600 font-medium flex items-center gap-1 hover:text-honey-700">
+          <button type="button" onClick={addConcern} className="text-xs text-honey-600 font-medium flex items-center gap-1 hover:text-honey-700 dark:text-honey-400">
             <Plus size={14} /> Add
           </button>
         </div>
@@ -287,7 +288,7 @@ export function InspectionForm({ hiveId, initial, onSubmit, onCancel, submitLabe
       {/* Overall Health Summary */}
       <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-card border border-stone-100 dark:border-stone-800 p-4">
         <div className="flex items-center gap-2 mb-3">
-          <span className="text-lg">📋</span>
+          <ClipboardList size={18} className="text-honey-600 dark:text-honey-400" />
           <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 uppercase tracking-wide">Overall Health</h3>
         </div>
         <div className="flex items-center justify-between mb-3">
@@ -353,7 +354,7 @@ export function InspectionForm({ hiveId, initial, onSubmit, onCancel, submitLabe
       {boxes && boxes.length > 0 && onBoxContentChange && (
         <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-card border border-stone-100 dark:border-stone-800 p-4">
           <div className="flex items-center gap-2 mb-3">
-            <span className="text-lg">📦</span>
+            <Boxes size={18} className="text-stone-500 dark:text-stone-400" />
             <div>
               <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 uppercase tracking-wide">Box Content</h3>
               <p className="text-[10px] text-stone-400 dark:text-stone-500">Quick-set what each box is majority of</p>
@@ -377,7 +378,7 @@ export function InspectionForm({ hiveId, initial, onSubmit, onCancel, submitLabe
                         }`}
                         style={{ background: meta.color, color: meta.textColor }}
                       >
-                        {meta.icon} {meta.label}
+                        {meta.label}
                       </button>
                     );
                   })}

@@ -151,7 +151,7 @@ export function Settings() {
                 flash('Reset to seed data.');
               }
             }}
-            className="w-full flex items-center gap-3 py-2.5 px-3 rounded-xl border border-amber-200 text-sm text-amber-700 dark:text-amber-300 hover:bg-amber-50"
+            className="w-full flex items-center gap-3 py-2.5 px-3 rounded-xl border border-amber-200 text-sm text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:border-amber-800"
           >
             <RotateCcw size={18} className="text-amber-600 dark:text-amber-400" />
             Reset to sample data
@@ -163,7 +163,7 @@ export function Settings() {
                 flash('All data cleared.');
               }
             }}
-            className="w-full flex items-center gap-3 py-2.5 px-3 rounded-xl border border-red-200 text-sm text-red-600 dark:text-red-400 hover:bg-red-50"
+            className="w-full flex items-center gap-3 py-2.5 px-3 rounded-xl border border-red-200 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:border-red-800"
           >
             <Trash2 size={18} className="text-red-500 dark:text-red-400" />
             Clear all data
@@ -383,7 +383,7 @@ function PestPrefsCard() {
           return (
             <div key={cat}>
               <p className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wide mb-1.5">
-                {meta.icon} {meta.label}
+                {meta.label}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                 {products.map((product) => {
