@@ -1,4 +1,4 @@
-import { Boxes, ClipboardList, Thermometer, CheckSquare, Settings as SettingsIcon, Hexagon, Bug, Flower2, ShoppingBag, Cpu, MessageCircle, Activity, Globe, Radio } from 'lucide-react';
+import { Boxes, ClipboardList, Thermometer, CheckSquare, Settings as SettingsIcon, Hexagon, MessageCircle, Activity, Cpu, Globe } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 /** Custom icon: a 10-frame deep hive box (side view with vertical frame lines) */
@@ -19,24 +19,56 @@ function HiveBoxIcon({ size = 20, strokeWidth = 2 }: { size?: number; strokeWidt
   );
 }
 
-const NAV_ITEMS = [
+/**
+ * Sidebar nav.
+ *
+ * Was 14 flat entries — a list of pages rather than a description of the app,
+ * with "Buzz" and "Buzz Thread" both present and neither distinguishable. The
+ * four module pages that used to live here (Pests, and the swarm/queen/
+ * treatment/trend pages that were never routed at all) are now tabs inside
+ * the hub that owns them: pests live under Hives, acoustics and anomalies
+ * under Sensors, scheduling under Inspections.
+ */
+const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: HiveBoxIcon, end: true },
   { to: '/chat', label: 'Buzz', icon: MessageCircle },
-  { to: '/buzz', label: 'Buzz Thread', icon: Radio },
   { to: '/inspections', label: 'Inspections', icon: ClipboardList },
   { to: '/hives', label: 'Hives', icon: Boxes },
   { to: '/sensors', label: 'Sensors', icon: Thermometer },
-  { to: '/pests', label: 'Pests', icon: Bug },
-  { to: '/forage', label: 'Forage', icon: Flower2 },
   { to: '/tasks', label: 'Tasks', icon: CheckSquare },
-  { to: '/equipment', label: 'Equipment', icon: ShoppingBag },
-  { to: '/hardware', label: 'Hardware', icon: Cpu },
-  { to: '/world', label: 'World', icon: Globe },
-  { to: '/activity', label: 'Activity', icon: Activity },
-  { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ];
 
+const SECONDARY_ITEMS: NavItem[] = [
+  { to: '/forage', label: 'Forage', icon: Globe },
+  { to: '/equipment', label: 'Equipment', icon: Boxes },
+  { to: '/hardware', label: 'Hardware', icon: Cpu },
+  { to: '/activity', label: 'Activity', icon: Activity },
+];
+
+type NavItem = { to: string; label: string; icon: React.ComponentType<{ size?: number; strokeWidth?: number }>; end?: boolean };
+
 export function Sidebar() {
+  const renderItem = (item: NavItem) => {
+    const Icon = item.icon;
+    return (
+      <NavLink
+        key={item.to}
+        to={item.to}
+        end={item.end}
+        className={({ isActive }) =>
+          `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+            isActive
+              ? 'bg-honey-50 dark:bg-honey-950 text-honey-700 dark:text-honey-300'
+              : 'text-stone-500 dark:text-stone-400 hover:bg-stone-50 dark:hover:bg-stone-800 hover:text-stone-700 dark:hover:text-stone-200'
+          }`
+        }
+      >
+        <Icon size={20} strokeWidth={2} />
+        {item.label}
+      </NavLink>
+    );
+  };
+
   return (
     <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 h-screen sticky top-0">
       <div className="px-5 py-5 flex items-center gap-2 border-b border-stone-100 dark:border-stone-800">
@@ -48,28 +80,16 @@ export function Sidebar() {
           <div className="text-[10px] text-stone-400 dark:text-stone-500 leading-tight">Integrated Beekeeping Management</div>
         </div>
       </div>
-      <nav className="flex-1 px-3 py-4 space-y-1">
-        {NAV_ITEMS.map((item) => {
-          const Icon = item.icon;
-          return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-honey-50 dark:bg-honey-950 text-honey-700 dark:text-honey-300'
-                    : 'text-stone-500 dark:text-stone-400 hover:bg-stone-50 dark:hover:bg-stone-800 hover:text-stone-700 dark:hover:text-stone-200'
-                }`
-              }
-            >
-              <Icon size={20} strokeWidth={2} />
-              {item.label}
-            </NavLink>
-          );
-        })}
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        {NAV_ITEMS.map(renderItem)}
+        <div className="pt-3 pb-1 px-3">
+          <span className="text-[10px] font-bold text-stone-300 dark:text-stone-600 uppercase tracking-wider">More</span>
+        </div>
+        {SECONDARY_ITEMS.map(renderItem)}
       </nav>
+      <div className="px-3 pb-2">
+        {renderItem({ to: '/settings', label: 'Settings', icon: SettingsIcon })}
+      </div>
       <div className="px-4 py-3 border-t border-stone-100 dark:border-stone-800">
         <p className="text-[10px] text-stone-300 dark:text-stone-600">BeeTree v0.2 · secure</p>
       </div>

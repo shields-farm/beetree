@@ -9,8 +9,9 @@ import {
   Clock,
   History,
   Lightbulb,
+  Check,
 } from 'lucide-react';
-import { PageHeader } from '../components/Layout';
+import { EmbeddedPageHeader } from '../components/EmbeddedPageHeader';
 import { Card } from '../components/Card';
 
 import { API_BASE, apiFetch, statusToMessage } from '../lib/apiBase';
@@ -217,7 +218,7 @@ export function AcousticAnalysis() {
 
   return (
     <div className="animate-fade-in space-y-5">
-      <PageHeader title="Hive Acoustics" subtitle="Detect queenlessness, swarms & stress from sound" />
+      <EmbeddedPageHeader title="Hive Acoustics" subtitle="Detect queenlessness, swarms & stress from sound" />
 
       {/* Hive selector */}
       <Card>
@@ -263,7 +264,7 @@ export function AcousticAnalysis() {
             </div>
           )}
           {!recording && recordSeconds > 0 && audioBase64 && (
-            <span className="text-xs text-green-600 dark:text-green-400">Recorded {recordSeconds}s ✓</span>
+            <span className="text-xs text-green-600 dark:text-green-400 inline-flex items-center gap-1">Recorded {recordSeconds}s <Check size={12} /></span>
           )}
         </div>
         {audioBase64 && !recording && (
