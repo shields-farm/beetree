@@ -24,12 +24,37 @@ const TABS: { id: TabId; label: string; icon: typeof Activity }[] = [
   { id: 'configure', label: 'Configure', icon: Settings },
 ];
 
+const VALID_TABS = TABS.map((t) => t.id);
+
+/** Read ?tab= from the hash, so a hive tab is deep-linkable and survives reload. */
+function tabFromHash(): TabId {
+  try {
+    const params = new URLSearchParams(window.location.hash.split('?')[1] || '');
+    const t = params.get('tab') as TabId | null;
+    if (t && VALID_TABS.includes(t)) return t;
+  } catch { /* ignore */ }
+  return 'overview';
+}
+
 export function HiveDetail({ id }: { id: string }) {
   const { hives, apiaries, inspections, sensors, updateHive, deleteHive, assignSensor, refreshSensorReadings } = useStore();
   const { setQuickQuestions } = useChat();
   const navigate = useNavigate();
   const hive = hives.find((h) => h.id === id);
-  const [tab, setTab] = useState<TabId>('overview');
+  const [tab, setTabState] = useState<TabId>(tabFromHash);
+
+  // Keep the tab in the URL so it deep-links and survives reload/back.
+  const setTab = (t: TabId) => {
+    setTabState(t);
+    const hash = window.location.hash.split('?')[0];
+    window.history.replaceState(null, '', `${hash}?tab=${t}`);
+  };
+
+  useEffect(() => {
+    const onHash = () => setTabState(tabFromHash());
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(hive?.name ?? '');
   const [type, setType] = useState<HiveType>(hive?.type ?? 'langstroth-10');
