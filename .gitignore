@@ -43,3 +43,12 @@ Thumbs.db
 staging/
 data/audio/
 data/raw/
+
+# Playwright / e2e
+e2e/.test-server-url
+test-results/
+playwright-report/
+data/e2e.db
+data/e2e.db-wal
+data/e2e.db-shm
+data/*.bak
