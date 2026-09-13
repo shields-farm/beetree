@@ -9,6 +9,7 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { SensorCard } from '../components/SensorCard';
+import { getUserName } from '../lib/apiBase';
 import { useChatStore } from '../lib/useChatStore';
 import * as chatStore from '../lib/chatStore';
 
@@ -57,7 +58,7 @@ ${hives.length} hives, ${sensors.length} sensors. ${urgentAlerts.length > 0 ? `U
 HIVES:
 ${hiveLines || 'None'}
 
-When asked about sensors or hives, give a 1-2 sentence summary and let the cards show the data. Use tools for detailed queries. Be direct — what should Mark do next?`;
+When asked about sensors or hives, give a 1-2 sentence summary and let the cards show the data. Use tools for detailed queries. Be direct — what should the beekeeper do next?`;
 }
 
 export function ChatPage() {
@@ -87,12 +88,13 @@ export function ChatPage() {
 
   // Create new session
   const newSession = useCallback(() => {
+    const userName = getUserName();
     const alerts = generateAlerts(hives, inspections, sensors, tasks);
     const urgentCount = alerts.filter(a => a.severity === 'urgent').length;
     const welcome: chatStore.ChatMessage = {
       id: uid(),
       role: 'assistant',
-      content: `Hi Mark — I'm Buzz, your beekeeping assistant. I can see your ${apiaries.length} apiaries, ${hives.length} hives, and ${sensors.length} sensors.\n\n${urgentCount > 0 ? `You have **${urgentCount} urgent alert${urgentCount !== 1 ? 's' : ''}** that need attention.` : 'Everything looks good right now.'}\n\nAsk me about any hive, sensor trends, what needs attention, or what to do next.`,
+      content: `Hi${userName ? ' ' + userName : ''} — I'm Buzz, your beekeeping assistant. I can see your ${apiaries.length} apiaries, ${hives.length} hives, and ${sensors.length} sensors.\n\n${urgentCount > 0 ? `You have **${urgentCount} urgent alert${urgentCount !== 1 ? 's' : ''}** that need attention.` : 'Everything looks good right now.'}\n\nAsk me about any hive, sensor trends, what needs attention, or what to do next.`,
       timestamp: new Date().toISOString(),
     };
     chatStore.newSession(welcome);

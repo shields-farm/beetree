@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Database, RotateCcw, Trash2, Download, Upload, Hexagon, Info, Sun, Moon, Monitor, Key, Check, ShieldCheck, AlertCircle, Loader2, Bug } from 'lucide-react';
+import { Database, RotateCcw, Trash2, Download, Upload, Hexagon, Info, Sun, Moon, Monitor, Key, Check, ShieldCheck, AlertCircle, Loader2, Bug, User } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useTheme, type Theme } from '../contexts/ThemeContext';
 import { PageHeader } from '../components/Layout';
 import { Card } from '../components/Card';
-import { setApiKey as saveApiKey, hasApiKey, API_BASE } from '../lib/apiBase';
+import { setApiKey as saveApiKey, hasApiKey, API_BASE, getUserName, setUserName } from '../lib/apiBase';
 import {
   PEST_PRODUCTS, CATEGORY_META, getPestPrefs, setPestPrefs,
   type PestProduct,
@@ -14,6 +14,7 @@ export function Settings() {
   const { apiaries, hives, inspections, sensors, tasks, resetToSeed, clearAll } = useStore();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [msg, setMsg] = useState('');
+  const [name, setName] = useState(() => getUserName());
 
   const flash = (m: string) => {
     setMsg(m);
@@ -35,6 +36,32 @@ export function Settings() {
   return (
     <div className="animate-fade-in">
       <PageHeader title="Settings" subtitle="Manage your BeeTree data" />
+
+      {/* Profile — Buzz greets you by this name instead of a hardcoded one. */}
+      <Card className="mb-4">
+        <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 mb-3 flex items-center gap-2">
+          <User size={16} className="text-honey-600 dark:text-honey-400" />
+          Your name
+        </h3>
+        <div className="flex gap-2">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={() => { setUserName(name); flash(name.trim() ? 'Name saved.' : 'Name cleared.'); }}
+            placeholder="e.g. Mark"
+            className="flex-1 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-3.5 py-2.5 text-sm"
+          />
+          <button
+            onClick={() => { setUserName(name); flash(name.trim() ? 'Name saved.' : 'Name cleared.'); }}
+            className="px-4 rounded-xl bg-honey-500 text-white text-sm font-medium hover:bg-honey-600 transition-colors"
+          >
+            Save
+          </button>
+        </div>
+        <p className="text-xs text-stone-400 dark:text-stone-500 mt-2">
+          Buzz uses this in his greeting. Leave blank for a neutral greeting.
+        </p>
+      </Card>
 
       {/* Theme selector */}
       <Card className="mb-4">
