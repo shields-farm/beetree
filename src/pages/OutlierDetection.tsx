@@ -7,8 +7,8 @@ import {
   ChevronDown,
   ChevronRight,
   Lightbulb,
+  CheckCircle2,
 } from 'lucide-react';
-import { PageHeader } from '../components/Layout';
 import { Card } from '../components/Card';
 
 import { API_BASE, apiFetch } from '../lib/apiBase';
@@ -91,7 +91,6 @@ export function OutlierDetection() {
   if (loading) {
     return (
       <div className="animate-fade-in space-y-5">
-        <PageHeader title="Outlier Detection" subtitle="Find hives falling behind the apiary" />
         <Card>
           <div className="flex items-center justify-center py-8 text-stone-400 dark:text-stone-500 text-sm">
             <Loader2 size={20} className="animate-spin mr-2" /> Analyzing apiaries…
@@ -104,7 +103,6 @@ export function OutlierDetection() {
   if (error) {
     return (
       <div className="animate-fade-in space-y-5">
-        <PageHeader title="Outlier Detection" subtitle="Find hives falling behind the apiary" />
         <Card>
           <div className="flex items-start gap-2 text-red-600 dark:text-red-400">
             <AlertTriangle size={20} className="shrink-0 mt-0.5" />
@@ -124,8 +122,6 @@ export function OutlierDetection() {
 
   return (
     <div className="animate-fade-in space-y-5">
-      <PageHeader title="Outlier Detection" subtitle="Find hives falling behind the apiary" />
-
       {/* Apiary selector */}
       <Card>
         <label className="block text-sm font-medium text-stone-700 dark:text-stone-200 mb-1">Apiary</label>
@@ -171,7 +167,7 @@ export function OutlierDetection() {
                     <div className="flex items-center justify-between text-xs mb-1">
                       <span className={'font-medium ' + (outlier ? 'text-red-700 dark:text-red-300' : 'text-stone-700 dark:text-stone-200')}>
                         {h.hiveName}
-                        {outlier && <span className="ml-1">⚠</span>}
+                        {outlier && <AlertTriangle size={12} className="ml-1 inline text-amber-500" />}
                       </span>
                       <span className="text-stone-500 dark:text-stone-400">{h.score}/100</span>
                     </div>
@@ -245,10 +241,10 @@ export function OutlierDetection() {
 
           {/* Inspect next recommendation */}
           {report.outliers.length > 0 && (
-            <div className="rounded-2xl bg-honey-50 dark:bg-honey-950 border border-honey-200 p-4 flex items-start gap-3">
+            <div className="rounded-2xl bg-honey-50 dark:bg-honey-950 border border-honey-200 p-4 flex items-start gap-3 dark:border-honey-800">
               <Lightbulb size={20} className="text-honey-600 dark:text-honey-400 shrink-0 mt-0.5" />
               <div>
-                <p className="font-medium text-sm text-honey-800">Inspect this hive next</p>
+                <p className="font-medium text-sm text-honey-800 dark:text-honey-200">Inspect this hive next</p>
                 <p className="text-xs text-honey-700 dark:text-honey-300 mt-0.5">
                   Prioritize <strong>{report.outliers[0].hiveName}</strong> — {report.outliers[0].reason}
                 </p>
@@ -258,7 +254,7 @@ export function OutlierDetection() {
 
           {report.outliers.length === 0 && (
             <Card>
-              <p className="text-sm text-green-700 dark:text-green-300 text-center py-2">✓ All hives are within normal range.</p>
+              <p className="text-sm text-green-700 dark:text-green-300 text-center py-2 flex items-center justify-center gap-1.5"><CheckCircle2 size={15} /> All hives are within normal range.</p>
             </Card>
           )}
         </div>
