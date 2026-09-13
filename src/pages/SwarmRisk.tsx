@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Wind,
   Loader2,
@@ -8,7 +7,7 @@ import {
   Clock,
   TrendingUp,
 } from 'lucide-react';
-import { PageHeader } from '../components/Layout';
+import { EmbeddedPageHeader } from '../components/EmbeddedPageHeader';
 import { Card } from '../components/Card';
 import { useStore } from '../store/useStore';
 
@@ -29,16 +28,15 @@ interface SwarmRiskAssessment {
   daysUntilLikelySwarm: number | null;
 }
 
-const RISK_META: Record<SwarmRiskAssessment['riskLevel'], { label: string; bg: string; text: string; bar: string; ring: string }> = {
-  low: { label: 'Low', bg: 'bg-green-100 dark:bg-green-900', text: 'text-green-800', bar: 'bg-green-500', ring: 'ring-green-200' },
-  moderate: { label: 'Moderate', bg: 'bg-amber-100 dark:bg-amber-900', text: 'text-amber-800', bar: 'bg-amber-500', ring: 'ring-amber-200' },
-  high: { label: 'High', bg: 'bg-orange-100 dark:bg-orange-900', text: 'text-orange-800', bar: 'bg-orange-500', ring: 'ring-orange-200' },
-  'very-high': { label: 'Very High', bg: 'bg-red-100 dark:bg-red-900', text: 'text-red-800', bar: 'bg-red-500', ring: 'ring-red-200' },
+const RISK_META: Record<SwarmRiskAssessment['riskLevel'], { label: string; bg: string; text: string; bar: string; ring: string; ringColor: string }> = {
+  low: { label: 'Low', bg: 'bg-green-100 dark:bg-green-900', text: 'text-green-700 dark:text-green-400', bar: 'bg-green-500', ring: 'ring-green-200', ringColor: '#22c55e' },
+  moderate: { label: 'Moderate', bg: 'bg-amber-100 dark:bg-amber-900', text: 'text-amber-700 dark:text-amber-400', bar: 'bg-amber-500', ring: 'ring-amber-200', ringColor: '#f59e0b' },
+  high: { label: 'High', bg: 'bg-orange-100 dark:bg-orange-900', text: 'text-orange-700 dark:text-orange-400', bar: 'bg-orange-500', ring: 'ring-orange-200', ringColor: '#f97316' },
+  'very-high': { label: 'Very High', bg: 'bg-red-100 dark:bg-red-900', text: 'text-red-700 dark:text-red-400', bar: 'bg-red-500', ring: 'ring-red-200', ringColor: '#ef4444' },
 };
 
 export function SwarmRisk() {
   const { hives } = useStore();
-  const navigate = useNavigate();
 
   const [assessments, setAssessments] = useState<SwarmRiskAssessment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,7 +68,7 @@ export function SwarmRisk() {
   if (selected) {
     return (
       <div className="animate-fade-in space-y-5">
-        <PageHeader
+        <EmbeddedPageHeader
           title={hiveName(selected.hiveId)}
           subtitle="Swarm risk assessment"
           action={
@@ -152,17 +150,9 @@ export function SwarmRisk() {
 
   return (
     <div className="animate-fade-in space-y-5">
-      <PageHeader
+      <EmbeddedPageHeader
         title="Swarm Risk"
         subtitle="AI swarm probability for all hives"
-        action={
-          <button
-            onClick={() => navigate(-1)}
-            className="lg:hidden flex items-center gap-1 text-sm text-stone-500 dark:text-stone-400"
-          >
-            <ChevronLeft size={18} /> Back
-          </button>
-        }
       />
 
       {loading && (
@@ -199,10 +189,22 @@ export function SwarmRisk() {
             return (
               <Card key={a.hiveId} onClick={() => setSelectedHiveId(a.hiveId)}>
                 <div className="flex items-center gap-4">
-                  {/* Score circle */}
-                  <div className={'shrink-0 w-16 h-16 rounded-2xl flex flex-col items-center justify-center ' + meta.bg}>
-                    <div className={'text-xl font-bold ' + meta.text}>{a.riskScore}</div>
-                    <div className="text-[9px] text-stone-400 dark:text-stone-500">/100</div>
+                  {/* Score gauge — deliberately a ring, not a filled tile. A
+                      filled colour tile is the same visual language the sensor
+                      cards use for a measured reading (95.2°F), and a risk
+                      score is not a measurement. */}
+                  <div className="shrink-0 relative w-16 h-16">
+                    <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
+                      <circle cx="18" cy="18" r="15.5" fill="none" strokeWidth="4"
+                        className="stroke-stone-100 dark:stroke-stone-800" />
+                      <circle cx="18" cy="18" r="15.5" fill="none" strokeWidth="4"
+                        strokeLinecap="round" stroke={meta.ringColor}
+                        strokeDasharray={`${(a.riskScore / 100) * 97.4} 97.4`} />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <div className={'text-lg font-bold leading-none ' + meta.text}>{a.riskScore}</div>
+                      <div className="text-[9px] text-stone-400 dark:text-stone-500 mt-0.5">risk</div>
+                    </div>
                   </div>
                   {/* Info */}
                   <div className="flex-1 min-w-0">
