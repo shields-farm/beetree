@@ -588,7 +588,10 @@ app.post('/api/inspections', (req, res) => {
   const b = req.body || {};
   const entityId = b.id || genId('insp');
   const rowId = genId('insp');
-  db.prepare(`INSERT INTO inspections (id, entity_id, version, superseded_by, superseded_at, hiveId, date, queenPresent, queenCells, queenLayingPattern, eggsPresent, larvaePresent, cappedBrood, temperament, honeyStores, pollenStores, populationSize, hiveWeight, healthStatus, healthAutoCalculated, colonyDead, notes, photoUrls) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+  // 23 columns / 23 placeholders. This statement had 24 placeholders against 23
+  // columns and only 19 bound values, so every inspection save failed with
+  // "24 values for 23 columns" — the create path had never worked.
+  db.prepare(`INSERT INTO inspections (id, entity_id, version, superseded_by, superseded_at, hiveId, date, queenPresent, queenCells, queenLayingPattern, eggsPresent, larvaePresent, cappedBrood, temperament, honeyStores, pollenStores, populationSize, hiveWeight, healthStatus, healthAutoCalculated, colonyDead, notes, photoUrls) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(
       rowId,
       entityId,
@@ -631,25 +634,28 @@ app.put('/api/inspections/:id', (req, res) => {
   const exists = db.prepare('SELECT 1 FROM inspections WHERE entity_id = ? AND superseded_by IS NULL').get(entityId);
   if (!exists) return res.status(404).json({ error: 'not found' });
 
+  // Same partial-update hazard as tasks: preserve anything not sent.
+  const cur = db.prepare('SELECT * FROM inspections WHERE entity_id = ? AND superseded_by IS NULL').get(entityId) as any;
+  const bool = (v: any, fallback: any) => (v === undefined ? (fallback ? 1 : 0) : (v ? 1 : 0));
   const newRowId = cowSupersede('inspections', entityId, () => ({
-    hiveId: b.hiveId,
-    date: b.date ?? new Date().toISOString(),
-    queenPresent: b.queenPresent ? 1 : 0,
-    queenCells: b.queenCells ? 1 : 0,
-    queenLayingPattern: b.queenLayingPattern ?? 'none',
-    eggsPresent: b.eggsPresent ? 1 : 0,
-    larvaePresent: b.larvaePresent ? 1 : 0,
-    cappedBrood: b.cappedBrood ? 1 : 0,
-    temperament: b.temperament ?? 'normal',
-    honeyStores: b.honeyStores ?? 'none',
-    pollenStores: b.pollenStores ?? 'none',
-    populationSize: b.populationSize ?? 'none',
-    hiveWeight: b.hiveWeight ?? 0,
-    healthStatus: b.healthStatus ?? 'good',
-    healthAutoCalculated: b.healthAutoCalculated ? 1 : 0,
-    colonyDead: b.colonyDead ? 1 : 0,
-    notes: b.notes ?? '',
-    photoUrls: JSON.stringify(b.photoUrls || []),
+    hiveId: b.hiveId ?? cur.hiveId,
+    date: b.date ?? cur.date ?? new Date().toISOString(),
+    queenPresent: bool(b.queenPresent, cur.queenPresent),
+    queenCells: bool(b.queenCells, cur.queenCells),
+    queenLayingPattern: b.queenLayingPattern ?? cur.queenLayingPattern ?? 'none',
+    eggsPresent: bool(b.eggsPresent, cur.eggsPresent),
+    larvaePresent: bool(b.larvaePresent, cur.larvaePresent),
+    cappedBrood: bool(b.cappedBrood, cur.cappedBrood),
+    temperament: b.temperament ?? cur.temperament ?? 'normal',
+    honeyStores: b.honeyStores ?? cur.honeyStores ?? 'none',
+    pollenStores: b.pollenStores ?? cur.pollenStores ?? 'none',
+    populationSize: b.populationSize ?? cur.populationSize ?? 'none',
+    hiveWeight: b.hiveWeight ?? cur.hiveWeight ?? 0,
+    healthStatus: b.healthStatus ?? cur.healthStatus ?? 'good',
+    healthAutoCalculated: bool(b.healthAutoCalculated, cur.healthAutoCalculated),
+    colonyDead: bool(b.colonyDead, cur.colonyDead),
+    notes: b.notes ?? cur.notes ?? '',
+    photoUrls: b.photoUrls === undefined ? (cur.photoUrls ?? '[]') : JSON.stringify(b.photoUrls),
   }));
 
   // Replace concerns if provided
@@ -946,14 +952,19 @@ app.put('/api/tasks/:id', (req, res) => {
   const exists = db.prepare('SELECT 1 FROM tasks WHERE entity_id = ? AND superseded_by IS NULL').get(entityId);
   if (!exists) return res.status(404).json({ error: 'not found' });
 
+  // Partial updates must not wipe fields the caller didn't send. This handler
+  // used `b.field ?? ''` / `?? null`, so a PUT carrying only { completed: true }
+  // — which is exactly what toggling a task sends — blanked the title,
+  // description, due date, priority and hive on the new version.
+  const cur = db.prepare('SELECT * FROM tasks WHERE entity_id = ? AND superseded_by IS NULL').get(entityId) as any;
   const newRowId = cowSupersede('tasks', entityId, () => ({
-    hiveId: b.hiveId ?? null,
-    apiaryId: b.apiaryId ?? null,
-    title: b.title ?? '',
-    description: b.description ?? null,
-    dueDate: b.dueDate ?? null,
-    completed: b.completed ? 1 : 0,
-    priority: b.priority ?? 'medium',
+    hiveId: b.hiveId ?? cur.hiveId ?? null,
+    apiaryId: b.apiaryId ?? cur.apiaryId ?? null,
+    title: b.title ?? cur.title ?? '',
+    description: b.description ?? cur.description ?? null,
+    dueDate: b.dueDate ?? cur.dueDate ?? null,
+    completed: b.completed === undefined ? (cur.completed ? 1 : 0) : (b.completed ? 1 : 0),
+    priority: b.priority ?? cur.priority ?? 'medium',
   }));
 
   const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(newRowId) as any;
