@@ -27,8 +27,11 @@ export function uid(prefix = 'id'): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+
 interface StoreContextValue extends AppState {
   refreshTick: number;  // bumps on every syncFromServer — components can depend on this to re-fetch
+  /** True while a syncFromServer call is in flight. */
+  syncing: boolean;
   // Apiaries
   addApiary: (a: Omit<Apiary, 'id'>) => Apiary;
   updateApiary: (id: string, patch: Partial<Apiary>) => void;
@@ -69,6 +72,7 @@ const StoreContext = createContext<StoreContextValue | null>(null);
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState>(loadState);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [syncing, setSyncing] = useState(false);
   const firstRender = useRef(true);
 
   // Persist to localStorage on every change (except first render)
@@ -109,9 +113,33 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const value = useMemo<StoreContextValue>(() => {
     const update = (fn: (s: AppState) => AppState) => setState((s) => fn(s));
 
+    /**
+     * Apply a box/frame edit and persist the hive's boxes to the server.
+     *
+     * These edits used to be localStorage-only. syncFromServer() REPLACES local
+     * state with server data, so every box add/remove/content change was wiped
+     * on the next reload. Boxes have no endpoint of their own; the hive PUT
+     * takes the full boxes array and rebuilds boxes + frame_slots from it.
+     */
+    const updateAndPersistBoxes = (fn: (s: AppState) => AppState, hiveId: string) => {
+      update(fn);
+      setState((cur) => {
+        const hive = cur.hives.find((h) => h.id === hiveId);
+        if (hive) {
+          apiFetch(API_BASE + '/api/hives/' + hiveId, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ boxes: hive.boxes }),
+          }).catch((e: any) => console.error('[setBoxes] server sync failed:', e));
+        }
+        return cur;
+      });
+    };
+
     return {
       ...state,
       refreshTick,
+      syncing,
 
       addApiary: (a) => {
         const apiary: Apiary = { ...a, id: uid('apiary') };
@@ -172,11 +200,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       addBox: (hiveId, boxType) =>
-        update((s) => ({
+        updateAndPersistBoxes((s) => ({
           ...s,
           hives: s.hives.map((h) => {
             if (h.id !== hiveId) return h;
-            const def = h.boxes.length;
             return {
               ...h,
               boxes: [
@@ -187,32 +214,32 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                   frames: Array.from({ length: 10 }, (_, i) => ({ position: i, content: 'empty' as const })),
                   sensorIds: [],
                 },
-              ].map((b, idx) => (idx === def ? b : b)),
+              ],
             };
           }),
-        })),
+        }), hiveId),
 
       removeBox: (hiveId, boxId) =>
-        update((s) => ({
+        updateAndPersistBoxes((s) => ({
           ...s,
           hives: s.hives.map((h) =>
             h.id === hiveId ? { ...h, boxes: h.boxes.filter((b) => b.id !== boxId) } : h,
           ),
           sensors: s.sensors.map((sn) => (sn.boxId === boxId ? { ...sn, boxId: undefined } : sn)),
-        })),
+        }), hiveId),
 
       setBoxContent: (hiveId, boxId, content) =>
-        update((s) => ({
+        updateAndPersistBoxes((s) => ({
           ...s,
           hives: s.hives.map((h) =>
             h.id === hiveId
               ? { ...h, boxes: h.boxes.map((b) => (b.id === boxId ? { ...b, content } : b)) }
               : h,
           ),
-        })),
+        }), hiveId),
 
       updateFrameContent: (hiveId, boxId, framePosition, content) =>
-        update((s) => ({
+        updateAndPersistBoxes((s) => ({
           ...s,
           hives: s.hives.map((h) =>
             h.id === hiveId
@@ -226,10 +253,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                 }
               : h,
           ),
-        })),
+        }), hiveId),
 
       cycleFrameContent: (hiveId, boxId, framePosition) =>
-        update((s) => {
+        updateAndPersistBoxes((s) => {
           const order: import('../types').FrameContent[] = ['empty', 'honey', 'brood', 'pollen', 'feeder', 'queen-excluder', 'foundation'];
           return {
             ...s,
@@ -253,7 +280,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                 : h,
             ),
           };
-        }),
+        }, hiveId),
+
 
       addSensor: (sn) => {
         const sensor: Sensor = { ...sn, id: uid('sensor') };
@@ -324,23 +352,66 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       addInspection: (i) => {
         const insp: Inspection = { ...i, id: uid('insp') };
         update((s) => ({ ...s, inspections: [...s.inspections, insp] }));
+        // Persist — without this the record vanished on the next syncFromServer,
+        // which replaces state with server data.
+        apiFetch(API_BASE + '/api/inspections', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(insp),
+        }).catch((e: any) => console.error('[addInspection] server sync failed:', e));
         return insp;
       },
-      updateInspection: (id, patch) =>
-        update((s) => ({ ...s, inspections: s.inspections.map((x) => (x.id === id ? { ...x, ...patch } : x)) })),
-      deleteInspection: (id) =>
-        update((s) => ({ ...s, inspections: s.inspections.filter((x) => x.id !== id) })),
+      updateInspection: (id, patch) => {
+        update((s) => ({ ...s, inspections: s.inspections.map((x) => (x.id === id ? { ...x, ...patch } : x)) }));
+        apiFetch(API_BASE + '/api/inspections/' + id, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+        }).catch((e: any) => console.error('[updateInspection] server sync failed:', e));
+      },
+      deleteInspection: (id) => {
+        update((s) => ({ ...s, inspections: s.inspections.filter((x) => x.id !== id) }));
+        apiFetch(API_BASE + '/api/inspections/' + id, { method: 'DELETE' })
+          .catch((e: any) => console.error('[deleteInspection] server sync failed:', e));
+      },
 
       addTask: (t) => {
         const task: Task = { ...t, id: uid('task') };
         update((s) => ({ ...s, tasks: [...s.tasks, task] }));
+        apiFetch(API_BASE + '/api/tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(task),
+        }).catch((e: any) => console.error('[addTask] server sync failed:', e));
         return task;
       },
-      updateTask: (id, patch) =>
-        update((s) => ({ ...s, tasks: s.tasks.map((x) => (x.id === id ? { ...x, ...patch } : x)) })),
-      toggleTask: (id) =>
-        update((s) => ({ ...s, tasks: s.tasks.map((x) => (x.id === id ? { ...x, completed: !x.completed } : x)) })),
-      deleteTask: (id) => update((s) => ({ ...s, tasks: s.tasks.filter((x) => x.id !== id) })),
+      updateTask: (id, patch) => {
+        update((s) => ({ ...s, tasks: s.tasks.map((x) => (x.id === id ? { ...x, ...patch } : x)) }));
+        apiFetch(API_BASE + '/api/tasks/' + id, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+        }).catch((e: any) => console.error('[updateTask] server sync failed:', e));
+      },
+      toggleTask: (id) => {
+        // Read the intended next value from current state, then persist it.
+        setState((cur) => {
+          const t = cur.tasks.find((x) => x.id === id);
+          if (t) {
+            apiFetch(API_BASE + '/api/tasks/' + id, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ completed: !t.completed }),
+            }).catch((e: any) => console.error('[toggleTask] server sync failed:', e));
+          }
+          return { ...cur, tasks: cur.tasks.map((x) => (x.id === id ? { ...x, completed: !x.completed } : x)) };
+        });
+      },
+      deleteTask: (id) => {
+        update((s) => ({ ...s, tasks: s.tasks.filter((x) => x.id !== id) }));
+        apiFetch(API_BASE + '/api/tasks/' + id, { method: 'DELETE' })
+          .catch((e: any) => console.error('[deleteTask] server sync failed:', e));
+      },
 
       resetToSeed: () =>
         update(() => ({
@@ -353,6 +424,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       clearAll: () => update(() => ({ apiaries: [], hives: [], inspections: [], sensors: [], tasks: [] })),
 
       syncFromServer: async () => {
+        setSyncing(true);
         try {
           const [apiaries, hives, inspections, sensors, tasks] = await Promise.all([
             apiFetch(API_BASE + '/api/apiaries').then((r) => r.ok ? r.json() : []).catch(() => []),
@@ -367,10 +439,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           setRefreshTick((t) => t + 1);
         } catch {
           // server not running — keep local state
+        } finally {
+          setSyncing(false);
         }
       },
     };
-  }, [state, refreshTick]);
+  }, [state, refreshTick, syncing]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
