@@ -7,7 +7,11 @@ import { fileURLToPath } from 'node:url';
 // Works regardless of the cwd the server is launched from.
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const DB_PATH = resolve(__dirname, '..', 'data', 'beetree.db');
+// Overridable so the Playwright suite can run against a throwaway copy instead
+// of the beekeeper's live database.
+const DB_PATH = process.env.BEETREE_DB
+  ? resolve(process.env.BEETREE_DB)
+  : resolve(__dirname, '..', 'data', 'beetree.db');
 
 mkdirSync(dirname(DB_PATH), { recursive: true });
 
@@ -90,6 +94,7 @@ export interface HiveRow {
 export interface BoxRow {
   id: string; entity_id: string; version: number; superseded_by: string | null; superseded_at: string | null;
   hiveId: string; type: string; index: number; sensorIds: string;
+  content: string | null;
 }
 
 export interface FrameSlotRow {
@@ -131,6 +136,8 @@ export function mapHive(
         type: b.type,
         index: b.index,
         sensorIds: JSON.parse(b.sensorIds || '[]'),
+        // Box-level majority content, when classified.
+        content: b.content ?? undefined,
         frames: frameSlots
           .filter((f) => f.boxId === b.entity_id && !f.superseded_by)
           .sort((a, b) => a.position - b.position)
@@ -270,11 +277,25 @@ export function cowSupersede(
 
   const placeholders = insertCols.map(() => '?').join(', ');
   const colNames = insertCols.map((c) => `"${c}"`).join(', ');
-  db.prepare(`INSERT INTO ${table} (${colNames}) VALUES (${placeholders})`).run(...insertVals);
 
-  db.prepare(
-    `UPDATE ${table} SET superseded_by = ?, superseded_at = ? WHERE id = ?`,
-  ).run(newRowId, ts, oldRow.id);
+  // Order matters: supersede the old row BEFORE inserting its successor.
+  //
+  // `hives` carries a unique index on entity_id for the current row
+  // (WHERE superseded_by IS NULL). Inserting first collides with the row still
+  // marked current and the whole update fails with "UNIQUE constraint failed:
+  // hives.entity_id" — which is why hive edits returned HTTP 500 and why no row
+  // in the entire database had ever moved past version 1.
+  //
+  // Both statements run in one transaction: a failure rolls back and leaves the
+  // entity exactly as it was rather than mid-supersede.
+  const supersede = db.transaction(() => {
+    db.prepare(
+      `UPDATE ${table} SET superseded_by = ?, superseded_at = ? WHERE id = ?`,
+    ).run(newRowId, ts, oldRow.id);
+
+    db.prepare(`INSERT INTO ${table} (${colNames}) VALUES (${placeholders})`).run(...insertVals);
+  });
+  supersede();
 
   return newRowId;
 }
