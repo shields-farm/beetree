@@ -182,14 +182,14 @@ export const PEST_PRODUCTS: PestProduct[] = [
 
 // ─── Category metadata ────────────────────────────────────────────────────────
 
-export const CATEGORY_META: Record<PestProduct['category'], { label: string; icon: string }> = {
-  varroa: { label: 'Varroa Mites', icon: '🐛' },
-  shb: { label: 'Small Hive Beetle', icon: '🪲' },
-  'wax-moth': { label: 'Wax Moth', icon: '🦋' },
-  nosema: { label: 'Nosema', icon: '🔬' },
-  management: { label: 'Hive Management', icon: '🔧' },
-  feeding: { label: 'Feeding Methods', icon: '🫗' },
-  robbing: { label: 'Robbing Prevention', icon: '🛡️' },
+export const CATEGORY_META: Record<PestProduct['category'], { label: string }> = {
+  varroa: { label: 'Varroa Mites' },
+  shb: { label: 'Small Hive Beetle' },
+  'wax-moth': { label: 'Wax Moth' },
+  nosema: { label: 'Nosema' },
+  management: { label: 'Hive Management' },
+  feeding: { label: 'Feeding Methods' },
+  robbing: { label: 'Robbing Prevention' },
 };
 
 // ─── Default preferences ───────────────────────────────────────────────────────

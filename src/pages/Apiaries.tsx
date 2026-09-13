@@ -164,7 +164,7 @@ export function ApiaryDetail({ id }: { id: string }) {
                   window.location.hash = '#/apiaries';
                 }
               }}
-              className="w-full py-2 rounded-xl border border-red-200 text-red-600 dark:text-red-400 text-sm flex items-center justify-center gap-1.5"
+              className="w-full py-2 rounded-xl border border-red-200 text-red-600 dark:text-red-400 text-sm flex items-center justify-center gap-1.5 dark:border-red-800"
             >
               <Trash2 size={14} /> Delete apiary
             </button>

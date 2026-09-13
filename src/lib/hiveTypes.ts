@@ -96,12 +96,12 @@ export const BOX_TYPE_LABELS: Record<BoxType, string> = {
   'queen-castle-comp': 'Queen Castle',
 };
 
-export const BOX_CONTENT_META: Record<string, { label: string; color: string; textColor: string; icon: string }> = {
-  brood: { label: 'Brood', color: '#f59e0b', textColor: '#fff', icon: '🐝' },
-  honey: { label: 'Honey', color: '#fbbf24', textColor: '#78350f', icon: '🍯' },
-  empty: { label: 'Empty', color: '#e7e5e4', textColor: '#44403c', icon: '⬜' },
-  mixed: { label: 'Mixed', color: '#a3a3a3', textColor: '#fff', icon: '🔀' },
-  pollen: { label: 'Pollen', color: '#fde68a', textColor: '#92400e', icon: '🌸' },
+export const BOX_CONTENT_META: Record<string, { label: string; color: string; textColor: string }> = {
+  brood: { label: 'Brood', color: '#f59e0b', textColor: '#fff', },
+  honey: { label: 'Honey', color: '#fbbf24', textColor: '#78350f', },
+  empty: { label: 'Empty', color: '#e7e5e4', textColor: '#44403c', },
+  mixed: { label: 'Mixed', color: '#a3a3a3', textColor: '#fff', },
+  pollen: { label: 'Pollen', color: '#fde68a', textColor: '#92400e', },
 };
 
 export const BOX_CONTENT_ORDER = ['brood', 'honey', 'mixed', 'pollen', 'empty'] as const;
@@ -116,14 +116,14 @@ export const FRAME_CONTENT_ORDER: FrameContent[] = [
   'foundation',
 ];
 
-export const FRAME_CONTENT_META: Record<FrameContent, { label: string; color: string; textColor: string; icon: string }> = {
-  empty: { label: 'Empty', color: '#f5f5f4', textColor: '#78716c', icon: '○' },
-  honey: { label: 'Honey', color: '#fbbf24', textColor: '#78350f', icon: '🍯' },
-  brood: { label: 'Brood', color: '#a16207', textColor: '#fef3c7', icon: '🐝' },
-  pollen: { label: 'Pollen', color: '#facc15', textColor: '#713f12', icon: '🌼' },
-  feeder: { label: 'Feeder', color: '#0ea5e9', textColor: '#0c4a6e', icon: '💧' },
-  'queen-excluder': { label: 'Queen Excluder', color: '#52525b', textColor: '#fafafa', icon: '☰' },
-  foundation: { label: 'Foundation', color: '#e7e5e4', textColor: '#44403c', icon: '▭' },
+export const FRAME_CONTENT_META: Record<FrameContent, { label: string; color: string; textColor: string }> = {
+  empty: { label: 'Empty', color: '#f5f5f4', textColor: '#78716c', },
+  honey: { label: 'Honey', color: '#fbbf24', textColor: '#78350f', },
+  brood: { label: 'Brood', color: '#a16207', textColor: '#fef3c7', },
+  pollen: { label: 'Pollen', color: '#facc15', textColor: '#713f12', },
+  feeder: { label: 'Feeder', color: '#0ea5e9', textColor: '#0c4a6e', },
+  'queen-excluder': { label: 'Queen Excluder', color: '#52525b', textColor: '#fafafa', },
+  foundation: { label: 'Foundation', color: '#e7e5e4', textColor: '#44403c', },
 };
 
 export function makeEmptyFrames(count: number): FrameSlot[] {

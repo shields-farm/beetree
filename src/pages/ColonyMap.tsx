@@ -9,6 +9,7 @@ import {
   Lightbulb,
   ChevronDown,
   ChevronRight,
+  Check,
 } from 'lucide-react';
 import { PageHeader } from '../components/Layout';
 import { Card } from '../components/Card';
@@ -282,7 +283,7 @@ export function ColonyMap() {
                         {expanded ? <ChevronDown size={16} className="text-stone-400 dark:text-stone-500" /> : <ChevronRight size={16} className="text-stone-400 dark:text-stone-500" />}
                         <span className="font-medium text-sm text-stone-800 dark:text-stone-100">Photo #{pp.index + 1}</span>
                         <span className="text-xs text-stone-400 dark:text-stone-500 capitalize">{a.broodPattern} brood</span>
-                        {a.queenSpotted && <span className="text-xs text-honey-600 dark:text-honey-400 font-medium">Queen ✓</span>}
+                        {a.queenSpotted && <span className="text-xs text-honey-600 dark:text-honey-400 font-medium inline-flex items-center gap-1">Queen seen <Check size={12} /></span>}
                       </div>
                       <div className="flex items-center gap-3 text-xs text-stone-500 dark:text-stone-400">
                         <span>Brood {pct(a.broodRatio)}</span>
