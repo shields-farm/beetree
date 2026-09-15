@@ -44,6 +44,18 @@ staging/
 data/audio/
 data/raw/
 
+# Capture media (filesystem store; large, regenerable, never for git)
+data/media/
+
+# launchd logs
+server/*.log
+server/.launchd-*.log
+
+# Stale SQLite leftovers (the live DB is data/beetree.db)
+server/beetree.db
+server/beetree.db-*
+server/beetree.db.*
+
 # Playwright / e2e
 e2e/.test-server-url
 test-results/
