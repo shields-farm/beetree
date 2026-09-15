@@ -1,6 +1,6 @@
 {
-  "name": "beelog",
-  "private": true,
+  "name": "beetree",
+  "private": false,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
@@ -45,5 +45,6 @@
     "typescript": "~6.0.2",
     "vite": "^8.1.1",
     "vitest": "^4.1.10"
-  }
+  },
+  "license": "MIT"
 }
