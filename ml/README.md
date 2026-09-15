@@ -26,6 +26,6 @@ Machine learning pipeline for BeeTree beehive monitoring. Lives under `ml/` in t
 - Audio data is NOT in git — too large (1.27 TB). See `phase2_audio/` scripts.
 
 ## License
-- UrBAN data: CC BY 4.0 (attribution required for commercial use)
-- BeeTree code: Proprietary (the BeeTree contributors)
-- Trained models: Proprietary (trained on own data for commercial product)
+- UrBAN data: CC BY 4.0 (attribution required)
+- BeeTree code: MIT (see `../LICENSE`)
+- Trained models: own terms — trained on UrBAN data plus project curriculum

@@ -1,51 +1,77 @@
-# BeeTree ML Training Setup
+# BeeTree
 
-Machine learning pipeline for BeeTree beehive monitoring system.
+Beekeeping management and hive sensor monitoring. Yard records, inspections, an
+ontology-backed knowledge model, sensor telemetry, and an assistant that answers
+questions about your own hives.
 
-## Structure
+Named after the B-tree, because we thought that was funny.
 
+## What's in here
+
+| Path | What it is |
+| --- | --- |
+| `src/` | React frontend (Vite, Tailwind, React Router) |
+| `server/` | Express + SQLite API, ontology engine, assistant tools |
+| `server/ontology/` | The beekeeping vocabulary: species, relations, seasonal windows |
+| `hardware/bm-diy/` | BeeStick — a DIY BLE hive sensor (firmware, enclosure, BOM) |
+| `pi/` | Mentra glasses receiver: a Pi-side HTTP webhook for photo capture |
+| `ml/` | Colony-strength research pipeline (sensor baseline, acoustics, LLM) |
+| `training/` | LoRA fine-tuning and RAG evaluation for the in-app assistant |
+| `e2e/` | Playwright end-to-end tests |
+| `grafana/` | Sensor dashboards and provisioning |
+
+## Quick start
+
+```bash
+npm install
+npm --prefix server install
+
+# Server config (see .env.example)
+cp .env.example server/.env
+
+npm run dev            # frontend (Vite)
+npm --prefix server run dev   # API
 ```
-beetree/
-├── README.md
-├── .gitignore
-├── phase1_sensor_baseline/     # Phase 1: sensor-only colony strength model
-│   ├── beetree_phase1.py       # Temp/humidity/weather → frames of bees
-│   └── results.md              # MAE=2.89 fob, Corr=0.848
-├── phase2_audio/               # Phase 2: audio → colony strength (CNN/CRDNN)
-│   ├── beetree_audio_pipeline.py  # Download + tensorgram extraction
-│   └── tensorgram_model.py     # CNN/CRDNN architecture (TBD)
-├── phase3_llm/                 # Phase 3: Gemma 4 fine-tuning (beekeeping advisor)
-│   ├── beetree_finetuning_dataset.py  # Dataset generator
-│   ├── finetuning/             # Generated training data
-│   └── finetune_gemma4.py      # Fine-tuning script (TBD)
-├── data/                       # Reference data (UrBAN annotations only)
-│   └── annotations/            # Inspection CSVs (CC BY 4.0)
-└── docs/
-    ├── paper_summary.md        # arXiv 2607.20386 summary
-    └── architecture.md         # System architecture
+
+The API listens on `:3001` by default and the frontend on `:5173`. On first run
+the app shows a setup wizard; a fresh database starts empty by design.
+
+The API generates a random bearer token on boot if `BEETREE_API_KEY` is unset and
+prints it to the console. Set it explicitly for anything beyond local dev —
+`GET /api/key` will hand it back to a localhost caller, which is convenient for
+device pairing and is not a security boundary you should rely on.
+
+## Configuration
+
+Copy `.env.example` to `server/.env`. Everything is optional; see the file for
+what each variable does. Nothing in the repo ships a working credential.
+
+## Tests
+
+```bash
+npm test               # unit (Vitest)
+npm run typecheck
+npm run lint
+npm run test:e2e       # Playwright
 ```
 
-## Phases
+Tests that touch the database use an in-memory SQLite instance, so no fixture
+data is required.
 
-### Phase 1 — Sensor Baseline (DONE)
-- Input: BroodMinder temp/humidity + weather
-- Model: Random Forest regression
-- Result: MAE=2.89 fob (clipped), Corr=0.848
-- Status: ✅ Validated on build-host
+## Status
 
-### Phase 2 — Audio Colony Strength (IN PROGRESS)
-- Input: In-hive audio (16kHz WAV) → modulation tensorgrams
-- Model: CNN/CRDNN (from arXiv 2607.20386)
-- Data: UrBAN dataset (FRDR, CC BY 4.0)
-- Status: 🟡 Audio download in progress, tensorgram pipeline written
+Early. The data model, ontology engine, and inspection workflow are in daily use
+by one beekeeper. Research code under `ml/` and `training/` is exploratory —
+results reported there are not validated across apiaries.
 
-### Phase 3 — Beekeeping Advisor LLM (IN PROGRESS)
-- Model: Gemma 4 E4B QAT (GGUF via Ollama)
-- Training: 119 Q&A pairs from UrBAN inspections + curriculum
-- Target: Pi 5 4GB inference
-- Status: 🟡 Dataset generated, fine-tuning script TBD
+## Credits and data
+
+- UrBAN hive audio and inspection annotations — CC BY 4.0. See `ml/README.md`.
+- BeeStick firmware protocol notes are in `hardware/bm-diy/firmware/PROTOCOL.md`.
+- Beekeeping vocabulary in `server/ontology/beetree-vocab.yaml` draws on published
+  extension guidance and standard apiculture terminology.
 
 ## License
-- BeeTree code: Proprietary (the BeeTree contributors)
-- UrBAN data/annotations: CC BY 4.0 (attribution required)
-- Trained models: Proprietary (trained on own data for commercial product)
+
+MIT — see `LICENSE`. Third-party data and dependencies keep their own terms;
+notably the UrBAN dataset is CC BY 4.0 and requires attribution.
