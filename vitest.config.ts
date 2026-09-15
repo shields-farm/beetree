@@ -19,5 +19,9 @@ export default defineConfig({
     // `server/node_modules` is a separate install; without the glob it
     // collects third-party test files from inside it.
     exclude: ['**/node_modules/**', 'dist/**', 'e2e/**'],
+    // Point every worker at its own throwaway DB + media dir before server/db.ts
+    // is imported. Without this the suite runs migrations against the live
+    // database, and parallel workers race each other applying them.
+    setupFiles: ['server/__tests__/setup-test-db.ts'],
   },
 });
