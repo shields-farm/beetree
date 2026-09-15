@@ -1,0 +1,36 @@
+[Unit]
+Description=Mentra Live photo receiver -> BeeTree
+Documentation=https://github.com/shields-farm/bee-tree/blob/main/pi/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mark
+WorkingDirectory=/opt/mentra
+
+# Credentials come from an EnvironmentFile rather than the ExecStart line, so the
+# BeeTree token never appears in `ps` output or in `systemctl cat`.
+EnvironmentFile=/etc/mentra-receiver.env
+
+ExecStart=/usr/bin/python3 /opt/mentra/mentra_receiver.py \
+  --host 0.0.0.0 \
+  --port 8790 \
+  --state-dir /var/lib/mentra
+
+Restart=always
+RestartSec=10
+
+# The receiver only needs to write its own state dir. It never needs root, and it
+# should not be able to reshape the box if it is ever fed a hostile upload.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/mentra
+
+# Spooled captures are the only copy until they forward. Keep them owner-only.
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
