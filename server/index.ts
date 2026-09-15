@@ -2870,6 +2870,66 @@ app.get('/api/ontology/threats/:id', async (req, res) => {
   res.json(t);
 });
 
+// Threat detail — species record + ontology graph + cited knowledge claims from the corpus.
+// Claims live in onto_evidence tagged by content.subject_id (see ingest_extractions.py).
+app.get('/api/ontology/threats/:id/detail', async (req, res) => {
+  const o = await import('./ontology.js');
+  const { db } = await import('./db.js');
+  const id = req.params.id;
+  const species = o.getThreatSpecies(id);
+  if (!species) return res.status(404).json({ error: 'Species not found' });
+
+  const entityId = `threat-${id}`;
+  const entity = o.getEntity(entityId);
+  const edges = entity ? o.getRelationsFor(entityId) : [];
+
+  // Claims whose subject is this species (species, state, or threshold claims).
+  // start_s/end_s are whisper-derived word timings, so each claim deep-links into
+  // the exact moment in the source video.
+  const claims = db.prepare(
+    `SELECT json_extract(content,'$.subject_type') AS subject_type,
+            json_extract(content,'$.subject_id')   AS subject_id,
+            json_extract(content,'$.claim')        AS claim,
+            json_extract(content,'$.quote')        AS quote,
+            json_extract(content,'$.kind')         AS kind,
+            json_extract(content,'$.context')      AS context,
+            json_extract(content,'$.confidence')   AS confidence,
+            json_extract(content,'$.episode')      AS episode,
+            json_extract(content,'$.start_s')      AS start_s,
+            json_extract(content,'$.end_s')        AS end_s,
+            json_extract(content,'$.youtube_url')  AS youtube_url,
+            source_id                              AS video_id
+       FROM onto_evidence
+      WHERE superseded_by IS NULL
+        AND source_table = 'uf_beekeeping_academy'
+        AND json_extract(content,'$.subject_id') = ?
+      ORDER BY json_extract(content,'$.episode'), json_extract(content,'$.start_s')`
+  ).all(id);
+
+  // Related species (relations where this species is subject or object).
+  const relatedSpecies: any[] = [];
+  for (const e of edges) {
+    const other = e.subject_id === entityId ? e.object_id : e.subject_id;
+    if (other.startsWith('threat-')) {
+      const sid = other.slice('threat-'.length);
+      const sp = o.getThreatSpecies(sid);
+      if (sp) relatedSpecies.push({ ...sp, predicate: e.predicate, confidence: e.confidence });
+    }
+  }
+
+  // Coverage: which episodes discuss this species (from the merged corpus index).
+  res.json({
+    species,
+    entity,
+    claims,
+    claimCount: claims.length,
+    episodes: [...new Set(claims.map((c: any) => c.episode))].sort((a: any, b: any) => a - b),
+    edges,
+    relatedSpecies,
+    hasKnowledge: claims.length > 0,
+  });
+});
+
 app.get('/api/ontology/entity/:id/graph', async (req, res) => {
   const o = await import('./ontology.js');
   const graph = o.getEntityGraph(req.params.id);
@@ -3167,10 +3227,16 @@ function chatRowToMessage(row: any): any {
   };
 }
 
-app.get('/api/chat/sessions', (_req, res) => {
+app.get('/api/chat/sessions', (req, res) => {
+  // Lane-scoped: the ChatPage and the Buzz Thread are separate correspondence lanes
+  // sharing these tables. Without this filter the pinned buzz-thread session sorts
+  // first (pinned DESC) and the ChatPage adopts it as active, so messages sent from
+  // the chat UI get written into the headlong lane and never answered.
+  const lane = typeof req.query.lane === 'string' ? req.query.lane : 'chat';
   const rows = db.prepare(
-    `SELECT * FROM chat_sessions WHERE deleted_at IS NULL ORDER BY pinned DESC, updated_at DESC LIMIT ?`
-  ).all(CHAT_SESSION_MAX) as any[];
+    `SELECT * FROM chat_sessions WHERE deleted_at IS NULL AND lane = ?
+     ORDER BY pinned DESC, updated_at DESC LIMIT ?`
+  ).all(lane, CHAT_SESSION_MAX) as any[];
   res.json(rows.map(chatRowToSession));
 });
 
@@ -3413,6 +3479,286 @@ app.get('/api/buzz/presence', async (_req, res) => {
     res.json({ alive: false, state: 'unknown', lastCycleAgeMin: null, source: 'error', error: String(e?.message || e) });
   }
 });
+
+// ============================================================================
+// /api/mentra — frame capture loop (glasses → analysis → ontology)
+// ============================================================================
+// The ingest path for Mentra Live (or any camera). One POST does the whole loop
+// and returns what the glasses should say out loud. See server/capture.ts.
+import { captureFrame, correctCapture, captureLabelPairs, resolveHive, listHives, composeSpeech } from './capture.js';
+import { inferFromFrame, outstandingChecks, MIN_SUPPORTED } from './inference.js';
+
+/** Express request carrying the raw body we buffer for multipart uploads. */
+type RawBodyRequest = express.Request & { rawBody?: Buffer };
+
+// Store raw multipart/form-data bodies for our own routes. Mentra's stock
+// starter kit POSTs the photo as multipart (field `photo` + `requestId`), and
+// there is no parser on the server for that. Rather than pull in busboy for one
+// route, we keep the raw bytes and lift the first JPEG/PNG payload out of them —
+// enough for a single-file upload, and it means the starter kit works unmodified.
+function rawBodyMiddleware(req: RawBodyRequest, res: express.Response, next: express.NextFunction) {
+  const ct = String(req.headers['content-type'] || '');
+  if (!ct.includes('multipart/form-data')) return next();
+  const chunks: Buffer[] = [];
+  let size = 0;
+  const MAX = 32 * 1024 * 1024;
+  req.on('data', (c: Buffer) => {
+    size += c.length;
+    if (size > MAX) {
+      res.status(413).json({ error: 'Upload too large (max 32MB).' });
+      req.destroy();
+      return;
+    }
+    chunks.push(c);
+  });
+  req.on('end', () => {
+    req.rawBody = Buffer.concat(chunks);
+    next();
+  });
+  req.on('error', () => {
+    if (!res.headersSent) res.status(400).json({ error: 'Upload stream failed.' });
+  });
+}
+
+/**
+ * Pull the first image out of a multipart body, plus any simple text fields.
+ * Deliberately minimal: we need `photo` and `requestId`, not a general parser.
+ */
+function extractMultipartImage(buf: Buffer, boundary: string): { image: string | null; fields: Record<string, string> } {
+  const fields: Record<string, string> = {};
+  let image: string | null = null;
+  const delim = Buffer.from(`--${boundary}`);
+  let idx = buf.indexOf(delim);
+  while (idx !== -1) {
+    const next = buf.indexOf(delim, idx + delim.length);
+    if (next === -1) break;
+    const part = buf.subarray(idx + delim.length, next);
+    const headerEnd = part.indexOf('\r\n\r\n');
+    if (headerEnd !== -1) {
+      const header = part.subarray(0, headerEnd).toString('utf8');
+      const nameMatch = /name="([^"]+)"/.exec(header);
+      const typeMatch = /Content-Type:\s*([^\r\n]+)/i.exec(header);
+      const body = part.subarray(headerEnd + 4).subarray(0, -2); // trailing CRLF
+      if (nameMatch && typeMatch && typeMatch[1].startsWith('image/') && !image) {
+        image = body.toString('base64');
+      } else if (nameMatch) {
+        fields[nameMatch[1]] = body.toString('utf8').trim().slice(0, 2000);
+      }
+    }
+    idx = next;
+  }
+  return { image, fields };
+}
+
+app.post('/api/mentra/photo', rawBodyMiddleware, async (req: RawBodyRequest, res) => {
+  try {
+    let image: string | undefined;
+    let transcript: string | undefined;
+    let hiveId: string | undefined;
+    let capturedAt: string | undefined;
+
+    const ct = String(req.headers['content-type'] || '');
+    if (ct.includes('multipart/form-data')) {
+      const boundary = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(ct);
+      const b = boundary?.[1] ?? boundary?.[2];
+      if (!b) return res.status(400).json({ error: 'multipart body without a boundary' });
+      const raw = req.rawBody as Buffer | undefined;
+      if (!raw || raw.length === 0) return res.status(400).json({ error: 'empty multipart body' });
+      const parsed = extractMultipartImage(raw, b.trim());
+      image = parsed.image ?? undefined;
+      transcript = parsed.fields.transcript;
+      hiveId = parsed.fields.hiveId;
+      capturedAt = parsed.fields.capturedAt;
+    } else {
+      const body = req.body || {};
+      image = typeof body.image === 'string' ? body.image : undefined;
+      transcript = typeof body.transcript === 'string' ? body.transcript : undefined;
+      hiveId = typeof body.hiveId === 'string' ? body.hiveId : undefined;
+      capturedAt = typeof body.capturedAt === 'string' ? body.capturedAt : undefined;
+    }
+
+    if (!image || !image.trim()) {
+      return res.status(400).json({ error: 'No image found. Send JSON {image} or multipart with a `photo` file field.' });
+    }
+
+    const result = await captureFrame({
+      image,
+      hiveId,
+      transcript,
+      source: 'glasses',
+      capturedAt,
+    });
+    res.status(201).json(result);
+  } catch (e) {
+    console.error('[mentra/photo] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'capture failed' });
+  }
+});
+
+/**
+ * Analyse without persisting anything — the dry-run the phone app uses to check
+ * framing and focus before committing an observation to the ontology.
+ */
+app.post('/api/mentra/analyze', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const image = typeof body.image === 'string' ? body.image.trim() : '';
+    if (!image) return res.status(400).json({ error: 'image (base64 data URL) is required' });
+
+    const { analyzeFramePhoto } = await import('./vision.js');
+    const { getSeasonPhaseFor } = await import('./ontology.js');
+    const { hive } = resolveHive(body.hiveId, body.transcript);
+    const analysis = await analyzeFramePhoto(image, hive?.name);
+    const season = getSeasonPhaseFor(new Date().toISOString()).phase;
+    const inference = inferFromFrame(analysis, season);
+    const checks = outstandingChecks(inference);
+
+    res.json({
+      analysis,
+      inference,
+      outstandingChecks: checks,
+      minSupported: MIN_SUPPORTED,
+      hiveId: hive?.id ?? null,
+      hiveName: hive?.name ?? null,
+      speech: composeSpeech({ hiveName: hive?.name ?? null, analysis, inference, checks }),
+    });
+  } catch (e) {
+    console.error('[mentra/analyze] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'analysis failed' });
+  }
+});
+
+/** Which hive a transcript would resolve to, without capturing anything. */
+app.get('/api/mentra/resolve', (req, res) => {
+  const transcript = typeof req.query.transcript === 'string' ? req.query.transcript : undefined;
+  const hiveId = typeof req.query.hiveId === 'string' ? req.query.hiveId : undefined;
+  const { hive, by } = resolveHive(hiveId, transcript);
+  res.json({ hiveId: hive?.id ?? null, hiveName: hive?.name ?? null, resolvedBy: by, hiveCount: listHives().length });
+});
+
+/**
+ * The beekeeper's verdict over the model's — the thing that makes captures into
+ * a labelled dataset rather than a pile of guesses.
+ */
+app.post('/api/mentra/correct', (req, res) => {
+  try {
+    const body = req.body || {};
+    if (typeof body.captureId !== 'string' || !body.captureId.trim()) {
+      return res.status(400).json({ error: 'captureId is required' });
+    }
+    if (typeof body.state !== 'string' || !body.state.trim()) {
+      return res.status(400).json({ error: 'state is required' });
+    }
+    const result = correctCapture(body.captureId.trim(), {
+      state: body.state.trim(),
+      note: typeof body.note === 'string' ? body.note : undefined,
+      evidenceIds: Array.isArray(body.evidenceIds) ? body.evidenceIds : undefined,
+    });
+    res.status(201).json(result);
+  } catch (e) {
+    console.error('[mentra/correct] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'correction failed' });
+  }
+});
+
+/**
+ * Capture history — the frames themselves, newest first, plus the state ledger.
+ * This is the read side of the flywheel: what did the system conclude, on what
+ * frame, and did the beekeeper agree.
+ */
+app.get('/api/mentra/captures', (req, res) => {
+  const limit = Math.min(Number(req.query.limit ?? 50) || 50, 200);
+  const hiveFilter = typeof req.query.hiveId === 'string' ? req.query.hiveId : null;
+
+  const rows = db.prepare(
+    `SELECT json_extract(content,'$.capture_id')     AS capture_id,
+            json_extract(content,'$.captured_at')     AS captured_at,
+            json_extract(content,'$.hive_id')         AS hive_id,
+            json_extract(content,'$.media_url')       AS media_url,
+            json_extract(content,'$.season_phase')    AS season_phase,
+            json_extract(content,'$.analysis.broodPattern') AS brood_pattern,
+            json_extract(content,'$.analysis.overallAssessment') AS assessment,
+            json_extract(content,'$.inference.low_confidence') AS low_confidence,
+            json_extract(content,'$.inference.ranked[0].state') AS lead_state,
+            json_extract(content,'$.inference.ranked[0].confidence') AS lead_confidence,
+            json_extract(content,'$.correction.state') AS corrected_state,
+            json_extract(content,'$.correction.agreed') AS corrected_agreed
+       FROM onto_evidence
+      WHERE superseded_by IS NULL
+        AND json_extract(content,'$.capture_id') IS NOT NULL
+        AND (? IS NULL OR json_extract(content,'$.hive_id') = ?)
+      ORDER BY recorded_at DESC LIMIT ?`,
+  ).all(hiveFilter, hiveFilter, limit) as any[];
+
+  // One capture produces two rows once corrected (capture + correction); keep the
+  // newest per capture_id so the list reads as one entry per frame.
+  const byId = new Map<string, any>();
+  for (const r of rows) {
+    const cur = byId.get(r.capture_id);
+    if (!cur) {
+      byId.set(r.capture_id, r);
+    } else if (r.corrected_state && !cur.corrected_state) {
+      byId.set(r.capture_id, { ...cur, ...r });
+    }
+  }
+
+  const captures = [...byId.values()].slice(0, limit);
+  const hiveNames = new Map(listHives().map((h) => [h.id, h.name]));
+  const labelled = captureLabelPairs(1000);
+  const agreed = labelled.filter((l) => l.agreed).length;
+
+  res.json({
+    captures: captures.map((c) => ({
+      captureId: c.capture_id,
+      capturedAt: c.captured_at,
+      hiveId: c.hive_id ?? null,
+      hiveName: c.hive_id ? (hiveNames.get(c.hive_id) ?? null) : null,
+      mediaUrl: c.media_url,
+      seasonPhase: c.season_phase ?? null,
+      broodPattern: c.brood_pattern ?? 'unknown',
+      assessment: c.assessment ?? '',
+      leadState: c.lead_state ?? null,
+      leadConfidence: c.lead_confidence ?? null,
+      lowConfidence: c.low_confidence === 1,
+      correctedState: c.corrected_state ?? null,
+      modelAgreed: c.corrected_agreed == null ? null : c.corrected_agreed === 1,
+    })),
+    stats: {
+      labelledCaptures: labelled.length,
+      beekeeperAgreedWithModel: agreed,
+      agreementRate: labelled.length > 0 ? Math.round((agreed / labelled.length) * 100) / 100 : null,
+      minSupported: MIN_SUPPORTED,
+    },
+  });
+});
+
+/** The labelled pairs themselves — the training set as it accumulates. */
+app.get('/api/mentra/labels', (req, res) => {
+  const limit = Math.min(Number(req.query.limit ?? 200) || 200, 1000);
+  const pairs = captureLabelPairs(limit);
+  res.json({
+    pairs,
+    total: pairs.length,
+    agreed: pairs.filter((p) => p.agreed).length,
+  });
+});
+
+// ============================================================================
+// /media — serve stored capture images
+// ============================================================================
+// Not under /api, so the Bearer middleware does not apply: an <img> tag cannot
+// send an Authorization header. Access is governed by the transport (tailnet /
+// LAN), same as the rest of the app. Path traversal is blocked in mediaStore.
+import { mediaDir, resolveMediaPath } from './mediaStore.js';
+
+app.get(/^\/media\/([^/]+)$/, (req, res) => {
+  const name = String((req.params as any)[0] ?? '');
+  const full = resolveMediaPath(name);
+  if (!full) return res.status(400).json({ error: 'invalid media name' });
+  if (!fs.existsSync(full)) return res.status(404).json({ error: 'not found' });
+  res.sendFile(full);
+});
+console.log(`🖼  Serving capture media from ${mediaDir()}`);
 
 // Serve built frontend (production mode)
 const distPath = path.resolve(import.meta.dirname, '..', 'dist');
