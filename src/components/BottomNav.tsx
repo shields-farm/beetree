@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Boxes, ClipboardList, Thermometer, CheckSquare, MoreHorizontal, X, Globe, Cpu, Activity, Settings as SettingsIcon, MessageCircle, RefreshCw } from 'lucide-react';
+import { Boxes, ClipboardList, Thermometer, CheckSquare, MoreHorizontal, X, Globe, Cpu, Activity, Settings as SettingsIcon, MessageCircle, RefreshCw, Network } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 
@@ -44,6 +44,7 @@ const SECONDARY_NAV: NavItem[] = [
   { to: '/equipment', label: 'Equipment', icon: Boxes },
   { to: '/hardware', label: 'Hardware', icon: Cpu },
   { to: '/activity', label: 'Activity', icon: Activity },
+  { to: '/world', label: 'World', icon: Network },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ];
 
