@@ -137,6 +137,47 @@ test.describe('navigation chrome', () => {
     }
   });
 
+  test('every page is reachable from the nav, not just by URL', async ({ page }) => {
+    // /world was registered as a route but absent from both navs, so the only way
+    // in was typing the hash. A page you cannot reach is a page that does not
+    // exist as far as a beekeeper is concerned — and nothing caught it, because
+    // the routing test only checks that each route RENDERS.
+    //
+    // The two navs are viewport-exclusive (the sidebar is `hidden lg:flex`), so
+    // each is asserted at the width where it actually renders. Desktop first and
+    // the mobile sheet last, so the sheet never has to be dismissed — the PWA
+    // install banner sits over the bottom bar and intercepts that click.
+    await gotoRoute(page, '/');
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await expect(page.locator('aside nav a[href="#/world"]')).toBeVisible();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    // The PWA install banner sits directly over the bottom bar and swallows the
+    // click. A real user dismisses it; so does the test.
+    const dismiss = page.getByRole('button', { name: /dismiss|not now|later/i });
+    if (await dismiss.count() > 0) {
+      await dismiss.first().click();
+    } else {
+      await page.evaluate(() => {
+        try { window.localStorage.setItem('beetree-install-dismissed', String(Date.now())); } catch { /* ignore */ }
+      });
+      await page.reload();
+      await gotoRoute(page, '/');
+      await page.setViewportSize({ width: 390, height: 844 });
+    }
+    // `exact` matters — the dashboard also renders a "More tabs" button.
+    await page.getByRole('button', { name: 'More', exact: true }).click();
+    await expect(page.getByText('More Pages')).toBeVisible();
+    await expect(page.locator('a[href="#/world"]').last()).toBeVisible();
+  });
+
+  test('the More sheet highlights when the current route lives in it', async ({ page }) => {
+    await gotoRoute(page, '/world');
+    const more = page.getByRole('button', { name: 'More' });
+    await expect(more).toHaveClass(/honey/);
+  });
+
   test('tab rows that overflow offer a scroll affordance', async ({ page }) => {
     // The old tab rows were clipped by the viewport with no cue that more
     // existed, which reads as a layout bug rather than a scroll.
