@@ -43,11 +43,34 @@ export interface ThreatSpeciesSeed {
   vectors?: string[]; vectored_by?: string[];
   notifiable?: boolean; notes?: string;
 }
+export interface VocabIndication {
+  state: string;
+  confidence?: number;
+  reason?: string;
+}
+/** One observation → candidate states, with the operational notes attached. */
+export interface VocabInferenceCue {
+  description?: string;
+  indicates?: VocabIndication[];
+  notes?: string;
+  /** comb_inference only: brood-cycle age band. */
+  age_cycles?: number | string;
+  /** comb_inference only: what to do about it. */
+  action?: string;
+}
 export interface Vocab {
   name: string; version: string; schema_version: string;
   classes: Record<string, VocabClass>;
   relations: Record<string, VocabRelation>;
   season_phase_inference: Record<string, { months: number[]; mean_temp_band_c?: [number, number] }>;
+  // Differential-diagnosis blocks. These are the knowledge the onto_* tools do
+  // NOT carry, and they are what server/inference.ts reads to turn a frame
+  // observation into ranked, checked candidates.
+  brood_inference?: Record<string, VocabInferenceCue>;
+  comb_inference?: Record<string, VocabInferenceCue>;
+  queen_inference?: Record<string, VocabInferenceCue>;
+  varroa_inference?: Record<string, VocabInferenceCue>;
+  deadout_inference?: Record<string, Record<string, unknown>>;
   threat_aliases: Record<string, string>;
   threat_species: ThreatSpeciesSeed[];
   undefined_behavior: Record<string, string>;
@@ -309,6 +332,37 @@ export function recordInstantiation(opts: {
     VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(id, id, now(), opts.state_class, opts.subject_id, validFrom, opts.valid_to ?? null, opts.confidence ?? 0.5, JSON.stringify(opts.supporting_evidence ?? []), opts.rationale ?? null);
   return id;
+}
+
+// ─── Evidence (observation provenance) ──────────────────────────────────────
+// Every capture, correction, or cited claim lands here. The content JSON is the
+// payload; evidence_kind says what sort of thing it is. This is the table the
+// threat-detail endpoint already reads for corpus claims, so capture evidence
+// and UF-corpus claims sit in one provenance store rather than two.
+export function recordEvidence(opts: {
+  evidence_kind: string;
+  content: Record<string, unknown>;
+  source_table?: string | null;
+  source_id?: string | null;
+  recorded_at?: string;
+}): string {
+  const id = genId(`onto_evd_${opts.evidence_kind.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`);
+  db.prepare(
+    `INSERT INTO onto_evidence (id, entity_id, version, superseded_by, superseded_at, created_at, evidence_kind, content, source_table, source_id, recorded_at)
+     VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id, id, now(), opts.evidence_kind, JSON.stringify(opts.content ?? {}),
+    opts.source_table ?? null, opts.source_id ?? null, opts.recorded_at ?? now(),
+  );
+  return id;
+}
+
+export function getEvidence(evidenceId: string): any {
+  const r = db.prepare(
+    `SELECT * FROM onto_evidence WHERE entity_id = ? AND superseded_by IS NULL`,
+  ).get(evidenceId) as any;
+  if (r?.content && typeof r.content === 'string') r.content = JSON.parse(r.content);
+  return r;
 }
 
 export function currentState(subjectId: string): any[] {
