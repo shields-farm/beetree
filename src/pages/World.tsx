@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Network, Bug, Boxes, Search, ChevronRight, RefreshCw, Globe, Activity } from 'lucide-react';
-import { apiFetch } from '../lib/apiBase';
+import { useNavigate } from 'react-router-dom';
+import { Network, Bug, Boxes, Search, ChevronRight, RefreshCw, Globe, Activity, MessageCircle, Quote, Link2, PlayCircle, AlertTriangle } from 'lucide-react';
+import { apiFetch, statusToMessage } from '../lib/apiBase';
 import { Card } from '../components/Card';
 
 interface Summary {
@@ -34,6 +35,40 @@ interface Threat {
   notes?: string;
 }
 
+interface ThreatClaim {
+  subject_type: string;
+  subject_id: string;
+  claim: string;
+  quote: string;
+  kind: string | null;
+  context: string | null;
+  confidence: number;
+  episode: number;
+  video_id: string;
+  start_s: number | null;
+  end_s: number | null;
+  youtube_url: string | null;
+}
+
+/** Seconds -> m:ss for a video timestamp. */
+function fmtTime(s: number | null | undefined): string {
+  if (s == null) return '';
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${String(sec).padStart(2, '0')}`;
+}
+
+interface ThreatDetail {
+  species: Threat;
+  entity: OntoEntity | null;
+  claims: ThreatClaim[];
+  claimCount: number;
+  episodes: number[];
+  edges: RelationRow[];
+  relatedSpecies: (Threat & { predicate: string; confidence: number })[];
+  hasKnowledge: boolean;
+}
+
 interface RelationRow {
   entity_id: string;
   subject_id: string;
@@ -52,6 +87,7 @@ interface Graph {
 type Tab = 'graph' | 'threats';
 
 export function World() {
+  const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('graph');
   const [summary, setSummary] = useState<Summary | null>(null);
   const [entities, setEntities] = useState<OntoEntity[]>([]);
@@ -62,6 +98,18 @@ export function World() {
   const [states, setStates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Set when a detail fetch fails. Without this the panel rendered nothing at
+  // all: a 429/500 body was parsed as if it were the graph, so `selected` was
+  // truthy but had no `.node` — killing the placeholder AND the detail view and
+  // leaving an empty column. Browsing a few entities quickly was enough to hit
+  // the per-IP rate limit and blank the panel.
+  const [detailError, setDetailError] = useState<string | null>(null);
+  // Threat catalog — cards expand inline. Multiple can be open at once, and fetched
+  // details are cached per species so re-opening is instant and costs no request.
+  const [detailCache, setDetailCache] = useState<Record<string, ThreatDetail>>({});
+  const [openThreats, setOpenThreats] = useState<Set<string>>(new Set());
+  const [loadingThreats, setLoadingThreats] = useState<Set<string>>(new Set());
+  const [expandedQuotes, setExpandedQuotes] = useState<Set<string>>(new Set());
 
   const load = async () => {
     setLoading(true);
@@ -107,19 +155,122 @@ export function World() {
     );
   }, [threats, query]);
 
+  /**
+   * Open an entity's graph + current inferred states.
+   *
+   * Guardrails that matter here:
+   *  - `!r.ok` is checked before parsing. The API returns JSON error bodies
+   *    ({"error":"Rate limit exceeded..."}) with a 4xx status, and parsing one as
+   *    a graph produced a truthy object with no `.node`, which blanked the panel.
+   *  - the shape is validated before it is stored, so a malformed body can never
+   *    render as an empty detail column.
+   */
   const openEntity = async (id: string) => {
     setSelectedId(id);
+    setDetailError(null);
     try {
-      const [g, st] = await Promise.all([
-        apiFetch(`/api/ontology/entity/${encodeURIComponent(id)}/graph`).then((r) => r.json()),
-        apiFetch(`/api/ontology/entity/${encodeURIComponent(id)}/state`).then((r) => r.json()),
+      const [gr, sr] = await Promise.all([
+        apiFetch(`/api/ontology/entity/${encodeURIComponent(id)}/graph`),
+        apiFetch(`/api/ontology/entity/${encodeURIComponent(id)}/state`),
       ]);
-      setSelected(g);
+      if (!gr.ok) {
+        const body = await gr.json().catch(() => ({}));
+        throw new Error(
+          gr.status === 429
+            ? 'Slow down — too many requests. Try again in a moment.'
+            : (body?.error || statusToMessage(gr.status)),
+        );
+      }
+      const g = await gr.json();
+      const st = sr.ok ? await sr.json() : [];
+      if (!g || typeof g !== 'object' || !('node' in g)) {
+        throw new Error('Unexpected response from the ontology graph.');
+      }
+      setSelected(g as Graph);
       setStates(Array.isArray(st) ? st : []);
-    } catch {
+    } catch (err: any) {
       setSelected(null);
       setStates([]);
+      setDetailError(err?.message ?? 'Could not load this entity.');
     }
+  };
+
+  // Toggle a threat card's inline detail. Multiple can be open at once; details are
+  // cached per species so re-opening is instant and makes no extra request.
+  //
+  // On failure the card previously fell through to its "no cited knowledge yet"
+  // copy, which was a lie: the species may carry 87 claims and we simply got a
+  // 429. Failures are tracked per species so the card can say what actually
+  // happened instead of claiming the corpus is empty.
+  const [threatError, setThreatError] = useState<Record<string, string>>({});
+
+  const openThreat = async (speciesId: string) => {
+    setOpenThreats((prev) => {
+      const next = new Set(prev);
+      if (next.has(speciesId)) next.delete(speciesId);
+      else next.add(speciesId);
+      return next;
+    });
+    if (detailCache[speciesId]) return;         // already fetched
+    setLoadingThreats((prev) => new Set(prev).add(speciesId));
+    setThreatError((prev) => {
+      const next = { ...prev };
+      delete next[speciesId];
+      return next;
+    });
+    try {
+      const r = await apiFetch(`/api/ontology/threats/${encodeURIComponent(speciesId)}/detail`);
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        throw new Error(
+          r.status === 429
+            ? 'Too many requests — try again in a moment.'
+            : (body?.error || statusToMessage(r.status)),
+        );
+      }
+      const d = await r.json();
+      if (!d || typeof d !== 'object') throw new Error('Unexpected response from the ontology.');
+      setDetailCache((prev) => ({ ...prev, [speciesId]: d }));
+    } catch (err: any) {
+      setThreatError((prev) => ({ ...prev, [speciesId]: err?.message ?? 'Could not load this species.' }));
+    } finally {
+      setLoadingThreats((prev) => {
+        const next = new Set(prev);
+        next.delete(speciesId);
+        return next;
+      });
+    }
+  };
+
+  const closeThreat = (speciesId?: string) => {
+    if (speciesId) {
+      setOpenThreats((prev) => {
+        const next = new Set(prev);
+        next.delete(speciesId);
+        return next;
+      });
+    } else {
+      setOpenThreats(new Set());
+    }
+  };
+
+  // Quote toggles are keyed by `speciesId:index` so cards don't interfere.
+  const toggleQuote = (key: string) => {
+    setExpandedQuotes((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  // Hand a question about this species to Buzz, pre-filled in the chat box.
+  const askBuzz = (t: { name: string; species_id: string; kind: string; scientific?: string }) => {
+    const prompt =
+      `Tell me about ${t.name}${t.scientific ? ` (${t.scientific})` : ''} — ` +
+      `what it is, how to detect it, and what I should do about it in my hives. ` +
+      `Then check my hives for anything related.`;
+    navigate('/chat', { state: { initialPrompt: prompt } });
   };
 
   if (loading && !summary) {
@@ -253,9 +404,29 @@ export function World() {
             ))}
           </div>
 
-          {/* Detail panel */}
+          {/* Detail panel — must always render one of: empty state, error, or detail.
+              A bare `{selected?.node && ...}` left the column blank whenever the
+              fetch failed, because `selected` was truthy but had no `.node`. */}
           <div>
-            {!selected && (
+            {detailError && (
+              <Card className="mb-3 bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800">
+                <div className="flex items-start gap-2 text-sm text-red-700 dark:text-red-300">
+                  <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                  <div>
+                    <p>{detailError}</p>
+                    {selectedId && (
+                      <button
+                        onClick={() => openEntity(selectedId)}
+                        className="text-xs underline mt-1 text-red-600 dark:text-red-300"
+                      >
+                        Retry
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            )}
+            {!selected && !detailError && (
               <Card>
                 <p className="text-sm text-stone-400 text-center py-6">
                   Select an entity to view its graph, relations, and current inferred states.
@@ -282,7 +453,7 @@ export function World() {
                           className="text-xs px-2 py-1 rounded-lg bg-honey-50 dark:bg-honey-950 text-honey-700 dark:text-honey-300"
                         >
                           <span className="font-medium">{s.state_class}</span>
-                          {s.rationale && <span className="text-honey-600/70"> — {s.rationale}</span>}
+                          {s.rationale && <span className="text-honey-600/70 dark:text-honey-400"> — {s.rationale}</span>}
                           <span className="text-honey-500/50"> (conf {Math.round((s.confidence ?? 0) * 100)}%)</span>
                         </div>
                       ))}
@@ -319,32 +490,219 @@ export function World() {
       )}
 
       {tab === 'threats' && (
-        <div className="grid sm:grid-cols-2 gap-2">
-          {filteredThreats.map((t) => (
-            <Card key={t.species_id}>
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-stone-800 dark:text-stone-100">{t.name}</div>
-                  {t.scientific && (
-                    <div className="text-xs italic text-stone-400">{t.scientific}</div>
-                  )}
-                  {t.notes && (
-                    <div className="text-xs text-stone-500 dark:text-stone-400 mt-1 line-clamp-2">{t.notes}</div>
-                  )}
-                </div>
-                <div className="flex flex-col items-end gap-1 shrink-0">
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${kindBadge(t.kind)}`}>
-                    {t.kind}
-                  </span>
-                  {t.notifiable ? (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-300 font-medium">
-                      notifiable
-                    </span>
-                  ) : null}
-                </div>
+        <div className="space-y-2">
+          {(openThreats.size > 0 || query) && (
+            <div className="flex items-center justify-between text-xs text-stone-400 px-1">
+              <span>
+                {filteredThreats.length} of {threats.length} species
+                {openThreats.size > 0 ? ` · ${openThreats.size} expanded` : ''}
+              </span>
+              {openThreats.size > 0 && (
+                <button
+                  onClick={() => closeThreat()}
+                  className="hover:text-honey-600 dark:hover:text-honey-300"
+                >
+                  Collapse all
+                </button>
+              )}
+            </div>
+          )}
+          {filteredThreats.length === 0 && (
+            <p className="text-sm text-stone-400 py-8 text-center">No threats match that search.</p>
+          )}
+
+          {filteredThreats.map((t) => {
+            const isOpen = openThreats.has(t.species_id);
+            const isLoading = loadingThreats.has(t.species_id);
+            const detail = detailCache[t.species_id];
+            return (
+              <div
+                key={t.species_id}
+                className={`rounded-xl border transition-colors overflow-hidden ${
+                  isOpen
+                    ? 'border-honey-400 dark:border-honey-700 bg-white dark:bg-stone-900'
+                    : 'border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:border-honey-300'
+                }`}
+              >
+                {/* Card header — always visible, click to expand inline */}
+                <button
+                  onClick={() => openThreat(t.species_id)}
+                  aria-expanded={isOpen}
+                  className={`w-full text-left p-3 transition-colors ${
+                    isOpen ? 'bg-honey-50 dark:bg-honey-950' : ''
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-medium text-stone-800 dark:text-stone-100">
+                          {t.name}
+                        </span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${kindBadge(t.kind)}`}>
+                          {t.kind}
+                        </span>
+                        {t.notifiable ? (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-300 font-medium">
+                            notifiable
+                          </span>
+                        ) : null}
+                        {detail && detail.claimCount > 0 && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-honey-100 dark:bg-honey-950 text-honey-700 dark:text-honey-300 font-medium">
+                            {detail.claimCount} cited
+                          </span>
+                        )}
+                      </div>
+                      {t.scientific && (
+                        <div className="text-xs italic text-stone-400 mt-0.5">{t.scientific}</div>
+                      )}
+                      {!isOpen && t.notes && (
+                        <div className="text-xs text-stone-500 dark:text-stone-400 mt-1 line-clamp-2">
+                          {t.notes}
+                        </div>
+                      )}
+                    </div>
+                    <ChevronRight
+                      size={15}
+                      className={`text-stone-300 transition-transform shrink-0 mt-0.5 ${isOpen ? 'rotate-90' : ''}`}
+                    />
+                  </div>
+                </button>
+
+                {/* Inline expanded detail */}
+                {isOpen && (
+                  <div className="border-t border-stone-100 dark:border-stone-800 px-3 pb-3 pt-3 space-y-3">
+                    {isLoading && !detail && (
+                      <div className="flex items-center justify-center py-6">
+                        <div className="w-5 h-5 border-2 border-honey-400 border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    )}
+
+                    {!isLoading && !detail && (
+                      <p className="text-xs text-stone-400 text-center py-4">
+                        Couldn't load details for this species.
+                      </p>
+                    )}
+
+                    {detail && (
+                      <>
+                        {t.notes && (
+                          <p className="text-xs text-stone-500 dark:text-stone-400">{t.notes}</p>
+                        )}
+
+                        <button
+                          onClick={(e) => { e.stopPropagation(); askBuzz(detail.species); }}
+                          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-honey-500 hover:bg-honey-600 text-white text-xs font-medium transition-colors"
+                        >
+                          <MessageCircle size={14} /> Ask Buzz about this
+                        </button>
+
+                        {detail.hasKnowledge ? (
+                          <>
+                            <div className="flex items-center justify-between text-[10px] text-stone-500">
+                              <span className="inline-flex items-center gap-1.5 font-medium">
+                                <Quote size={11} /> What Jamie Ellis says
+                              </span>
+                              <span className="text-stone-400">
+                                Ep {detail.episodes.join(', ')} · {detail.claimCount} claims
+                              </span>
+                            </div>
+                            <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                              {detail.claims.map((c, i) => {
+                                const qkey = `${t.species_id}:${i}`;
+                                const isQuoteOpen = expandedQuotes.has(qkey);
+                                return (
+                                  <div
+                                    key={qkey}
+                                    className="text-xs rounded-lg border border-stone-200 dark:border-stone-800 p-2.5 space-y-1"
+                                  >
+                                    <div className="flex items-start gap-2">
+                                      <span className="text-stone-700 dark:text-stone-200 flex-1">{c.claim}</span>
+                                      <span className="text-[10px] text-stone-400 shrink-0 mt-0.5">
+                                        {Math.round((c.confidence ?? 0) * 100)}%
+                                      </span>
+                                    </div>
+                                    {c.context && (
+                                      <div className="text-[10px] text-stone-400 italic">{c.context}</div>
+                                    )}
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <button
+                                        onClick={() => toggleQuote(qkey)}
+                                        className="text-[10px] text-honey-600 dark:text-honey-300 hover:underline"
+                                      >
+                                        {isQuoteOpen ? 'Hide source quote' : 'Show source quote'}
+                                      </button>
+                                      {c.youtube_url && (
+                                        <a
+                                          href={c.youtube_url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          onClick={(e) => e.stopPropagation()}
+                                          title="Watch this moment on YouTube"
+                                          className="text-[10px] text-stone-400 hover:text-honey-600 dark:hover:text-honey-300 inline-flex items-center gap-1"
+                                        >
+                                          <PlayCircle size={11} /> Ep {c.episode} · {fmtTime(c.start_s)}
+                                        </a>
+                                      )}
+                                    </div>
+                                    {isQuoteOpen && (
+                                      <div className="text-[10px] text-stone-500 dark:text-stone-400 border-l-2 border-honey-300 dark:border-honey-800 pl-2 italic">
+                                        "{c.quote}"
+                                        {!c.youtube_url && (
+                                          <div className="not-italic text-stone-400 mt-0.5">
+                                            — Ep {c.episode}{c.kind ? ` · ${c.kind}` : ''}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </>
+                        ) : threatError[t.species_id] ? (
+                          <div className="text-xs text-red-600 dark:text-red-300 text-center py-3">
+                            {threatError[t.species_id]}
+                            <button
+                              onClick={() => openThreat(t.species_id)}
+                              className="block mx-auto mt-1 underline"
+                            >
+                              Retry
+                            </button>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-stone-400 text-center py-3">
+                            No cited knowledge yet — this species is in the catalog but no episode covers it.
+                            Ask Buzz directly.
+                          </p>
+                        )}
+
+                        {detail.relatedSpecies.length > 0 && (
+                          <div>
+                            <div className="text-[10px] text-stone-500 mb-1.5 inline-flex items-center gap-1.5 font-medium">
+                              <Link2 size={11} /> Related species
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {detail.relatedSpecies.map((r) => (
+                                <button
+                                  key={`${r.species_id}-${r.predicate}`}
+                                  onClick={() => openThreat(r.species_id)}
+                                  className="text-[10px] text-stone-600 dark:text-stone-300 inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-stone-200 dark:border-stone-800 hover:border-honey-300 hover:text-honey-600 dark:hover:text-honey-300"
+                                >
+                                  <span className="font-medium">{r.name}</span>
+                                  <span className="font-mono text-honey-600 dark:text-honey-300">{r.predicate}</span>
+                                  <span className="text-stone-400">{Math.round((r.confidence ?? 0) * 100)}%</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
-            </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
