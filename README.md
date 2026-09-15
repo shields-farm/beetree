@@ -13,12 +13,14 @@ Named after the B-tree, because we thought that was funny.
 | `src/` | React frontend (Vite, Tailwind, React Router) |
 | `server/` | Express + SQLite API, ontology engine, assistant tools |
 | `server/ontology/` | The beekeeping vocabulary: species, relations, seasonal windows |
-| `hardware/bm-diy/` | BeeStick — a DIY BLE hive sensor (firmware, enclosure, BOM) |
 | `pi/` | Mentra glasses receiver: a Pi-side HTTP webhook for photo capture |
 | `ml/` | Colony-strength research pipeline (sensor baseline, acoustics, LLM) |
 | `training/` | LoRA fine-tuning and RAG evaluation for the in-app assistant |
 | `e2e/` | Playwright end-to-end tests |
 | `grafana/` | Sensor dashboards and provisioning |
+
+The custom BLE sensor hardware (firmware, enclosure, BOM) is not part of this
+repository.
 
 ## Quick start
 
@@ -67,7 +69,6 @@ results reported there are not validated across apiaries.
 ## Credits and data
 
 - UrBAN hive audio and inspection annotations — CC BY 4.0. See `ml/README.md`.
-- BeeStick firmware protocol notes are in `hardware/bm-diy/firmware/PROTOCOL.md`.
 - Beekeeping vocabulary in `server/ontology/beetree-vocab.yaml` draws on published
   extension guidance and standard apiculture terminology.
 
