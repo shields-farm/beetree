@@ -1,6 +1,6 @@
 {
   "name": "beetree-server",
-  "private": true,
+  "private": false,
   "version": "0.0.1",
   "type": "module",
   "scripts": {
@@ -29,5 +29,6 @@
     "@types/node": "^24.13.2",
     "tsx": "^4.19.3",
     "typescript": "^5.7.3"
-  }
+  },
+  "license": "MIT"
 }

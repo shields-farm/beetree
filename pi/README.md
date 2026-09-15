@@ -34,7 +34,7 @@ the trigger; this is the destination.
 
 ```bash
 sudo bash pi/install_receiver.sh \
-  --beetree-url https://beetree-host.tailnet-id.ts.net:8443 \
+  --beetree-url https://your-host.your-tailnet.ts.net:8443 \
   --beetree-key <BEETREE_API_KEY> \
   --upload-token <a token you invent>
 ```

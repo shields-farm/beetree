@@ -26,6 +26,12 @@ __pycache__/
 venv/
 *.egg-info/
 
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.tsbuildinfo
+
 # OS
 .DS_Store
 Thumbs.db
@@ -34,10 +40,18 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Secrets
+# Secrets and local config
 .env
+.env.*
+!.env.example
 *.key
 *.pem
+*.p12
+certs/
+
+# Local deployment state
+*.log
+*.pid
 
 # Staging (local data, not for git)
 staging/
@@ -64,3 +78,8 @@ data/e2e.db
 data/e2e.db-wal
 data/e2e.db-shm
 data/*.bak
+data/*.sqlite
+data/*.sqlite3
+data/*.db
+data/*.db-wal
+data/*.db-shm

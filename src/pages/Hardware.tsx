@@ -41,7 +41,7 @@ const ARCH_DIAGRAM = `graph TB
   end
 
   subgraph External["External Access"]
-    FUNNEL["Tailscale Funnel<br/>beetree-host.ts.net"]
+    FUNNEL["Tailscale Funnel<br/>your-host.ts.net"]
   end
 
   BM1 -.->|"BLE 4.1"| PI
@@ -317,7 +317,7 @@ export function Hardware() {
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           <Spec label="Role" value="Primary server" />
-          <Spec label="Network" value="Tailscale tailnet-id" />
+          <Spec label="Network" value="Tailscale tailnet" />
           <Spec label="BeeTree" value="Express :3001 (127.0.0.1)" />
           <Spec label="Ollama" value=":11434" />
           <Spec label="HA" value=":8123" />
