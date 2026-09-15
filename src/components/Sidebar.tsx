@@ -1,4 +1,4 @@
-import { Boxes, ClipboardList, Thermometer, CheckSquare, Settings as SettingsIcon, Hexagon, MessageCircle, Activity, Cpu, Globe } from 'lucide-react';
+import { Boxes, ClipboardList, Thermometer, CheckSquare, Settings as SettingsIcon, Hexagon, MessageCircle, Activity, Cpu, Globe, Network } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 /** Custom icon: a 10-frame deep hive box (side view with vertical frame lines) */
@@ -43,6 +43,7 @@ const SECONDARY_ITEMS: NavItem[] = [
   { to: '/equipment', label: 'Equipment', icon: Boxes },
   { to: '/hardware', label: 'Hardware', icon: Cpu },
   { to: '/activity', label: 'Activity', icon: Activity },
+  { to: '/world', label: 'World', icon: Network },
 ];
 
 type NavItem = { to: string; label: string; icon: React.ComponentType<{ size?: number; strokeWidth?: number }>; end?: boolean };
