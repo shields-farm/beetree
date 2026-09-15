@@ -82,8 +82,10 @@ function authMiddleware(req: express.Request, res: express.Response, next: expre
 // CORS: restrict to known origins (Tailscale + localhost)
 // ============================================================================
 const ALLOWED_ORIGINS = [
-  'https://beetree-host.tailnet-id.ts.net',
-  'https://beetree-host.tailnet-id.ts.net:8443',
+  ...(process.env.BEETREE_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((o: string) => o.trim())
+    .filter(Boolean),
   'https://localhost:5173',
   'https://127.0.0.1:5173',
   'http://localhost:5173',

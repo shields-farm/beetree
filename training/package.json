@@ -1,6 +1,6 @@
 {
   "name": "training",
-  "private": true,
+  "private": false,
   "devDependencies": {
     "@types/bun": "latest",
     "@types/three": "^0.185.4"
@@ -11,5 +11,6 @@
   "dependencies": {
     "3d-force-graph": "^1.80.0",
     "three": "^0.185.1"
-  }
+  },
+  "license": "MIT"
 }
