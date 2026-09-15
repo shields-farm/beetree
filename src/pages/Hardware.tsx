@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import {
   Cpu, Server, Radio, Thermometer, Activity, Cloud,
   Zap, Wifi, HardDrive, Brain, Mic, ArrowDownRight, CheckCircle2,
-  Circle, Satellite, Gauge, AlertTriangle, Sun,
+  Circle, Satellite, Gauge, AlertTriangle, Sun, Glasses, Database,
+  CheckSquare, AlertCircle,
   Cpu as CpuIcon2,
 } from 'lucide-react';
 import { PageHeader } from '../components/Layout';
@@ -69,14 +70,20 @@ const DATA_FLOW_DIAGRAM = `flowchart LR
     SCAN["btmon + hcitool<br/>20s capture cycle"]
     DECODE["bm_btmon_decode.py<br/>21-byte parser"]
     PUB["repeater_btmon.py<br/>HA REST publisher"]
+    RECV2["mentra_receiver.py<br/>:8790 /upload"]
+    SPOOL2[("spool/<br/>store + forward")]
   end
   subgraph MacMini["Mac Mini"]
     HA2["Home Assistant<br/>MQTT discovery"]
     INFLUX2["InfluxDB<br/>temp · humidity · battery"]
+    CAP2["/api/mentra/photo<br/>vision + inference"]
   end
   subgraph App["BeeTree"]
     API["Express API :3001<br/>sensor readings"]
     UI["React Frontend<br/>charts + alerts"]
+  end
+  subgraph Glass["Glasses"]
+    ML["Mentra Live<br/>Wi-Fi upload"]
   end
 
   BM -.->|"BLE adv"| SCAN
@@ -86,6 +93,11 @@ const DATA_FLOW_DIAGRAM = `flowchart LR
   HA2 --> INFLUX2
   INFLUX2 --> API
   API --> UI
+
+  ML -->|"JPEG over Wi-Fi"| RECV2
+  RECV2 --> SPOOL2
+  SPOOL2 -->|"HTTPS + Bearer"| CAP2
+  CAP2 --> API
 `;
 
 const AI_DIAGRAM = `graph TB
@@ -134,11 +146,60 @@ const LORA_DIAGRAM = `graph LR
   PY -.->|"unknown → log"| HA
 `;
 
+/**
+ * Glasses capture path.
+ *
+ * The split that matters: the glasses upload the JPEG *directly over Wi-Fi to a
+ * webhook*, while *issuing* the capture needs the Mentra Bluetooth SDK. So the
+ * receiver half runs on infrastructure we own, and the trigger half must be a
+ * phone app. There is no Linux/Python binding for the SDK, which is why the Pi
+ * cannot fire the shutter.
+ */
+const GLASSES_DIAGRAM = `flowchart TB
+  subgraph Wear["On the beekeeper"]
+    GL["Mentra Live<br/>12MP · 119° FOV · 43g"]
+    PH["Phone app<br/>Mentra Bluetooth SDK"]
+  end
+
+  subgraph Pi["Pi Zero W — 192.0.2.20"]
+    RECV["mentra_receiver.py<br/>:8790 /upload"]
+    SPOOL[("spool/<br/>uploads + forwarded")]
+    FWD["forward worker<br/>backoff retry"]
+  end
+
+  subgraph Mac["Mac Mini"]
+    CAP["POST /api/mentra/photo"]
+    VIS["vision analysis"]
+    INF["ontology inference<br/>differential checks"]
+    ONT[("state ledger<br/>≥0.6 only")]
+    CAND[("candidate only")]
+    MEDIA[("data/media/*.jpg")]
+  end
+
+  GL -->|"1 · JPEG over Wi-Fi"| RECV
+  PH -.->|"BLE: requestPhoto(webhookUrl)"| GL
+  PH -.->|"BT fallback relay"| GL
+  RECV -->|"2 · ack 202 immediately"| PH
+  RECV --> SPOOL
+  SPOOL --> FWD
+  FWD -->|"3 · HTTPS + Bearer"| CAP
+  CAP --> VIS --> INF
+  INF -->|"clears threshold"| ONT
+  INF -->|"below threshold"| CAND
+  CAP --> MEDIA
+
+  classDef ours fill:#fef3c7,stroke:#f59e0b,color:#78350f
+  classDef them fill:#e0e7ff,stroke:#6366f1,color:#312e81
+  class RECV,SPOOL,FWD,CAP,VIS,INF,ONT,CAND,MEDIA ours
+  class GL,PH them
+`;
+
 // ─── Hardware Page ─────────────────────────────────────────────────────────
 
 export function Hardware() {
   const [health, setHealth] = useState<{ status: string; uptime?: number } | null>(null);
-  const [tab, setTab] = useState<'overview' | 'hardware' | 'lora' | 'software'>('overview');
+  const [tab, setTab] = useState<'overview' | 'hardware' | 'glasses' | 'lora' | 'software'>('overview');
+  const [receiver, setReceiver] = useState<{ queued?: number; beetreeReachable?: boolean } | null>(null);
 
   useEffect(() => {
     apiFetch('/api/health')
@@ -146,6 +207,19 @@ export function Hardware() {
       .then(setHealth)
       .catch(() => setHealth(null));
   }, []);
+
+  // The Pi's receiver exposes /health. It is only reachable once the receiver is
+  // actually installed on the Pi, so a failure here is the normal state, not an
+  // error worth showing.
+  useEffect(() => {
+    if (tab !== 'glasses') return;
+    let cancelled = false;
+    fetch('http://192.0.2.20:8790/health')
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled) setReceiver(d); })
+      .catch(() => { if (!cancelled) setReceiver(null); });
+    return () => { cancelled = true; };
+  }, [tab]);
 
   return (
     <div className="animate-fade-in max-w-4xl mx-auto">
@@ -159,6 +233,7 @@ export function Hardware() {
         {([
           ['overview', 'Overview'],
           ['hardware', 'Hardware'],
+          ['glasses', 'Glasses'],
           ['lora', 'LoRa Relay'],
           ['software', 'Software & AI'],
         ] as const).map(([key, label]) => (
@@ -205,6 +280,8 @@ export function Hardware() {
         </div>
         <p className="text-xs text-stone-500 dark:text-stone-400 mb-3">
           BroodMinder BLE host — scans beehive sensors and forwards readings to Home Assistant.
+          Also receives Mentra Live photo uploads over Wi-Fi (see the Glasses tab), which needs no
+          Bluetooth and so does not contend for the radio.
           Installed in garage with mains power.
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -221,6 +298,7 @@ export function Hardware() {
             <StackItem icon={Radio} name="btmon + hcitool" desc="Kernel-level BLE capture (bypasses BlueZ/dbus)" />
             <StackItem icon={Brain} name="bm_btmon_decode.py" desc="21-byte BroodMinder protocol parser (company ID 0x028D)" />
             <StackItem icon={Wifi} name="repeater_btmon.py" desc="Publishes to HA REST API — 20s scan cycles" />
+            <StackItem icon={Glasses} name="mentra_receiver.py" desc="Glasses photo webhook on :8790 — HTTP only, no Bluetooth" />
           </div>
         </div>
       </Card>
@@ -310,6 +388,146 @@ export function Hardware() {
         </div>
       </Card>
       </>
+      )}
+
+      {/* Glasses Capture */}
+      {tab === 'glasses' && (
+        <>
+        <h2 className="text-xs font-bold text-stone-400 dark:text-stone-500 uppercase tracking-wider mb-2 mt-4">
+          Capture Path
+        </h2>
+
+        <Card className="mb-4">
+          <Mermaid chart={GLASSES_DIAGRAM} />
+          <p className="text-[11px] text-stone-400 dark:text-stone-500 mt-3">
+            Amber runs on our own hardware, with no third-party cloud in the path.
+          </p>
+        </Card>
+
+        <Card className="mb-4">
+          <div className="flex items-start justify-between mb-3">
+            <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 flex items-center gap-2">
+              <Glasses size={16} className="text-honey-600 dark:text-honey-400" />
+              Mentra Live
+            </h3>
+            <StatusBadge status="planned" label="Not purchased" />
+          </div>
+          <p className="text-xs text-stone-500 dark:text-stone-400 mb-3">
+            Camera glasses chosen because the whole stack is open (MentraOS is MIT) and photos
+            upload straight to an endpoint you own. No model provider is locked in anywhere in
+            this path.
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <Spec label="Camera" value="12MP · 3264×2448" />
+            <Spec label="Field of view" value="119°" />
+            <Spec label="Weight" value="43g" />
+            <Spec label="Audio" value="Mic + speaker" />
+            <Spec label="Upload" value="Wi-Fi → own webhook" />
+            <Spec label="SDK" value="Android · iOS · RN" />
+          </div>
+          <div className="mt-3 pt-3 border-t border-stone-100 dark:border-stone-800">
+            <h4 className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase mb-2">
+              Open question
+            </h4>
+            <p className="text-xs text-stone-500 dark:text-stone-400">
+              <strong className="text-amber-700 dark:text-amber-300">Minimum focus distance is
+              unverified.</strong> Every candidate is a fixed-focus point-of-view camera built for
+              roughly a metre and beyond. Reading a frame at 15–30&nbsp;cm — which is what
+              spotting eggs requires — is the opposite of that. This is the make-or-break test and
+              it cannot be settled from a spec sheet.
+            </p>
+          </div>
+        </Card>
+
+        <Card className="mb-4">
+          <div className="flex items-start justify-between mb-3">
+            <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 flex items-center gap-2">
+              <Wifi size={16} className="text-honey-600 dark:text-honey-400" />
+              Pi Zero W — photo receiver
+            </h3>
+            <StatusBadge
+              status={receiver ? 'active' : 'planned'}
+              label={receiver ? 'Receiving' : 'Not installed'}
+            />
+          </div>
+          <p className="text-xs text-stone-500 dark:text-stone-400 mb-3">
+            The glasses push JPEGs over Wi-Fi to a webhook on this Pi, which spools them and
+            forwards to BeeTree. It does not talk Bluetooth, so it runs alongside the BroodMinder
+            repeater without contending for the single BLE radio.
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <Spec label="Port" value="8790" />
+            <Spec label="Endpoint" value="POST /upload" />
+            <Spec label="Delivery" value="Store and forward" />
+            <Spec label="Queue now" value={receiver ? String(receiver.queued ?? 0) : '—'} />
+            <Spec label="BeeTree" value={receiver ? (receiver.beetreeReachable ? 'Reachable' : 'Unreachable') : '—'} />
+            <Spec label="Bluetooth" value="Not used" />
+          </div>
+          <div className="mt-3 pt-3 border-t border-stone-100 dark:border-stone-800">
+            <h4 className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 uppercase mb-2">
+              Software Stack
+            </h4>
+            <div className="space-y-1.5">
+              <StackItem icon={Radio} name="mentra_receiver.py" desc="Multipart upload receiver — answers 202 immediately" />
+              <StackItem icon={Database} name="spool/" desc="Uploads persist to disk before forwarding, so a hive visit survives a dead network" />
+              <StackItem icon={Wifi} name="forward worker" desc="Backoff retry; permanently-rejected uploads are archived so they cannot block the queue" />
+            </div>
+          </div>
+        </Card>
+
+        <Card className="mb-4">
+          <div className="flex items-start justify-between mb-3">
+            <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 flex items-center gap-2">
+              <Server size={16} className="text-honey-600 dark:text-honey-400" />
+              BeeTree capture loop
+            </h3>
+            <StatusBadge status="active" label="Built" />
+          </div>
+          <p className="text-xs text-stone-500 dark:text-stone-400 mb-3">
+            Analyses the frame, runs the ontology's differential rules, and records a colony state
+            only when the evidence clears the threshold. A single photo is weak evidence, so
+            anything below the bar is kept as a candidate and nothing more.
+          </p>
+          <div className="space-y-1.5">
+            <StackItem icon={Brain} name="POST /api/mentra/photo" desc="Vision analysis → ontology inference → state ledger → spoken reply" />
+            <StackItem icon={CheckSquare} name="POST /api/mentra/correct" desc="Beekeeper's verdict over the model's — this is what becomes a training label" />
+            <StackItem icon={Database} name="GET /api/mentra/labels" desc="Labelled pairs (ai_top, human_state, agreed) as they accumulate" />
+          </div>
+        </Card>
+
+        <Card className="mb-4">
+          <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-200 flex items-center gap-2 mb-3">
+            <AlertCircle size={16} className="text-amber-600 dark:text-amber-400" />
+            What is built, and what is not
+          </h3>
+          <div className="space-y-2 text-xs text-stone-500 dark:text-stone-400">
+            <p>
+              <strong className="text-green-700 dark:text-green-400">Built and tested:</strong> the
+              receiver, the capture loop, the ontology join, and the correction-to-label path.
+              Verified end to end with a real photograph travelling Pi&nbsp;→&nbsp;Tailscale&nbsp;→&nbsp;BeeTree
+              and coming back a colony state.
+            </p>
+            <p>
+              <strong className="text-amber-700 dark:text-amber-300">Not built:</strong> the phone
+              app that triggers a capture. Issuing <code className="text-[11px]">requestPhoto()</code> requires
+              the Mentra Bluetooth SDK, which ships for Android, iOS, and React&nbsp;Native only — there
+              is no Linux or Python binding, so the Pi cannot fire the shutter. Nothing calls the
+              receiver from real glasses yet.
+            </p>
+            <p>
+              <strong className="text-amber-700 dark:text-amber-300">Also missing:</strong> audio
+              narration is not wired. The server-side transcript&#8209;to&#8209;inspection parser exists and
+              works, but nothing connects the glasses' microphone to it, and nothing speaks the
+              reply back through the glasses' speaker.
+            </p>
+            <p>
+              <strong className="text-amber-700 dark:text-amber-300">No session grouping:</strong> each
+              capture is currently a standalone observation. Nothing yet binds a run of captures
+              into a single inspection record.
+            </p>
+          </div>
+        </Card>
+        </>
       )}
 
       {/* LoRa Relay Section */}
