@@ -143,9 +143,23 @@ app.use('/api', (req, res, next) => {
   if (req.path === '/health') return next();
   if (req.path === '/setup/status') return next();
   if (req.path === '/key') {
-    // Only allow from localhost
+    // Only allow from a genuine loopback peer.
+    //
+    // NOTE: binding the server to :3001 and putting it behind a reverse proxy
+    // (Tailscale serve/funnel, nginx) defeats a naive remoteAddress check — the
+    // proxy connects from 127.0.0.1, so every remote caller looks local. Require
+    // both a loopback socket AND a loopback Host header, which a proxy forwards
+    // as the public hostname. Set BEETREE_TRUST_PROXY=1 only if you knowingly
+    // accept that proxied callers can read the key.
     const ip = req.ip || req.socket.remoteAddress || '';
-    if (ip.includes('127.0.0.1') || ip.includes('::1') || ip.includes('::ffff:127.0.0.1')) {
+    const isLoopbackPeer =
+      ip.includes('127.0.0.1') || ip === '::1' || ip.includes('::ffff:127.0.0.1');
+    const host = (req.headers.host || '').split(':')[0].toLowerCase();
+    const isLoopbackHost =
+      host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '::1';
+    const trustProxy = process.env.BEETREE_TRUST_PROXY === '1';
+
+    if (isLoopbackPeer && (isLoopbackHost || trustProxy)) {
       return next();
     }
     return res.status(403).json({ error: 'Key retrieval only available from localhost' });
