@@ -309,7 +309,7 @@ export function SetupWizard() {
                   type="text"
                   value={apiaryName}
                   onChange={(e) => setApiaryName(e.target.value)}
-                  placeholder="e.g. the home apiary"
+                  placeholder="e.g. Back Yard"
                   className="w-full px-4 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-800 dark:text-stone-100 text-sm focus:ring-2 focus:ring-honey-400 focus:border-transparent"
                   autoFocus
                 />
@@ -320,7 +320,7 @@ export function SetupWizard() {
                   type="text"
                   value={apiaryAddress}
                   onChange={(e) => setApiaryAddress(e.target.value)}
-                  placeholder="e.g. 1111 the home apiary Rd"
+                  placeholder="e.g. 123 Pollinator Lane"
                   className="w-full px-4 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-800 dark:text-stone-100 text-sm focus:ring-2 focus:ring-honey-400 focus:border-transparent"
                 />
               </div>

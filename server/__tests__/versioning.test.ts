@@ -72,35 +72,35 @@ describe('copy-on-write versioning', () => {
   it('should create v1 on insert', () => {
     const entityId = genId('apiary');
     db.prepare('INSERT INTO apiaries (id, entity_id, version, superseded_by, superseded_at, name, address) VALUES (?, ?, 1, NULL, NULL, ?, ?)')
-      .run(genId('apiary'), entityId, 'the home apiary', '1111 the home apiary Rd');
+      .run(genId('apiary'), entityId, 'Riverside Apiary', '123 Riverside Rd');
 
     const row = db.prepare('SELECT * FROM apiaries WHERE entity_id = ? AND superseded_by IS NULL').get(entityId) as any;
     expect(row).toBeDefined();
     expect(row.version).toBe(1);
-    expect(row.name).toBe('the home apiary');
+    expect(row.name).toBe('Riverside Apiary');
     expect(row.superseded_by).toBeNull();
   });
 
   it('should create new version on update (copy-on-write)', () => {
     const entityId = genId('apiary');
     db.prepare('INSERT INTO apiaries (id, entity_id, version, superseded_by, superseded_at, name, address) VALUES (?, ?, 1, NULL, NULL, ?, ?)')
-      .run(genId('apiary'), entityId, 'the home apiary', '1111 the home apiary Rd');
+      .run(genId('apiary'), entityId, 'Riverside Apiary', '123 Riverside Rd');
 
     // Simulate a rename
     cowSupersede(db, entityId, () => ({
-      name: 'the home apiary Apiary',
-      address: '1111 the home apiary Rd',
+      name: 'Riverside Apiary',
+      address: '123 Riverside Rd',
     }));
 
     // Current version should be v2 with new name
     const current = db.prepare('SELECT * FROM apiaries WHERE entity_id = ? AND superseded_by IS NULL').get(entityId) as any;
     expect(current.version).toBe(2);
-    expect(current.name).toBe('the home apiary Apiary');
+    expect(current.name).toBe('Riverside Apiary');
 
     // Old version should be superseded
     const old = db.prepare('SELECT * FROM apiaries WHERE entity_id = ? AND superseded_by IS NOT NULL').get(entityId) as any;
     expect(old.version).toBe(1);
-    expect(old.name).toBe('the home apiary');
+    expect(old.name).toBe('Riverside Apiary');
     expect(old.superseded_by).not.toBeNull();
     expect(old.superseded_at).not.toBeNull();
   });
