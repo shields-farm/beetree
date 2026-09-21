@@ -89,6 +89,7 @@ export interface HiveRow {
   location_lat: number | null; location_lng: number | null; location_accuracy: number | null;
   location_pinnedAt: string | null; location_label: string | null;
   sensorIds: string;
+  groupId: string | null;
 }
 
 export interface BoxRow {
@@ -119,6 +120,7 @@ export function mapHive(
     notes: r.notes ?? undefined,
     createdAt: r.createdAt,
     sensorIds: JSON.parse(r.sensorIds || '[]'),
+    groupId: r.groupId ?? undefined,
     location: r.location_lat != null && r.location_lng != null
       ? {
           lat: r.location_lat,
@@ -143,6 +145,27 @@ export function mapHive(
           .sort((a, b) => a.position - b.position)
           .map((f) => ({ position: f.position, content: f.content })),
       })),
+  };
+}
+
+export interface HiveGroupRow {
+  id: string; entity_id: string; version: number; superseded_by: string | null; superseded_at: string | null;
+  apiaryId: string; name: string; template: string;
+  notes: string | null; createdAt: string;
+  members: string; // JSON array of ordered hive entity_ids
+}
+
+export function mapHiveGroup(r: HiveGroupRow) {
+  return {
+    id: r.entity_id,
+    version: r.version,
+    entityId: r.entity_id,
+    apiaryId: r.apiaryId,
+    name: r.name,
+    template: r.template,
+    notes: r.notes ?? undefined,
+    createdAt: r.createdAt,
+    members: JSON.parse(r.members || '[]') as string[],
   };
 }
 
