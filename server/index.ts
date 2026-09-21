@@ -24,6 +24,7 @@ import {
   initSchema,
   mapApiary,
   mapHive,
+  mapHiveGroup,
   mapInspection,
   mapSensor,
   mapTask,
@@ -33,6 +34,7 @@ import {
   cowSupersede,
   type ApiaryRow,
   type HiveRow,
+  type HiveGroupRow,
   type BoxRow,
   type FrameSlotRow,
   type InspectionRow,
@@ -426,7 +428,7 @@ app.post('/api/hives', (req, res) => {
   const entityId = b.id || genId('hive');
   const rowId = genId('hive');
   const loc = b.location || {};
-  db.prepare(`INSERT INTO hives (id, entity_id, version, superseded_by, superseded_at, apiaryId, name, type, healthStatus, notes, createdAt, location_lat, location_lng, location_accuracy, location_pinnedAt, location_label, sensorIds) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+  db.prepare(`INSERT INTO hives (id, entity_id, version, superseded_by, superseded_at, apiaryId, name, type, healthStatus, notes, createdAt, location_lat, location_lng, location_accuracy, location_pinnedAt, location_label, sensorIds, groupId) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(
       rowId,
       entityId,
@@ -442,6 +444,7 @@ app.post('/api/hives', (req, res) => {
       loc.pinnedAt ?? null,
       loc.label ?? null,
       JSON.stringify(b.sensorIds || []),
+      b.groupId ?? null,
     );
 
   // Insert boxes + frame_slots
@@ -497,6 +500,9 @@ app.put('/api/hives/:id', (req, res) => {
     sensorIds: b.sensorIds === undefined
       ? (cur.sensorIds ?? '[]')
       : JSON.stringify(b.sensorIds || []),
+    groupId: b.groupId === undefined
+      ? (cur.groupId ?? null)
+      : (b.groupId ?? null),
   }));
 
   // Replace boxes + frame_slots if provided
@@ -577,12 +583,191 @@ app.post('/api/hives/:id/revert', (req, res) => {
     location_pinnedAt: target.location_pinnedAt,
     location_label: target.location_label,
     sensorIds: target.sensorIds,
+    groupId: target.groupId,
   }));
 
   const row = db.prepare('SELECT * FROM hives WHERE id = ?').get(newRowId) as HiveRow;
   const hBoxes = getHiveBoxes(entityId);
   const slots = db.prepare('SELECT * FROM frame_slots WHERE superseded_by IS NULL AND boxId IN (SELECT entity_id FROM boxes WHERE hiveId = ? AND superseded_by IS NULL)').all(entityId) as FrameSlotRow[];
   res.json(mapHive(row, hBoxes, slots));
+});
+
+// ============================================================================
+// /api/hive-groups — yard groupings (e.g. the "Ellis Special": two hives with
+// a nuc in the middle). Members are ordered hive entity_ids; the order IS the
+// physical left-to-right arrangement in the yard.
+// ============================================================================
+function setHivesGroupId(hiveIds: string[], groupId: string | null): void {
+  const stmt = db.prepare('SELECT entity_id FROM hives WHERE entity_id = ? AND superseded_by IS NULL');
+  const upd = db.prepare('UPDATE hives SET groupId = ? WHERE entity_id = ? AND superseded_by IS NULL');
+  for (const id of hiveIds) {
+    if (!stmt.get(id)) continue; // silently skip unknown hive ids (e.g. deleted)
+    upd.run(groupId, id);
+  }
+}
+
+function hiveGroupMembersValid(apiaryId: string, members: unknown): string[] {
+  if (!Array.isArray(members)) return [];
+  const ids = members.filter((m): m is string => typeof m === 'string');
+  // All member hives must exist and belong to the same apiary — a group is a
+  // physical arrangement in one yard, so cross-apiary membership is a bug.
+  const valid: string[] = [];
+  const seen = new Set<string>();
+  for (const id of ids) {
+    if (seen.has(id)) continue;
+    const hive = db.prepare('SELECT apiaryId FROM hives WHERE entity_id = ? AND superseded_by IS NULL').get(id) as { apiaryId: string } | undefined;
+    if (hive && hive.apiaryId === apiaryId) {
+      valid.push(id);
+      seen.add(id);
+    }
+  }
+  return valid;
+}
+
+app.get('/api/hive-groups', (_req, res) => {
+  const rows = db.prepare('SELECT * FROM hive_groups WHERE superseded_by IS NULL').all() as HiveGroupRow[];
+  res.json(rows.map(mapHiveGroup));
+});
+
+app.get('/api/hive-groups/:id', (req, res) => {
+  const row = db.prepare('SELECT * FROM hive_groups WHERE entity_id = ? AND superseded_by IS NULL').get(req.params.id) as HiveGroupRow | undefined;
+  if (!row) return res.status(404).json({ error: 'not found' });
+  res.json(mapHiveGroup(row));
+});
+
+app.post('/api/hive-groups', (req, res) => {
+  const b = req.body || {};
+  if (!b.apiaryId || !b.name?.trim()) {
+    return res.status(400).json({ error: 'apiaryId and name are required' });
+  }
+  const apiary = db.prepare('SELECT 1 FROM apiaries WHERE entity_id = ? AND superseded_by IS NULL').get(b.apiaryId);
+  if (!apiary) return res.status(404).json({ error: 'apiary not found' });
+
+  const members = hiveGroupMembersValid(b.apiaryId, b.members);
+  const entityId = b.id || genId('group');
+  const rowId = genId('group');
+  db.prepare(`INSERT INTO hive_groups (id, entity_id, version, superseded_by, superseded_at, apiaryId, name, template, notes, createdAt, members) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?, ?, ?)`)
+    .run(rowId, entityId, b.apiaryId, b.name.trim(), b.template ?? 'custom', b.notes ?? null, b.createdAt ?? new Date().toISOString(), JSON.stringify(members));
+  setHivesGroupId(members, entityId);
+
+  const row = db.prepare('SELECT * FROM hive_groups WHERE id = ?').get(rowId) as HiveGroupRow;
+  res.status(201).json(mapHiveGroup(row));
+});
+
+app.put('/api/hive-groups/:id', (req, res) => {
+  const b = req.body || {};
+  const entityId = req.params.id;
+  const cur = db.prepare('SELECT * FROM hive_groups WHERE entity_id = ? AND superseded_by IS NULL').get(entityId) as HiveGroupRow | undefined;
+  if (!cur) return res.status(404).json({ error: 'not found' });
+
+  const apiaryId = b.apiaryId ?? cur.apiaryId;
+  const members = b.members === undefined
+    ? JSON.parse(cur.members || '[]')
+    : hiveGroupMembersValid(apiaryId, b.members);
+
+  const newRowId = cowSupersede('hive_groups', entityId, () => ({
+    apiaryId,
+    name: b.name?.trim() ?? cur.name,
+    template: b.template ?? cur.template,
+    notes: b.notes ?? cur.notes,
+    createdAt: cur.createdAt,
+    members: JSON.stringify(members),
+  }));
+
+  // Regroup: hives that left the member list drop their groupId; new ones gain it.
+  const oldMembers = JSON.parse(cur.members || '[]') as string[];
+  const removed = oldMembers.filter((m) => !members.includes(m));
+  setHivesGroupId(removed, null);
+  setHivesGroupId(members, entityId);
+
+  const row = db.prepare('SELECT * FROM hive_groups WHERE id = ?').get(newRowId) as HiveGroupRow;
+  res.json(mapHiveGroup(row));
+});
+
+app.delete('/api/hive-groups/:id', (req, res) => {
+  const entityId = req.params.id;
+  const cur = db.prepare('SELECT * FROM hive_groups WHERE entity_id = ? AND superseded_by IS NULL').get(entityId) as HiveGroupRow | undefined;
+  if (cur) {
+    const members = JSON.parse(cur.members || '[]') as string[];
+    setHivesGroupId(members, null);
+  }
+  db.prepare('DELETE FROM hive_groups WHERE entity_id = ?').run(entityId);
+  res.json({ ok: true });
+});
+
+// ============================================================================
+// /api/hive-groups/from-template — create a group from a named layout
+// ("ellis-special": hive · nuc · hive, per Jamie Ellis's GBA recommendation).
+// Creates the hives AND the group atomically, so a failure can't leave orphan
+// hives in the yard.
+// ============================================================================
+const HIVE_GROUP_TEMPLATES: Record<string, { name: string; slots: { role: 'hive' | 'nuc'; type: string }[] }> = {
+  'ellis-special': {
+    name: 'Ellis Special',
+    slots: [
+      { role: 'hive', type: 'langstroth-10' },
+      { role: 'nuc', type: 'nuc-5' },
+      { role: 'hive', type: 'langstroth-10' },
+    ],
+  },
+};
+
+app.post('/api/hive-groups/from-template', (req, res) => {
+  const b = req.body || {};
+  const templateId = b.template;
+  const tpl = templateId ? HIVE_GROUP_TEMPLATES[templateId] : undefined;
+  if (!tpl) return res.status(400).json({ error: `unknown template "${templateId}". Available: ${Object.keys(HIVE_GROUP_TEMPLATES).join(', ')}` });
+  if (!b.apiaryId) return res.status(400).json({ error: 'apiaryId is required' });
+  const apiary = db.prepare('SELECT 1 FROM apiaries WHERE entity_id = ? AND superseded_by IS NULL').get(b.apiaryId);
+  if (!apiary) return res.status(404).json({ error: 'apiary not found' });
+
+  const baseName = (b.name?.trim()) || tpl.name;
+  const groupId = genId('group');
+
+  const createHive = db.transaction((slot: { role: 'hive' | 'nuc'; type: string }, index: number) => {
+    const hiveId = genId('hive');
+    const def = slot.type;
+    // Short names — the tile label under each hive in the yard view is narrow,
+    // so "Hive 1 / Nuc / Hive 2" beats "Ellis Special Hive 1" (which truncates).
+    // A custom group name prefixes them so trios in the same yard stay distinct.
+    const custom = (b.name?.trim() || '') !== '' ? `${baseName} ` : '';
+    const hiveName = slot.role === 'nuc' ? `${custom}Nuc` : `${custom}Hive ${index + 1}`;
+    db.prepare(`INSERT INTO hives (id, entity_id, version, superseded_by, superseded_at, apiaryId, name, type, healthStatus, notes, createdAt, sensorIds, groupId) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, 'good', NULL, ?, '[]', ?)`)
+      .run(genId('hive'), hiveId, b.apiaryId, hiveName, def, new Date().toISOString(), groupId);
+    // One default box with the type's standard frame count (nuc-5 = 5 frames,
+    // langstroth-10 = 10). Frame slot rows for the standard box.
+    const insBox = db.prepare(`INSERT INTO boxes (id, entity_id, version, superseded_by, superseded_at, hiveId, type, "index", sensorIds) VALUES (?, ?, 1, NULL, NULL, ?, ?, 0, '[]')`);
+    const insSlot = db.prepare(`INSERT INTO frame_slots (id, entity_id, version, superseded_by, superseded_at, boxId, position, content) VALUES (?, ?, 1, NULL, NULL, ?, ?, 'empty')`);
+    const boxEntityId = genId('box');
+    insBox.run(genId('box'), boxEntityId, hiveId, def === 'nuc-5' ? 'nuc' : 'deep');
+    const frameCount = def === 'nuc-5' ? 5 : 10;
+    for (let p = 0; p < frameCount; p++) {
+      insSlot.run(genId('fs'), genId('fs'), boxEntityId, p);
+    }
+    return hiveId;
+  });
+
+  try {
+    const memberIds: string[] = [];
+    let hiveIndex = 0;
+    db.transaction(() => {
+      tpl.slots.forEach((slot) => {
+        if (slot.role === 'hive') {
+          memberIds.push(createHive(slot, hiveIndex));
+          hiveIndex++;
+        } else {
+          memberIds.push(createHive(slot, 0));
+        }
+      });
+      db.prepare(`INSERT INTO hive_groups (id, entity_id, version, superseded_by, superseded_at, apiaryId, name, template, notes, createdAt, members) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, NULL, ?, ?)`)
+        .run(genId('group'), groupId, b.apiaryId, b.name?.trim() || tpl.name, templateId, new Date().toISOString(), JSON.stringify(memberIds));
+    })();
+  } catch (e: any) {
+    return res.status(500).json({ error: `template instantiation failed: ${e.message}` });
+  }
+
+  const row = db.prepare('SELECT * FROM hive_groups WHERE entity_id = ? AND superseded_by IS NULL').get(groupId) as HiveGroupRow;
+  res.status(201).json(mapHiveGroup(row));
 });
 
 // ============================================================================

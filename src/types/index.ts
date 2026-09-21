@@ -82,6 +82,7 @@ export interface Hive {
   sensorIds?: string[];
   notes?: string;
   createdAt: string;
+  groupId?: string;
   location?: {
     lat: number;
     lng: number;
@@ -89,6 +90,19 @@ export interface Hive {
     pinnedAt?: string; // ISO timestamp of when location was set
     label?: string; // optional label like "near the oak tree"
   };
+}
+
+export type HiveGroupTemplateId = 'ellis-special' | 'custom';
+
+export interface HiveGroup {
+  id: string;
+  apiaryId: string;
+  name: string;
+  template: HiveGroupTemplateId;
+  notes?: string;
+  createdAt: string;
+  /** Ordered member hive ids — the order IS the physical left-to-right arrangement. */
+  members: string[];
 }
 
 export interface Concern {
@@ -159,4 +173,5 @@ export interface AppState {
   inspections: Inspection[];
   sensors: Sensor[];
   tasks: Task[];
+  hiveGroups?: HiveGroup[];
 }
