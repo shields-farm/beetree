@@ -1741,6 +1741,7 @@ app.get('/api/treatment', (_req, res) => {
 // ============================================================================
 import { getForageForecast, getForageForecastWithPreview, getAllForageSpecies } from './forage.js';
 import { getWeather } from './weather.js';
+import { seasonProfileFor, isoToMinutesOfDay, resolveCadence, buildCadenceConfigPayload } from './cadence.js';
 
 // /api/weather — Weather + inspection window for an apiary or lat/lng
 // ============================================================================
@@ -1772,6 +1773,43 @@ app.get('/api/weather', async (req, res) => {
   } catch (e) {
     console.error('[weather] error:', e);
     res.status(500).json({ error: e instanceof Error ? e.message : 'weather failed' });
+  }
+});
+
+// ============================================================================
+// /api/cadence — BeeStick v1.1 sampling schedule for an apiary
+// The hub owns the cadence: it resolves season × daypart × transition
+// windows from the apiary's sunrise/sunset and returns the class, the
+// interval, and the GATT payload a sensor sync writes. See server/cadence.ts.
+// ============================================================================
+app.get('/api/cadence', async (req, res) => {
+  try {
+    let sunriseMin = 420;   // sensible defaults if no apiary/weather
+    let sunsetMin = 1170;
+    if (req.query.apiaryId) {
+      const apiary = db.prepare('SELECT * FROM apiaries WHERE entity_id = ? AND superseded_by IS NULL').get(req.query.apiaryId as string) as ApiaryRow | undefined;
+      if (apiary?.location_lat && apiary?.location_lng) {
+        const weather = await getWeather(apiary.location_lat, apiary.location_lng);
+        if (weather.daily?.[0]?.sunrise && weather.daily?.[0]?.sunset) {
+          sunriseMin = isoToMinutesOfDay(weather.daily[0].sunrise);
+          sunsetMin = isoToMinutesOfDay(weather.daily[0].sunset);
+        }
+      }
+    } else if (req.query.sunriseMin && req.query.sunsetMin) {
+      sunriseMin = Number(req.query.sunriseMin);
+      sunsetMin = Number(req.query.sunsetMin);
+    }
+    const season = req.query.season !== undefined
+      ? (Number(req.query.season) as 0 | 1 | 2)
+      : seasonProfileFor(new Date().getMonth());
+    const schedule = resolveCadence(season, sunriseMin, sunsetMin);
+    res.json({
+      ...schedule,
+      gatt: buildCadenceConfigPayload(schedule),
+    });
+  } catch (e) {
+    console.error('[cadence] error:', e);
+    res.status(500).json({ error: e instanceof Error ? e.message : 'cadence failed' });
   }
 });
 
