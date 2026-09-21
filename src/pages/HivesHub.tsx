@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Boxes, Bug } from 'lucide-react';
+import { MapPin, Boxes, Bug, Users } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { Hives } from './Hives';
+import { HiveGroups } from './HiveGroups';
 import { ColonyMap } from './ColonyMap';
 import { HealthTrends } from './HealthTrends';
 import { SwarmRisk } from './SwarmRisk';
@@ -11,10 +12,11 @@ import { Treatments } from './Treatments';
 import { Pests } from './Pests';
 import { PageTabs, type PageTab } from '../components/PageTabs';
 
-type TabId = 'hives' | 'swarm' | 'queen' | 'treatments' | 'pests' | 'trends' | 'apiaries' | 'map';
+type TabId = 'hives' | 'groups' | 'swarm' | 'queen' | 'treatments' | 'pests' | 'trends' | 'apiaries' | 'map';
 
 const TABS: PageTab<TabId>[] = [
   { id: 'hives', label: 'Hives', icon: <Boxes size={15} /> },
+  { id: 'groups', label: 'Groups', icon: <Users size={15} /> },
   { id: 'swarm', label: 'Swarm Risk' },
   { id: 'queen', label: 'Queen' },
   { id: 'treatments', label: 'Treatments', icon: <Bug size={15} /> },
@@ -82,7 +84,7 @@ export function HivesHub() {
       <h1 className="text-xl sm:text-2xl font-bold text-stone-800 dark:text-stone-100 mb-3">Hives</h1>
 
       {/* Apiary chip picker — only scopes the tabs that are per-hive */}
-      {(tab === 'hives' || tab === 'swarm' || tab === 'queen' || tab === 'trends') && apiaries.length > 0 && (
+      {(tab === 'hives' || tab === 'groups' || tab === 'swarm' || tab === 'queen' || tab === 'trends') && apiaries.length > 0 && (
         <div className="flex items-center gap-2 mb-3 overflow-x-auto no-scrollbar pb-1">
           <MapPin size={14} className="text-stone-400 shrink-0" />
           <button
@@ -117,6 +119,7 @@ export function HivesHub() {
 
       {/* Tab content */}
       {tab === 'hives' && <Hives apiaryFilter={selectedApiaryId} />}
+      {tab === 'groups' && <HiveGroups apiaryFilter={selectedApiaryId} />}
       {tab === 'swarm' && <SwarmRisk />}
       {tab === 'queen' && <QueenTracking />}
       {tab === 'treatments' && <Treatments />}
