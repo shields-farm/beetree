@@ -3,6 +3,10 @@ services:
     image: otel/opentelemetry-collector-contrib:latest
     container_name: beetree-otel-collector
     command: ["--config=/etc/otelcol/config.yaml"]
+    environment:
+      # The collector config reads ${env:HONEYCOMB_API_KEY} — set it here or
+      # in an .env file next to this compose file. Never commit the value.
+      - HONEYCOMB_API_KEY=${HONEYCOMB_API_KEY:-}
     volumes:
       - ./otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
       - otel-collector-data:/var/lib/otelcol
