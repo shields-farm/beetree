@@ -12,7 +12,7 @@ type SortKey = 'name' | 'lastInspected' | 'health';
 type HealthFilter = 'all' | HealthStatus;
 
 export function Hives({ apiaryFilter }: { apiaryFilter?: string }) {
-  const { hives, apiaries, addHive, inspections } = useStore();
+  const { hives, apiaries, addHive, inspections, hiveGroups } = useStore();
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState('');
   const [apiaryId, setApiaryId] = useState(apiaryFilter ?? apiaries[0]?.id ?? '');
@@ -107,6 +107,12 @@ export function Hives({ apiaryFilter }: { apiaryFilter?: string }) {
   };
 
   const activeFilters = (healthFilter !== 'all' ? 1 : 0) + (typeFilter !== 'all' ? 1 : 0);
+
+  /** The yard group this hive belongs to, if any (for the list badge). */
+  function hiveGroupOf(h: { id: string; groupId?: string }) {
+    if (!h.groupId) return undefined;
+    return (hiveGroups ?? []).find((g) => g.id === h.groupId);
+  }
 
   function daysSinceInspected(dateStr: string | null): number | null {
     if (!dateStr) return null;
@@ -305,6 +311,11 @@ export function Hives({ apiaryFilter }: { apiaryFilter?: string }) {
                     {!apiaryFilter && apiary && <span className="truncate">{apiary.name}</span>}
                     {!apiaryFilter && apiary && <span className="text-stone-300 dark:text-stone-600">·</span>}
                     <span>{(HIVE_TYPES[h.type] || HIVE_TYPES['langstroth-10']).label}</span>
+                    {hiveGroupOf(h) && (
+                      <span className="px-1.5 py-0.5 rounded-full bg-honey-50 dark:bg-honey-950 text-honey-600 dark:text-honey-400 font-medium">
+                        {hiveGroupOf(h)?.name}
+                      </span>
+                    )}
                     {hasSensor && <Thermometer size={11} className="text-sky-500" />}
                     {h.location && <MapPin size={11} className="text-honey-500" />}
                   </div>
