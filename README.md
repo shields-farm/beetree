@@ -22,6 +22,47 @@ Named after the B-tree, because we thought that was funny.
 The custom BLE sensor hardware (firmware, enclosure, BOM) is not part of this
 repository.
 
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph HIVE [At the hive]
+        BS[BeeStick sensor<br/>BLE 5.0 advertising<br/>30B telemetry + 20B acoustic]
+        BM[BroodMinder sensors<br/>BLE 0x028D]
+    end
+
+    subgraph HUB [BeeTree hub — this repo]
+        SCAN[BLE scanner daemon<br/>bleak]
+        API[Express + SQLite API<br/>:3001]
+        CAD[cadence.ts<br/>sampling scheduler]
+        ONT[ontology engine<br/>beetree-vocab.yaml]
+        ASSIST[assistant tools<br/>buzz, inference, tasks]
+    end
+
+    subgraph CLIENT [Beekeeper]
+        UI[React PWA<br/>Vite :5173]
+        PH[Phone / Tailscale]
+    end
+
+    subgraph RESEARCH [Research pipeline]
+        ML[ml/ colony-strength<br/>sensor baseline]
+        TR[training/ LoRA + RAG<br/>assistant fine-tune]
+    end
+
+    BS -- "advertise" --> SCAN
+    BM -- "advertise" --> SCAN
+    SCAN -- "decode + write" --> API
+    API <--> CAD
+    CAD -- "sunrise/sunset" --> WX[Open-Meteo]
+    API <--> ONT
+    ASSIST <--> ONT
+    API <--> UI
+    PH -- "Tailscale serve" --> UI
+    API -- "labels" --> ML
+    API -- "inspection corpus" --> TR
+    TR -- "adapter" --> ASSIST
+```
+
 ## Quick start
 
 ```bash
