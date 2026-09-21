@@ -703,7 +703,7 @@ def generate_acoustic_knowledge():
             "response": """BeeTree acoustic colony assessment:
 
 **Pipeline:**
-1. an in-hive PDM microphone records 60-second audio windows at 16kHz
+1. An in-hive PDM microphone records 60-second audio windows at 16kHz
 2. Audio is compressed into modulation tensorgrams (~44KB per window)
 3. CNN/CRDNN model predicts frames of bees (colony strength metric)
 4. Results displayed on BeeTree dashboard with trend over time

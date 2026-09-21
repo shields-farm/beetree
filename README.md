@@ -27,14 +27,12 @@ repository.
 ```mermaid
 flowchart LR
     subgraph HIVE [At the hive]
-        BS[custom BLE sensor]
         BM[BroodMinder sensors<br/>BLE 0x028D]
     end
 
     subgraph HUB [BeeTree hub — this repo]
         SCAN[BLE scanner daemon<br/>bleak]
         API[Express + SQLite API<br/>:3001]
-        CAD[cadence.ts<br/>sampling scheduler]
         ONT[ontology engine<br/>beetree-vocab.yaml]
         ASSIST[assistant tools<br/>buzz, inference, tasks]
     end
@@ -49,11 +47,8 @@ flowchart LR
         TR[training/ LoRA + RAG<br/>assistant fine-tune]
     end
 
-    BS -- "advertise" --> SCAN
     BM -- "advertise" --> SCAN
     SCAN -- "decode + write" --> API
-    API <--> CAD
-    CAD -- "sunrise/sunset" --> WX[Open-Meteo]
     API <--> ONT
     ASSIST <--> ONT
     API <--> UI
