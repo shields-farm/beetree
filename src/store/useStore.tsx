@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { Apiary, AppState, Hive, Inspection, Sensor, Task } from '../types';
+import type { Apiary, AppState, Hive, HiveGroup, Inspection, Sensor, Task } from '../types';
 import { API_BASE, apiFetch } from '../lib/apiBase';
 
 const STORAGE_KEY = 'beetree-state-v3'; // v3 — bust stale localStorage from server crash period
@@ -40,6 +40,11 @@ interface StoreContextValue extends AppState {
   addHive: (h: Omit<Hive, 'id' | 'createdAt'>) => Hive;
   updateHive: (id: string, patch: Partial<Hive>) => void;
   deleteHive: (id: string) => void;
+  // Hive groups (yard groupings, e.g. the Ellis Special)
+  addHiveGroup: (g: Omit<HiveGroup, 'id' | 'createdAt'>) => HiveGroup;
+  updateHiveGroup: (id: string, patch: Partial<HiveGroup>) => void;
+  deleteHiveGroup: (id: string) => void;
+  addHiveGroupFromTemplate: (template: 'ellis-special', apiaryId: string, name?: string) => Promise<HiveGroup | null>;
   // Boxes
   addBox: (hiveId: string, boxType: import('../types').BoxType) => void;
   removeBox: (hiveId: string, boxId: string) => void;
@@ -93,16 +98,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     (async () => {
       try {
-        const [apiaries, hives, inspections, sensors, tasks] = await Promise.all([
+        const [apiaries, hives, inspections, sensors, tasks, hiveGroups] = await Promise.all([
           apiFetch(API_BASE + '/api/apiaries').then((r) => r.ok ? r.json() : []).catch(() => []),
           apiFetch(API_BASE + '/api/hives').then((r) => r.ok ? r.json() : []).catch(() => []),
           apiFetch(API_BASE + '/api/inspections').then((r) => r.ok ? r.json() : []).catch(() => []),
           apiFetch(API_BASE + '/api/sensors').then((r) => r.ok ? r.json() : []).catch(() => []),
           apiFetch(API_BASE + '/api/tasks').then((r) => r.ok ? r.json() : []).catch(() => []),
+          apiFetch(API_BASE + '/api/hive-groups').then((r) => r.ok ? r.json() : []).catch(() => []),
         ]);
         if (cancelled) return;
         // Replace local state entirely with server data
-        setState({ apiaries, hives, inspections, sensors, tasks });
+        setState({ apiaries, hives, inspections, sensors, tasks, hiveGroups });
       } catch {
         // Server not running — keep local state
       }
@@ -197,6 +203,54 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }));
         apiFetch(API_BASE + '/api/hives/' + id, { method: 'DELETE' })
           .catch((e: any) => console.error('[deleteHive] server sync failed:', e));
+      },
+
+      // Hive groups — optimistic local update + server sync, mirroring the
+      // hive CRUD pattern. Group mutations change hive.groupId; the server
+      // owns that side-effect (setHivesGroupId), so the local hive.groupId
+      // may lag until the next full sync. Callers that need it immediately
+      // can pass refresh=true to syncFromServer.
+      addHiveGroup: (g) => {
+        const group: HiveGroup = { ...g, id: uid('group'), createdAt: new Date().toISOString() };
+        update((s) => ({ ...s, hiveGroups: [...(s.hiveGroups ?? []), group] }));
+        apiFetch(API_BASE + '/api/hive-groups', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(group),
+        }).catch((e: any) => console.error('[addHiveGroup] server sync failed:', e));
+        return group;
+      },
+      updateHiveGroup: (id, patch) => {
+        update((s) => ({ ...s, hiveGroups: (s.hiveGroups ?? []).map((x) => (x.id === id ? { ...x, ...patch } : x)) }));
+        apiFetch(API_BASE + '/api/hive-groups/' + id, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+        }).catch((e: any) => console.error('[updateHiveGroup] server sync failed:', e));
+      },
+      deleteHiveGroup: (id) => {
+        update((s) => ({ ...s, hiveGroups: (s.hiveGroups ?? []).filter((x) => x.id !== id) }));
+        apiFetch(API_BASE + '/api/hive-groups/' + id, { method: 'DELETE' })
+          .catch((e: any) => console.error('[deleteHiveGroup] server sync failed:', e));
+      },
+      addHiveGroupFromTemplate: async (template, apiaryId, name) => {
+        try {
+          const r = await apiFetch(API_BASE + '/api/hive-groups/from-template', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ template, apiaryId, name }),
+          });
+          if (!r.ok) {
+            console.error('[addHiveGroupFromTemplate] server rejected:', await r.text());
+            return null;
+          }
+          const group = (await r.json()) as HiveGroup;
+          update((s) => ({ ...s, hiveGroups: [...(s.hiveGroups ?? []), group] }));
+          return group;
+        } catch (e: any) {
+          console.error('[addHiveGroupFromTemplate] server sync failed:', e);
+          return null;
+        }
       },
 
       addBox: (hiveId, boxType) =>
