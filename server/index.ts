@@ -3688,6 +3688,7 @@ app.get('/api/buzz/presence', async (_req, res) => {
 // The ingest path for Mentra Live (or any camera). One POST does the whole loop
 // and returns what the glasses should say out loud. See server/capture.ts.
 import { captureFrame, correctCapture, captureLabelPairs, resolveHive, listHives, composeSpeech } from './capture.js';
+import { calibrationReport } from './calibration.js';
 import { inferFromFrame, outstandingChecks, MIN_SUPPORTED } from './inference.js';
 
 /** Express request carrying the raw body we buffer for multipart uploads. */
@@ -3944,6 +3945,19 @@ app.get('/api/mentra/labels', (req, res) => {
     agreed: pairs.filter((p) => p.agreed).length,
   });
 });
+
+/**
+ * Calibration — did the vocab's confidences actually hold up on these hives?
+ *
+ * `captureLabelPairs` above tells you whether the model's top pick matched the
+ * beekeeper. This goes one level deeper: per vocab cue, what did we claim vs what
+ * happened. Advisory output only; nothing here writes to the graph or the vocab.
+ */
+app.get('/api/mentra/calibration', (req, res) => {
+  const limit = Math.min(Number(req.query.limit ?? 2000) || 2000, 5000);
+  res.json(calibrationReport(limit));
+});
+
 
 // ============================================================================
 // /media — serve stored capture images
