@@ -16,10 +16,27 @@
 
 import { db } from './db.js';
 
-const INFLUX_URL = 'http://192.0.2.10:8086';
-const INFLUX_DB = 'broodminder';
-const INFLUX_USER = 'admin';
-const INFLUX_PASS = '<REDACTED-INFLUXDB-PASSWORD>';
+// Endpoint and credentials come from the environment. Nothing here may carry a
+// default password: this repository is published publicly, and a
+// `process.env.X || '<literal>'` fallback is the worst possible shape — the
+// literal is a live credential in source, and it silently re-activates if the
+// env var is ever unset. Configure it in server/.env (gitignored).
+//
+// The v1 API takes database/username/password (Basic auth), NOT the v2
+// org/bucket/token triple.
+const INFLUX_URL = process.env.INFLUX_URL || 'http://homeassistant.local:8086';
+const INFLUX_DB = process.env.INFLUX_DB || 'broodminder';
+const INFLUX_USER = process.env.INFLUX_USER || 'admin';
+const INFLUX_PASS = process.env.INFLUX_PASS || '';
+
+const INFLUX_ENABLED = INFLUX_PASS !== '';
+
+if (!INFLUX_ENABLED) {
+  console.warn(
+    '[influxdb] INFLUX_PASS is not set — sensor time-series will return empty. ' +
+    'Set INFLUX_URL/INFLUX_DB/INFLUX_USER/INFLUX_PASS in server/.env to enable.',
+  );
+}
 
 // Cache TTL: how long before we consider cached data stale.
 // The background poller refreshes every 5 min, so 6 min gives slack.
