@@ -16,6 +16,7 @@ import { getWeightTrend, getAllWeightTrends } from './weightTracking.js';
 import { recordFeeding, getFeedingStatus, getAllFeedingStatuses } from './feeding.js';
 import { syrupTypeForSeason } from './weightTracking.js';
 import { ontologyToolSchemas, dispatchOntologyTool } from './ontologyTools.js';
+import { calibrationReport } from './calibration.js';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Tool schemas (OpenAI function-calling format)
@@ -263,6 +264,14 @@ export const buzzToolSchemas = [...ontologyToolSchemas,
       parameters: { type: 'object', properties: {} },
     },
   },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'get_inference_calibration',
+      description: 'Get how well the ontology\'s own predictions have held up against beekeeper corrections on these hives. Returns per-cue calibration: what confidence the vocab claimed vs the rate it actually landed, the delta, a Brier score, and top-1 accuracy. Buckets below the minimum sample size report only a count, never a rate. Use when asked whether the model is accurate, whether a confidence can be trusted, or how the assistant is performing against real inspections.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
 ];
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -443,6 +452,10 @@ async function _dispatchBuzzToolInner(
 
       case 'get_syrup_recommendation': {
         return JSON.stringify(syrupTypeForSeason());
+      }
+
+      case 'get_inference_calibration': {
+        return JSON.stringify(calibrationReport());
       }
 
       default:
