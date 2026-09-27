@@ -24,18 +24,41 @@ import { db } from './db.js';
 //
 // The v1 API takes database/username/password (Basic auth), NOT the v2
 // org/bucket/token triple.
-const INFLUX_URL = process.env.INFLUX_URL || 'http://homeassistant.local:8086';
-const INFLUX_DB = process.env.INFLUX_DB || 'broodminder';
-const INFLUX_USER = process.env.INFLUX_USER || 'admin';
-const INFLUX_PASS = process.env.INFLUX_PASS || '';
+//
+// Read lazily, not into module constants. ESM hoists every `import` above the
+// importing module's top-level statements, so this module is evaluated BEFORE
+// index.ts runs its .env loader — module-level reads would capture `undefined`
+// for a value that is configured correctly, and the symptom is a 401 against a
+// password that works everywhere else.
+function cfg() {
+  return {
+    url: process.env.INFLUX_URL || 'http://homeassistant.local:8086',
+    db: process.env.INFLUX_DB || 'broodminder',
+    user: process.env.INFLUX_USER || 'admin',
+    pass: process.env.INFLUX_PASS || '',
+  };
+}
 
-const INFLUX_ENABLED = INFLUX_PASS !== '';
+function influxEnabled(): boolean {
+  return cfg().pass !== '';
+}
 
-if (!INFLUX_ENABLED) {
-  console.warn(
-    '[influxdb] INFLUX_PASS is not set — sensor time-series will return empty. ' +
-    'Set INFLUX_URL/INFLUX_DB/INFLUX_USER/INFLUX_PASS in server/.env to enable.',
-  );
+let warnedDisabled = false;
+function warnIfDisabled(): boolean {
+  if (influxEnabled()) return true;
+  if (!warnedDisabled) {
+    warnedDisabled = true;
+    console.warn(
+      '[influxdb] INFLUX_PASS is not set — sensor time-series will return empty. ' +
+      'Set INFLUX_URL/INFLUX_DB/INFLUX_USER/INFLUX_PASS in server/.env to enable.',
+    );
+  }
+  return false;
+}
+
+function authHeader(): string {
+  const c = cfg();
+  return 'Basic ' + Buffer.from(`${c.user}:${c.pass}`).toString('base64');
 }
 
 // Cache TTL: how long before we consider cached data stale.
@@ -56,10 +79,12 @@ export interface SensorTimeSeries {
 }
 
 async function influxQuery(query: string): Promise<any[]> {
-  const url = `${INFLUX_URL}/query?db=${INFLUX_DB}&q=${encodeURIComponent(query)}`;
+  if (!warnIfDisabled()) return [];
+  const c = cfg();
+  const url = `${c.url}/query?db=${c.db}&q=${encodeURIComponent(query)}`;
   const resp = await fetch(url, {
     headers: {
-      'Authorization': 'Basic ' + Buffer.from(`${INFLUX_USER}:${INFLUX_PASS}`).toString('base64'),
+      'Authorization': authHeader(),
     },
   });
   if (!resp.ok) throw new Error(`InfluxDB returned ${resp.status}`);
@@ -106,10 +131,11 @@ export async function getSensorTimeSeries(
 
   // Run all queries in one batch
   const batchQuery = queries.join(';');
-  const url = `${INFLUX_URL}/query?db=${INFLUX_DB}&q=${encodeURIComponent(batchQuery)}`;
+  const c = cfg();
+  const url = `${c.url}/query?db=${c.db}&q=${encodeURIComponent(batchQuery)}`;
   const resp = await fetch(url, {
     headers: {
-      'Authorization': 'Basic ' + Buffer.from(`${INFLUX_USER}:${INFLUX_PASS}`).toString('base64'),
+      'Authorization': authHeader(),
     },
   });
   if (!resp.ok) throw new Error(`InfluxDB returned ${resp.status}`);
@@ -276,10 +302,11 @@ async function fetchAllFromInflux(range: string): Promise<SensorTimeSeries[]> {
   ];
 
   const batchQuery = queries.join(';');
-  const url = `${INFLUX_URL}/query?db=${INFLUX_DB}&q=${encodeURIComponent(batchQuery)}`;
+  const c = cfg();
+  const url = `${c.url}/query?db=${c.db}&q=${encodeURIComponent(batchQuery)}`;
   const resp = await fetch(url, {
     headers: {
-      'Authorization': 'Basic ' + Buffer.from(`${INFLUX_USER}:${INFLUX_PASS}`).toString('base64'),
+      'Authorization': authHeader(),
     },
   });
   if (!resp.ok) throw new Error(`InfluxDB returned ${resp.status}`);
