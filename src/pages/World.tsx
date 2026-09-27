@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Network, Bug, Boxes, Search, ChevronRight, RefreshCw, Globe, Activity, MessageCircle, Quote, Link2, PlayCircle, AlertTriangle } from 'lucide-react';
+import { Network, Bug, Boxes, Search, ChevronRight, RefreshCw, Globe, Activity, MessageCircle, Quote, Link2, PlayCircle, AlertTriangle, Loader2, BookOpenCheck } from 'lucide-react';
 import { apiFetch, statusToMessage } from '../lib/apiBase';
 import { Card } from '../components/Card';
 
@@ -84,7 +84,159 @@ interface Graph {
   neighbors: OntoEntity[];
 }
 
-type Tab = 'graph' | 'threats';
+type Tab = 'graph' | 'threats' | 'evidence';
+
+// ---- Research Evidence (verified Ellis-corpus quote bank) -----------------
+interface EvidenceQuote {
+  id: string;
+  ep: number;
+  speaker?: string;
+  quote?: string;
+  claim?: string;
+  verdict: 'supports' | 'contradicts' | 'says_nothing';
+  confidence?: number | null;
+  margin?: number | null;
+  band: 'auto_accept' | 'reject_review' | 'human_review';
+}
+interface EvidenceStats {
+  passages_total: number;
+  quotes_total: number;
+  verified_supports: number;
+  contradicts: number;
+  says_nothing: number;
+  auto_accept: number;
+  reject_review: number;
+  human_review: number;
+  uncertain_share_pct: number;
+  per_question_uncertain?: Record<string, { uncertain: number; total: number }>;
+}
+interface EvidencePayload {
+  meta: { generated: string; source: string };
+  stats: EvidenceStats;
+  quotes: EvidenceQuote[];
+}
+
+const VERDICT_META: Record<EvidenceQuote['verdict'], { label: string; cls: string }> = {
+  supports: { label: 'Verified', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700' },
+  contradicts: { label: 'Contradicts claim', cls: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border-red-300 dark:border-red-700' },
+  says_nothing: { label: 'Not evidence', cls: 'bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-400 border-stone-300 dark:border-stone-700' },
+};
+const BAND_META: Record<EvidenceQuote['band'], { label: string; cls: string }> = {
+  auto_accept: { label: 'auto-accept', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
+  reject_review: { label: 'fix first', cls: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' },
+  human_review: { label: 'human review', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
+};
+
+function EvidenceTab() {
+  const [data, setData] = useState<EvidencePayload | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<'all' | 'supports' | 'contradicts' | 'says_nothing'>('all');
+  const [q, setQ] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await apiFetch('/api/research/evidence');
+        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`);
+        setData(await r.json());
+      } catch (e: any) {
+        setError(e?.message ?? 'Failed to load evidence');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) return <div className="py-16 text-center text-stone-400"><Loader2 className="mx-auto mb-2 animate-spin" size={22} /> Loading verified evidence…</div>;
+  if (error) return <div className="py-10 text-center text-sm text-red-500">{error}</div>;
+  if (!data) return null;
+
+  const { stats, quotes } = data;
+  const shown = quotes.filter((qc) => {
+    if (filter !== 'all' && qc.verdict !== filter) return false;
+    if (q && !(`${qc.ep} ${qc.speaker ?? ''} ${qc.quote ?? ''}`.toLowerCase().includes(q.toLowerCase()))) return false;
+    return true;
+  });
+
+  return (
+    <div className="space-y-4">
+      {/* stats strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Card className="p-4">
+          <div className="text-2xl font-bold text-honey-600 dark:text-honey-300">{stats.passages_total}</div>
+          <div className="text-xs text-stone-400">passages swept</div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-300">{stats.verified_supports}</div>
+          <div className="text-xs text-stone-400">verified quotes</div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-2xl font-bold text-red-500">{stats.contradicts}</div>
+          <div className="text-xs text-stone-400">contradictions caught</div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-2xl font-bold text-amber-500">{stats.uncertain_share_pct}%</div>
+          <div className="text-xs text-stone-400">decisions uncertain</div>
+        </Card>
+      </div>
+      <p className="text-xs text-stone-400 leading-relaxed">
+        Every quote machine-verified against the Two Bees in a Podcast transcripts (Eps 200–249) by a typed-decision
+        model: substring-located, then judged <em>supports / contradicts / says_nothing</em> against the claim attached
+        to it. Generated {data.meta.generated} · {data.meta.source}
+      </p>
+
+      {/* filters */}
+      <div className="flex flex-wrap items-center gap-2">
+        {(['all', 'supports', 'contradicts', 'says_nothing'] as const).map((f) => (
+          <button key={f} onClick={() => setFilter(f)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium border ${
+              filter === f ? 'bg-honey-500 text-white border-honey-500' : 'bg-white dark:bg-stone-900 text-stone-500 border-stone-200 dark:border-stone-800 hover:text-stone-700'
+            }`}>
+            {f === 'all' ? `All ${quotes.length}` : `${VERDICT_META[f].label} (${quotes.filter((qc) => qc.verdict === f).length})`}
+          </button>
+        ))}
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…"
+          className="ml-auto w-40 px-3 py-1.5 rounded-full text-xs bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800" />
+      </div>
+
+      {/* quote cards */}
+      <div className="space-y-3">
+        {shown.map((qc) => (
+          <Card key={qc.id} className={`p-4 ${qc.verdict === 'contradicts' ? 'border-l-4 border-l-red-500' : ''}`}>
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <div className="text-[11px] font-medium text-stone-400">
+                Ep {qc.ep}{qc.speaker ? ` · ${qc.speaker}` : ''}
+              </div>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${VERDICT_META[qc.verdict].cls}`}>
+                  {VERDICT_META[qc.verdict].label}
+                </span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${BAND_META[qc.band].cls}`}>
+                  {BAND_META[qc.band].label}
+                </span>
+              </div>
+            </div>
+            <blockquote className="text-sm text-stone-700 dark:text-stone-200 leading-relaxed border-l-2 border-honey-400 pl-3">
+              “{qc.quote}”
+            </blockquote>
+            {qc.claim && (
+              <div className="mt-2 text-[11px] text-stone-400 leading-snug">
+                Claim checked: {qc.claim}
+              </div>
+            )}
+            {qc.confidence != null && (
+              <div className="mt-2 text-[10px] text-stone-400">
+                confidence {qc.confidence.toFixed(2)} · margin {qc.margin?.toFixed(2)}
+              </div>
+            )}
+          </Card>
+        ))}
+        {shown.length === 0 && <div className="py-10 text-center text-sm text-stone-400">No quotes match.</div>}
+      </div>
+    </div>
+  );
+}
 
 export function World() {
   const navigate = useNavigate();
@@ -359,6 +511,16 @@ export function World() {
           }`}
         >
           <Bug size={15} /> Threat Catalog
+        </button>
+        <button
+          onClick={() => setTab('evidence')}
+          className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px flex items-center gap-1.5 ${
+            tab === 'evidence'
+              ? 'border-honey-500 text-honey-600 dark:text-honey-300'
+              : 'border-transparent text-stone-400 hover:text-stone-600'
+          }`}
+        >
+          <BookOpenCheck size={15} /> Evidence
         </button>
       </div>
 
@@ -705,6 +867,8 @@ export function World() {
           })}
         </div>
       )}
+
+      {tab === 'evidence' && <EvidenceTab />}
     </div>
   );
 }

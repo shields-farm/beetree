@@ -11,6 +11,7 @@ import {
   Trash2,
   Plus,
   Sparkles,
+  ShieldCheck,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { PageHeader } from '../components/Layout';
@@ -75,6 +76,14 @@ export function QuickInspect() {
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ id: string } | null>(null);
+  // Jev typed-judgment verification (margins + SDE defect gate)
+  const [verifying, setVerifying] = useState(false);
+  const [verifyData, setVerifyData] = useState<{
+    fields: Record<string, { value: unknown; margin: number | null; q?: number | null }>;
+    verification: { gate: string; fired: string[]; defect?: string | null; defect_q?: number | null };
+    cost_usd: number;
+  } | null>(null);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
 
   const handleParse = async () => {
     if (!text.trim()) return;
@@ -83,6 +92,8 @@ export function QuickInspect() {
     setParsed(null);
     setCreated(null);
     setConfirmError(null);
+    setVerifyData(null);
+    setVerifyError(null);
     try {
       const resp = await apiFetch(API_BASE + '/api/inspect/parse', {
         method: 'POST',
@@ -106,6 +117,28 @@ export function QuickInspect() {
       setParseError(e instanceof Error ? e.message : 'Failed to parse notes');
     } finally {
       setParsing(false);
+    }
+  };
+
+  const handleVerify = async () => {
+    if (!text.trim()) return;
+    setVerifying(true);
+    setVerifyError(null);
+    try {
+      const resp = await apiFetch(API_BASE + '/api/inspect/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      if (!resp.ok) {
+        const errBody = await resp.json().catch(() => ({}));
+        throw new Error(errBody.error || statusToMessage(resp.status));
+      }
+      setVerifyData(await resp.json());
+    } catch (e) {
+      setVerifyError(e instanceof Error ? e.message : 'Verification failed');
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -271,6 +304,82 @@ export function QuickInspect() {
           <p className="text-xs text-stone-400 dark:text-stone-500 mb-3">
             Review what Buzz filled in. Edit anything that's wrong, then create the inspection.
           </p>
+
+          {/* Jev verification */}
+          <div className="mb-4 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <ShieldCheck size={15} className="text-honey-500" />
+                <span className="text-xs font-semibold text-stone-600 dark:text-stone-300">
+                  Independent verification
+                </span>
+              </div>
+              {!verifyData && (
+                <button
+                  type="button"
+                  onClick={handleVerify}
+                  disabled={verifying || !text.trim()}
+                  className="text-xs font-medium px-2.5 py-1 rounded-lg bg-honey-500 text-white hover:bg-honey-600 disabled:opacity-50 flex items-center gap-1"
+                >
+                  {verifying ? <><Loader2 size={12} className="animate-spin" /> Verifying…</> : <>Verify with Jev</>}
+                </button>
+              )}
+            </div>
+            {!verifyData && !verifying && (
+              <p className="text-[11px] text-stone-400 mt-1.5">
+                A separate typed-decision model re-reads your note and scores every field for evidence.
+                Fields without support get flagged before you save. (~1s)
+              </p>
+            )}
+            {verifyData && (
+              <div className="mt-2 space-y-1.5">
+                <div className={`text-[11px] font-semibold px-2 py-1 rounded-md inline-block ${
+                  verifyData.verification.gate === 'PASS'
+                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+                    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                }`}>
+                  {verifyData.verification.gate === 'PASS'
+                    ? 'PASS — every field is supported by your note'
+                    : (() => {
+                        const d = verifyData.verification.defect;
+                        const q = verifyData.verification.defect_q;
+                        const qs = q != null ? ` (confidence ${q.toFixed(2)})` : '';
+                        if (d && d !== 'none') {
+                          return verifyData.verification.gate === 'REVIEW'
+                            ? `REVIEW — possible ${d.replace(/_/g, ' ')}${qs}: check the flagged fields`
+                            : `SOFT — possible ${d.replace(/_/g, ' ')}${qs}: worth a look, not blocking`;
+                        }
+                        return 'SOFT — the verifier could not confidently confirm this note: worth a look';
+                      })()
+                  }
+                </div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                  {Object.entries(verifyData.fields).map(([k, f]) => (
+                    <div key={k} className="text-[10.5px] text-stone-500 dark:text-stone-400 flex items-center gap-1">
+                      <span className="truncate">{k}</span>
+                      <span
+                        className={`ml-auto shrink-0 font-mono ${
+                          (f.q ?? null) == null ? 'text-stone-300'
+                          : (f.q as number) >= 0.90 ? 'text-emerald-500'
+                          : (f.q as number) >= 0.65 ? 'text-amber-500'
+                          : 'text-red-400'
+                        }`}
+                        title="confidence q = max option probability (>=0.90 solid, >=0.65 ok, below worth a look)"
+                      >
+                        {(f.q ?? null) != null ? (f.q as number).toFixed(2) : (f.margin != null ? f.margin.toFixed(2) : '—')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] text-stone-400">
+                  margin ≥ 0.6 strong · 0.3–0.6 check it · &lt; 0.3 coin-flip · ${verifyData.cost_usd?.toFixed(5)} per check
+                </p>
+              </div>
+            )}
+            {verifyError && (
+              <p className="text-[11px] text-red-500 mt-1.5">{verifyError}</p>
+            )}
+          </div>
 
           {/* Hive selector */}
           <label className="block py-2">
