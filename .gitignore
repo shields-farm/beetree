@@ -61,6 +61,11 @@ data/raw/
 # Capture media (filesystem store; large, regenerable, never for git)
 data/media/
 
+# Generated research dataset (per-deployment; rebuilt by the judgments pipeline).
+# The endpoint that serves it degrades to a 404-shaped JSON when it is absent, so a
+# fresh clone runs without it.
+data/evidence.json
+
 # launchd logs
 server/*.log
 server/.launchd-*.log
