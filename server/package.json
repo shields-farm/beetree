@@ -12,11 +12,16 @@
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/auto-instrumentations-node": "^0.62.0",
-    "@opentelemetry/exporter-metrics-otlp-http": "^0.205.0",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.205.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.223.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.223.0",
     "@opentelemetry/sdk-metrics": "^2.2.0",
+<<<<<<< HEAD
     "@opentelemetry/sdk-node": "^0.205.0",
     "better-sqlite3": "^13.0.0",
+=======
+    "@opentelemetry/sdk-node": "^0.223.0",
+    "better-sqlite3": "^11.8.1",
+>>>>>>> 8c80b43 (fix(deps): update opentelemetry-js monorepo)
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "js-yaml": "^5.2.3"
