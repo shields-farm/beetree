@@ -6,7 +6,7 @@
     "@types/three": "^0.185.4"
   },
   "peerDependencies": {
-    "typescript": "^5"
+    "typescript": "^5 || ^7.0.0"
   },
   "dependencies": {
     "3d-force-graph": "^1.80.0",
