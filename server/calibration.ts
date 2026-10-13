@@ -16,7 +16,7 @@
 //
 // Deliberate limits, all in the same direction as the rest of the ontology:
 //
-//   * We do NOT edit the vocab. `beetree-vocab.yaml` is human-canonical and Mark
+//   * We do NOT edit the vocab. The `okf/` bundle is human-canonical and Mark
 //     maintains it by hand. Recalibration is an ADVISORY output — "this cue reads
 //     0.85 and has landed 0.40 of 12 observations" — and a human decides.
 //   * We do NOT report a rate below MIN_CALIBRATION_SAMPLE. One correction is an
@@ -248,7 +248,7 @@ export function calibrationReport(limit = 2000): CalibrationReport {
   const note = actionable.length > 0
     ? `${actionable.length} cue${actionable.length !== 1 ? 's' : ''} `
       + `${actionable.length !== 1 ? 'disagree' : 'disagrees'} with the vocab by 0.15 or more. `
-      + 'Recalibration is advisory — edit server/ontology/beetree-vocab.yaml by hand.'
+      + 'Recalibration is advisory — edit the okf/ bundle by hand.'
     : 'No cue is off by more than 0.15. Vocab confidences are tracking the hives.';
 
   return {
