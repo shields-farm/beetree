@@ -33,7 +33,7 @@ flowchart LR
     subgraph HUB [BeeTree hub — this repo]
         SCAN[BLE scanner daemon<br/>bleak]
         API[Express + SQLite API<br/>:3001]
-        ONT[ontology engine<br/>beetree-vocab.yaml]
+        ONT[ontology engine<br/>okf/ bundle]
         ASSIST[assistant tools<br/>buzz, inference, tasks]
     end
 
@@ -105,7 +105,7 @@ results reported there are not validated across apiaries.
 ## Credits and data
 
 - UrBAN hive audio and inspection annotations — CC BY 4.0. See `ml/README.md`.
-- Beekeeping vocabulary in `server/ontology/beetree-vocab.yaml` draws on published
+- Beekeeping vocabulary in the `okf/` bundle (Open Knowledge Format v0.2) draws on published
   extension guidance and standard apiculture terminology.
 
 ## License
