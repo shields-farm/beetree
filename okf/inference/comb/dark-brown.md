@@ -11,7 +11,7 @@ method: comb_inference
 key: dark_brown
 observes: /classes/comb-condition.md
 generated:
-  by: human:mark
+  by: agent:sam
   at: '2026-09-15T15:45:00Z'
 age_cycles: 12-16
 action: Rotate out this season. Move to the outside of the brood box or replace with new foundation/frame.

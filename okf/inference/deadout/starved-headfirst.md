@@ -11,7 +11,7 @@ method: deadout_inference
 key: starved_headfirst
 observes: /classes/dead-out-pattern.md
 generated:
-  by: human:mark
+  by: agent:sam
   at: '2026-09-15T15:45:00Z'
 diagnosis: Starvation. Bees crawled into cells looking for food and died there.
 ---

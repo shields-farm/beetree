@@ -11,7 +11,7 @@ method: comb_inference
 key: golden_medium
 observes: /classes/comb-condition.md
 generated:
-  by: human:mark
+  by: agent:sam
   at: '2026-09-15T15:45:00Z'
 age_cycles: 7-11
 action: Note age. Plan to rotate in the next 1-2 seasons.

@@ -11,7 +11,7 @@ method: comb_inference
 key: black_old
 observes: /classes/comb-condition.md
 generated:
-  by: human:mark
+  by: agent:sam
   at: '2026-09-15T15:45:00Z'
 age_cycles: '>16'
 action: Replace immediately. This comb is overdue and potentially harmful to colony health.

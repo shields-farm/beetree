@@ -11,7 +11,7 @@ method: deadout_inference
 key: mice_damage
 observes: /classes/dead-out-pattern.md
 generated:
-  by: human:mark
+  by: agent:sam
   at: '2026-09-15T15:45:00Z'
 diagnosis: Mouse infestation during winter. Mouse entered through the entrance and nested in the hive.
 ---

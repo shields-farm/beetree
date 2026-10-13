@@ -12,7 +12,7 @@ method: comb_inference
 key: cross_comb
 observes: /classes/comb-condition.md
 generated:
-  by: human:mark
+  by: agent:sam
   at: '2026-09-15T15:45:00Z'
 action: 'Cut the cross comb out carefully during inspection. Realign frames to proper spacing. If the
   colony persists, use foundation or starter strips to guide comb direction. Cross comb makes inspections

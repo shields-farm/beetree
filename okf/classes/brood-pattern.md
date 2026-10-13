@@ -7,7 +7,7 @@ tags:
 - class
 key: BroodPattern
 generated:
-  by: human:mark
+  by: agent:sam
   at: '2026-09-15T15:45:00Z'
 description: Frame-face observation of brood layout. The primary diagnostic a beekeeper reads during inspection.
   Maps to colony-state inferences via brood_inference rules below.

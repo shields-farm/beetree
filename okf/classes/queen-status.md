@@ -7,7 +7,7 @@ tags:
 - class
 key: QueenStatus
 generated:
-  by: human:mark
+  by: agent:sam
   at: '2026-09-15T15:45:00Z'
 description: Queen and egg observations during inspection. The highest-stakes diagnostic after brood pattern
   — distinguishes swarm prep, supersedure, emergency queen raising, queen failure, and laying workers.

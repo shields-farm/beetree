@@ -11,7 +11,7 @@ name: beetree-vocab
 version: 1.1.0
 schema_version: '2026-08-11'
 generated:
-  by: human:mark
+  by: agent:sam
   at: '2026-09-15T15:45:00Z'
 ---
 

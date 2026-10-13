@@ -11,7 +11,7 @@ method: comb_inference
 key: burr_comb
 observes: /classes/comb-condition.md
 generated:
-  by: human:mark
+  by: agent:sam
   at: '2026-09-15T15:45:00Z'
 action: 'Scrape burr comb during inspection to keep frames separable and prevent cross comb. Assess whether
   the colony needs more space (add a box, pull honey frames). If the colony is a chronic comb-builder

@@ -11,7 +11,7 @@ method: queen_inference
 key: queen_capped
 observes: /classes/queen-status.md
 generated:
-  by: human:mark
+  by: agent:sam
   at: '2026-09-15T15:45:00Z'
 candidates:
 - state: SwarmPrep

@@ -11,7 +11,7 @@ method: varroa_inference
 key: deformed_wings
 observes: /classes/varroa-indicator.md
 generated:
-  by: human:mark
+  by: agent:sam
   at: '2026-09-15T15:45:00Z'
 candidates:
 - state: Dwindling

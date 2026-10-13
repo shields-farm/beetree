@@ -11,7 +11,7 @@ method: comb_inference
 key: golden_light
 observes: /classes/comb-condition.md
 generated:
-  by: human:mark
+  by: agent:sam
   at: '2026-09-15T15:45:00Z'
 age_cycles: 3-6
 action: No action. Healthy comb in its prime.

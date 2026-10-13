@@ -11,7 +11,7 @@ method: comb_inference
 key: white_new
 observes: /classes/comb-condition.md
 generated:
-  by: human:mark
+  by: agent:sam
   at: '2026-09-15T15:45:00Z'
 age_cycles: 0
 action: No action. New comb is cleanest — ideal for honey supers.

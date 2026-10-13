@@ -11,7 +11,7 @@ tags:
 key: ngh
 kind: predator
 generated:
-  by: human:mark
+  by: agent:sam
   at: '2026-09-15T15:45:00Z'
 scientific_name: Vespa mandarinia
 severity: low

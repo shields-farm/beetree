@@ -11,7 +11,7 @@ method: comb_inference
 key: wax_moth_damage
 observes: /classes/comb-condition.md
 generated:
-  by: human:mark
+  by: agent:sam
   at: '2026-09-15T15:45:00Z'
 action: Remove affected frames immediately. If salvageable, freeze the frame for 48 hours to kill larvae,
   then clean out webbing. If too far gone, discard.

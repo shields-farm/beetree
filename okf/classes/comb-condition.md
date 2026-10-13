@@ -7,7 +7,7 @@ tags:
 - class
 key: CombCondition
 generated:
-  by: human:mark
+  by: agent:sam
   at: '2026-09-15T15:45:00Z'
 description: Frame comb state — color, cell size, structural integrity. Drives the frame rotation cadence
   and detects pesticide/wax accumulation. Comb darkens with each brood cycle as cocoons and propolis build

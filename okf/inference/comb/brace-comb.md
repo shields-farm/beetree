@@ -12,7 +12,7 @@ method: comb_inference
 key: brace_comb
 observes: /classes/comb-condition.md
 generated:
-  by: human:mark
+  by: agent:sam
   at: '2026-09-15T15:45:00Z'
 action: Break brace comb gently during inspection to separate frames. Minor brace comb is normal and unavoidable.
 ---

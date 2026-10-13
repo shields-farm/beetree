@@ -7,7 +7,7 @@ tags:
 - class
 key: VarroaIndicator
 generated:
-  by: human:mark
+  by: agent:sam
   at: '2026-09-15T15:45:00Z'
 description: Visible symptoms of varroa/virus pressure without requiring a mite wash. Lets the agent do
   triage from a description or photo. DWV prevalence is a proxy for mite burden.

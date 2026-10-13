@@ -15,7 +15,7 @@ mean_temp_band_c:
 - 4
 - 18
 generated:
-  by: human:mark
+  by: agent:sam
   at: '2026-09-15T15:45:00Z'
 ---
 

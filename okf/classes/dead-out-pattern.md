@@ -7,7 +7,7 @@ tags:
 - class
 key: DeadOutPattern
 generated:
-  by: human:mark
+  by: agent:sam
   at: '2026-09-15T15:45:00Z'
 description: Forensic signs found when opening a dead or dying colony. The pattern of death indicates
   the cause. This is where the model becomes a teacher.

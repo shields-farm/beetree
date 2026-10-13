@@ -7,7 +7,7 @@ tags:
 - class
 key: Box
 generated:
-  by: human:mark
+  by: agent:sam
   at: '2026-09-15T15:45:00Z'
 parent_of:
 - FrameSlot

@@ -11,7 +11,7 @@ method: comb_inference
 key: drone_comb_in_worker_area
 observes: /classes/comb-condition.md
 generated:
-  by: human:mark
+  by: agent:sam
   at: '2026-09-15T15:45:00Z'
 action: Monitor. Some drone comb is natural (~10-15% of comb). If excessive, the queen may be failing
   or the colony is crowded.

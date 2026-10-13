@@ -7,7 +7,7 @@ tags:
 - class
 key: Colony
 generated:
-  by: human:mark
+  by: agent:sam
   at: '2026-09-15T15:45:00Z'
 description: the living colony — persists across re-queening and hive moves.
 inferred_states:
