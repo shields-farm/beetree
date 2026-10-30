@@ -11,20 +11,20 @@ Trains `gemma-3-4b-it` 4-bit LoRA on synthetic ontology instructions so the mode
 
 ```bash
 # 1. Generate fresh instructions from ontology + DB
-uv run --with pyyaml training/generate_instructions.py
+uv run --with pyyaml llm-assistant-training/generate_instructions.py
 
 # 2. Chat-format split (train/valid)
-python3 training/prepare_dataset.py
+python3 llm-assistant-training/prepare_dataset.py
 
 # 3. Train (smoke = 20 iters sanity, full = 3 epochs)
-python3 training/run_lora.py smoke
-python3 training/run_lora.py full
+python3 llm-assistant-training/run_lora.py smoke
+python3 llm-assistant-training/run_lora.py full
 
 # 4. Behavior eval (10 hand-picked cases)
-python3 training/eval_quick.py --verbose
+python3 llm-assistant-training/eval_quick.py --verbose
 
 # 5. Export GGUF + register in Ollama
-bash training/export_gguf.sh
+bash llm-assistant-training/export_gguf.sh
 ```
 
 ## Layout
@@ -64,11 +64,11 @@ Any time the vocab YAML changes or the yard DB grows materially:
 ```bash
 # Full re-run, ~30 min end-to-end
 cd ~/beetree
-uv run --with pyyaml training/generate_instructions.py
-python3 training/prepare_dataset.py
-python3 training/run_lora.py full
-python3 training/eval_quick.py > training/eval_report.txt
-bash training/export_gguf.sh
+uv run --with pyyaml llm-assistant-training/generate_instructions.py
+python3 llm-assistant-training/prepare_dataset.py
+python3 llm-assistant-training/run_lora.py full
+python3 llm-assistant-training/eval_quick.py > llm-assistant-training/eval_report.txt
+bash llm-assistant-training/export_gguf.sh
 ```
 
 Pin a git tag `lora/YYYYMMDD` so rollback is one command:

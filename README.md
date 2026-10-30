@@ -13,9 +13,9 @@ Named after the B-tree, because we thought that was funny.
 | `src/` | React frontend (Vite, Tailwind, React Router) |
 | `server/` | Express + SQLite API, ontology engine, assistant tools |
 | `server/ontology/` | The beekeeping vocabulary: species, relations, seasonal windows |
-| `pi/` | Mentra glasses receiver: a Pi-side HTTP webhook for photo capture |
-| `ml/` | Colony-strength research pipeline (sensor baseline, acoustics, LLM) |
-| `training/` | LoRA fine-tuning and RAG evaluation for the in-app assistant |
+| `eyewear-receiver/` | Mentra glasses receiver: a Pi-side HTTP webhook for photo capture |
+| `ml-research/` | Colony-strength research pipeline (sensor baseline, acoustics, LLM) |
+| `llm-assistant-training/` | LoRA fine-tuning and RAG evaluation for the in-app assistant |
 | `e2e/` | Playwright end-to-end tests |
 | `observability/` | Telemetry stack: Prometheus, OpenTelemetry collector, Grafana dashboards, and the telemetry compose file |
 | `docs/` | Project docs (`TESTING.md`, `VERIFY.md`) |
@@ -44,8 +44,8 @@ flowchart LR
     end
 
     subgraph RESEARCH [Research pipeline]
-        ML[ml/ colony-strength<br/>sensor baseline]
-        TR[training/ LoRA + RAG<br/>assistant fine-tune]
+        ML[ml-research/ colony-strength<br/>sensor baseline]
+        TR[llm-assistant-training/ LoRA + RAG<br/>assistant fine-tune]
     end
 
     BM -- "advertise" --> SCAN
@@ -100,12 +100,12 @@ data is required.
 ## Status
 
 Early. The data model, ontology engine, and inspection workflow are in daily use
-by one beekeeper. Research code under `ml/` and `training/` is exploratory —
+by one beekeeper. Research code under `ml-research/` and `llm-assistant-training/` is exploratory —
 results reported there are not validated across apiaries.
 
 ## Credits and data
 
-- UrBAN hive audio and inspection annotations — CC BY 4.0. See `ml/README.md`.
+- UrBAN hive audio and inspection annotations — CC BY 4.0. See `ml-research/README.md`.
 - Beekeeping vocabulary in `server/ontology/beetree-vocab.yaml` draws on published
   extension guidance and standard apiculture terminology.
 

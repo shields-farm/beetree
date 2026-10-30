@@ -13,10 +13,10 @@
 *.onnx
 
 # ML venvs
-ml/.venv/
-ml/venv/
+.venv/
+venv/
 
 # Staging data
-ml/staging/
-ml/data/audio/
-ml/data/raw/
+staging/
+data/audio/
+data/raw/

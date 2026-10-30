@@ -1,6 +1,6 @@
 {
   "model": "mlx-community/gemma-3-text-12b-it-4bit",
-  "adapter": "/Users/developer/beetree/training/adapters",
+  "adapter": "/Users/developer/beetree/llm-assistant-training/adapters",
   "method": "RAG + LoRA",
   "total": 25,
   "pass": 12,

@@ -2,7 +2,7 @@
 # train_lora.sh — gemma3:4b LoRA fine-tune via mlx-lm on Apple Silicon.
 #
 # Usage:
-#   bash training/train_lora.sh [smoke|full]
+#   bash llm-assistant-training/train_lora.sh [smoke|full]
 #
 # smoke: 20 iters on the full dataset — validates template + memory + JSON output
 # full:  ~370 iters (495 examples, batch 4, 3 epochs) — the real run
@@ -14,8 +14,8 @@ cd "$(dirname "$0")/.."
 
 VENV="$HOME/.venvs/beetree-train"
 MODEL="mlx-community/gemma-3-4b-it-4bit"
-DATA="training/data"
-OUT="training/adapters"
+DATA="llm-assistant-training/data"
+OUT="llm-assistant-training/adapters"
 
 MODE="${1:-smoke}"
 
