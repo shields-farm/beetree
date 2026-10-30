@@ -1,0 +1,12 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: beetree
+  description: Beekeeping management and hive sensor monitoring.
+  annotations:
+    github.com/project-slug: shields-farm/beetree
+spec:
+  type: website
+  lifecycle: production
+  owner: shields-farm
+  system: estate-platform
