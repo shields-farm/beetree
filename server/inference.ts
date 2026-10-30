@@ -1,7 +1,7 @@
 // server/inference.ts — map a frame observation to the ontology's diagnostic rules.
 //
 // This is the join that did not exist. `server/vision.ts` returns a structured
-// FrameAnalysis and stops; `server/ontology/beetree-vocab.yaml` carries weighted
+// FrameAnalysis and stops; the `okf/` bundle carries weighted
 // differential rules (brood_inference / queen_inference / varroa_inference) that
 // nothing ever read. So a photo could say `broodPattern: "spotty"` and the system
 // would never surface that the vocab calls that Queenright 0.25 / Queenless 0.20 /
