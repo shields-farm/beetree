@@ -44,11 +44,21 @@
       "automerge": false
     },
     {
-      "description": "server/ is the production API. Nothing in CI exercises it at runtime, so its dependency tree is read by a human.",
+      "description": "server/ is the production API, so its dependency tree is read by a human — with one exception below.",
       "matchFileNames": [
         "server/package.json"
       ],
       "automerge": false
+    },
+    {
+      "description": "server/ PATCH bumps may automerge now that serverBoot.test.ts starts the real process against a throwaway DB and asserts health, migrations, the ontology load and an authenticated query. That covers the boot-time failure modes of express, better-sqlite3, js-yaml and otel init. It does not cover every route handler, so minor and major bumps on server/ still wait for a human.",
+      "matchFileNames": [
+        "server/package.json"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "automerge": true
     },
     {
       "description": "Group the low-risk tail so the queue stops filling with one-line PRs.",
