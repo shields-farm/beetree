@@ -2,5 +2,101 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "timezone": "America/New_York",
+  "schedule": [
+    "before 6am on monday"
+  ],
+  "minimumReleaseAge": "3 days",
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "rebaseWhen": "conflicted",
+  "platformAutomerge": true,
+  "automergeStrategy": "squash",
+  "osvVulnerabilityAlerts": true,
+  "vulnerabilityAlerts": {
+    "labels": [
+      "security"
+    ]
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true,
+    "schedule": [
+      "before 6am on the first day of the month"
+    ]
+  },
+  "packageRules": [
+    {
+      "description": "Majors always get a human. Dashboard approval first, then a PR to read.",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false,
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "On a 0.x package a minor bump is breaking by semver convention. @a2ui/react and @a2ui/web_core both live here and both drive the chat UI.",
+      "matchCurrentVersion": "/^0\\./",
+      "matchUpdateTypes": [
+        "minor"
+      ],
+      "automerge": false
+    },
+    {
+      "description": "server/ is the production API. Nothing in CI exercises it at runtime, so its dependency tree is read by a human.",
+      "matchFileNames": [
+        "server/package.json"
+      ],
+      "automerge": false
+    },
+    {
+      "description": "Group the low-risk tail so the queue stops filling with one-line PRs.",
+      "matchUpdateTypes": [
+        "patch",
+        "pin",
+        "digest"
+      ],
+      "groupName": "low-risk updates"
+    },
+    {
+      "description": "Patch bumps for anything already at 1.0 or beyond.",
+      "matchCurrentVersion": "!/^0\\./",
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "automerge": true
+    },
+    {
+      "description": "Minor bumps only for dev tooling at 1.0+ — build, test, lint and type packages that never ship to a browser.",
+      "matchDepTypes": [
+        "devDependencies"
+      ],
+      "matchCurrentVersion": "!/^0\\./",
+      "matchUpdateTypes": [
+        "minor"
+      ],
+      "automerge": true
+    },
+    {
+      "description": "Pin and digest churn is mechanical.",
+      "matchUpdateTypes": [
+        "pin",
+        "digest"
+      ],
+      "automerge": true
+    },
+    {
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "github-actions"
+    },
+    {
+      "matchDatasources": [
+        "docker"
+      ],
+      "groupName": "docker-images"
+    }
   ]
 }

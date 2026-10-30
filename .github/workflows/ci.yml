@@ -1,0 +1,70 @@
+# Build and test gate for pull requests.
+#
+# Before this existed the only check on the repo was gitleaks, which meant a
+# dependency bump could reach `main` without anything ever compiling. That is
+# fine while every merge is read by a human and unacceptable the moment Renovate
+# is allowed to merge its own PRs — this workflow is the thing that makes
+# automerge safe rather than reckless.
+#
+# The repo is three npm projects, not one:
+#   /                 React frontend + the server sources (vitest, tsc -b)
+#   server/           the Express API, with its own package-lock.json
+#   training/         exploratory ML scripts, not gated here
+#
+# `server/` deps must be installed before the root test run: `server/db.ts`
+# imports better-sqlite3 from `server/node_modules`, and vitest imports
+# `server/db.ts`. Install only the root tree and four test files fail to collect.
+#
+# better-sqlite3 ships no prebuilt binaries at v13, so `npm ci` compiles it with
+# node-gyp. ubuntu-latest carries python3/make/g++, so that build works, but it
+# is the slow step — budget a couple of minutes.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # Matches the version the app is developed against. Do not drop this to
+          # an older LTS without running the suite first — tsc 7 and vite 8 are
+          # both pinned forward.
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+
+      - name: Install frontend deps
+        run: npm ci
+
+      - name: Install server deps
+        run: npm --prefix server ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
