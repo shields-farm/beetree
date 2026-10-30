@@ -17,7 +17,7 @@ Named after the B-tree, because we thought that was funny.
 | `ml/` | Colony-strength research pipeline (sensor baseline, acoustics, LLM) |
 | `training/` | LoRA fine-tuning and RAG evaluation for the in-app assistant |
 | `e2e/` | Playwright end-to-end tests |
-| `grafana/` | Sensor dashboards and provisioning |
+| `observability/grafana/` | Sensor dashboards and provisioning |
 
 The custom BLE sensor hardware (firmware, enclosure, BOM) is not part of this
 repository.
