@@ -2,10 +2,10 @@
 # export_gguf.sh — merge LoRA adapters into base model, convert to GGUF, quantize, register in Ollama.
 #
 # Usage:
-#   bash training/export_gguf.sh
+#   bash llm-assistant-training/export_gguf.sh
 #
 # Steps:
-#   1. mlx_lm.fuse: merge adapters into gemma-3-4b-it-4bit → training/fused/
+#   1. mlx_lm.fuse: merge adapters into gemma-3-4b-it-4bit → llm-assistant-training/fused/
 #   2. convert_hf_to_gguf.py: HF safetensors → GGUF (via llama.cpp)
 #   3. llama-quantize: FP16 GGUF → Q4_K_M (Pi) + Q5_K_M (Mini)
 #   4. ollama create beetree:4b-lora
@@ -17,11 +17,11 @@ cd "$(dirname "$0")/.."
 
 PY="/Users/developer/.venvs/beetree-train/bin/python"
 BASE="mlx-community/gemma-3-4b-it-4bit"
-ADAPTER="training/adapters"
-FUSED="training/fused"
-GGUF_F16="training/gguf/beetree-4b-lora-f16.gguf"
-GGUF_Q4="training/gguf/beetree-4b-lora-q4_k_m.gguf"
-GGUF_Q5="training/gguf/beetree-4b-lora-q5_k_m.gguf"
+ADAPTER="llm-assistant-training/adapters"
+FUSED="llm-assistant-training/fused"
+GGUF_F16="llm-assistant-training/gguf/beetree-4b-lora-f16.gguf"
+GGUF_Q4="llm-assistant-training/gguf/beetree-4b-lora-q4_k_m.gguf"
+GGUF_Q5="llm-assistant-training/gguf/beetree-4b-lora-q5_k_m.gguf"
 LLAMA_CPP_DIR="${LLAMA_CPP_DIR:-$HOME/src/llama.cpp}"
 
 if [ ! -d "$ADAPTER" ]; then
@@ -37,7 +37,7 @@ $PY -m mlx_lm fuse \
   --de-quantize
 
 echo "[2/4] Converting fused HF model → GGUF (FP16)"
-mkdir -p training/gguf
+mkdir -p llm-assistant-training/gguf
 if [ ! -f "$LLAMA_CPP_DIR/convert_hf_to_gguf.py" ]; then
   echo "[setup] llama.cpp not found at $LLAMA_CPP_DIR — cloning"
   git clone --depth=1 https://github.com/ggml-org/llama.cpp "$LLAMA_CPP_DIR"
@@ -56,7 +56,7 @@ fi
 "$LLAMA_CPP_DIR/build/bin/llama-quantize" "$GGUF_F16" "$GGUF_Q5" Q5_K_M
 
 echo "[4/4] Registering in Ollama"
-cat > training/gguf/Modelfile <<EOF
+cat > llm-assistant-training/gguf/Modelfile <<EOF
 FROM $GGUF_Q5
 TEMPLATE """{{ if .System }}<start_of_turn>system
 {{ .System }}<end_of_turn>
@@ -68,7 +68,7 @@ TEMPLATE """{{ if .System }}<start_of_turn>system
 PARAMETER stop "<start_of_turn>"
 PARAMETER stop "<end_of_turn>"
 EOF
-ollama create beetree:4b-lora -f training/gguf/Modelfile
+ollama create beetree:4b-lora -f llm-assistant-training/gguf/Modelfile
 
 echo ""
 echo "Done. Test:"
