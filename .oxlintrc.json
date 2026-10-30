@@ -18,5 +18,8 @@
         "react/rules-of-hooks": "off"
       }
     }
+  ],
+  "ignorePatterns": [
+    "**/*.bundled.js"
   ]
 }
