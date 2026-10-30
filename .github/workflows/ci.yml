@@ -22,6 +22,11 @@ name: CI
 
 on:
   pull_request:
+  # Manual re-run on any branch. Two reasons this exists: a required check that
+  # only ever ran once is un-rerunnable after a flake, and PRs opened before this
+  # workflow landed have no run at all — the ruleset on main requires `ci`, so
+  # they sit BLOCKED forever without a way to start one.
+  workflow_dispatch:
   push:
     branches: [main]
 
