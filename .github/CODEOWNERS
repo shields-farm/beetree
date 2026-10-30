@@ -1,16 +1,23 @@
 # CODEOWNERS
 #
-# Default owners for every path in this repository. A pull request that touches
-# any path below requires an approving review from at least one listed owner
-# before it can merge to the default branch.
+# Default owners for every path in this repository.
 #
-# Enforcement lives in the repository ruleset "protect-default-branch":
+# Enforcement lives in the repository ruleset "main: require review + ci + gitleaks".
+# What that ruleset actually enforces on the default branch:
 #   - 1 approving review required
-#   - the approval must come from a CODEOWNER
+#   - the approval must come from a CODEOWNER (this file)
 #   - stale approvals are dismissed when new commits are pushed
 #   - the approval must come from someone other than the last pusher
 #   - all review conversations must be resolved
+#   - status checks `ci` and `gitleaks` must pass
 #   - force pushes and branch deletion are blocked
+#
+# Two bypasses exist, both deliberate:
+#   - Repository admin: so an owner can unblock the repo in an emergency.
+#   - The Renovate app: dependency PRs cannot approve themselves, so without this
+#     bypass every Renovate PR would wait on a human forever and automerge would
+#     be dead. Renovate PRs still have to pass `ci` and `gitleaks`; they only
+#     skip the review count.
 #
 # Reviews only count toward CODEOWNER review if the reviewer has write access.
 
