@@ -1,6 +1,6 @@
 [Unit]
 Description=Mentra Live photo receiver -> BeeTree
-Documentation=https://github.com/your-org/beetree/blob/main/pi/README.md
+Documentation=https://github.com/shields-farm/beetree/blob/main/eyewear-receiver/README.md
 After=network-online.target
 Wants=network-online.target
 

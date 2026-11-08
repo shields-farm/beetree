@@ -5,9 +5,9 @@ prepare_dataset.py — Split instructions.jsonl into mlx-lm chat-format train/va
 mlx-lm expects JSONL in chat format:
   {"messages": [{"role": "system", ...}, {"role": "user", ...}, {"role": "assistant", ...}]}
 
-  Input : training/data/instructions.jsonl   (Alpaca style + system + category)
-  Output: training/data/train.jsonl          (~90%)
-          training/data/valid.jsonl          (~10%)
+  Input : llm-assistant-training/data/instructions.jsonl   (Alpaca style + system + category)
+  Output: llm-assistant-training/data/train.jsonl          (~90%)
+          llm-assistant-training/data/valid.jsonl          (~10%)
 """
 
 import json

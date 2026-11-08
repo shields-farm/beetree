@@ -33,7 +33,7 @@ the trigger; this is the destination.
 ## Install
 
 ```bash
-sudo bash pi/install_receiver.sh \
+sudo bash eyewear-receiver/install_receiver.sh \
   --beetree-url https://your-host.your-tailnet.ts.net:8443 \
   --beetree-key <BEETREE_API_KEY> \
   --upload-token <a token you invent>
@@ -95,7 +95,7 @@ made to look like the BeeTree route it forwards to.
 ## Tests
 
 ```bash
-python3 pi/test_mentra_receiver.py
+python3 eyewear-receiver/test_mentra_receiver.py
 ```
 
 32 tests covering multipart parsing (including binary payloads containing

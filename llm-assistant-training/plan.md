@@ -80,9 +80,9 @@ No distillation needed — same 4B LoRA weights:
 
 ## Deliverables
 
-- `training/generate_instructions.py` — extract 1k synthetic examples
-- `training/train_lora.py` — mlx-lm LoRA training loop
-- `training/export_gguf.sh` — merge + quantize + register
+- `llm-assistant-training/generate_instructions.py` — extract 1k synthetic examples
+- `llm-assistant-training/train_lora.py` — mlx-lm LoRA training loop
+- `llm-assistant-training/export_gguf.sh` — merge + quantize + register
 - `README.md` — quickstart guide
 
 ## Success Metrics

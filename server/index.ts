@@ -3018,7 +3018,7 @@ app.get('/api/health', (_req, res) => res.json({ status: 'ok', time: new Date().
 // ============================================================================
 // On-device inference (RAG + LoRA)
 // Proxies to Python inference server on port 3002.
-// Start it: .venvs/beetree-train/bin/python training/inference_server.py
+// Start it: .venvs/beetree-train/bin/python llm-assistant-training/inference_server.py
 // ============================================================================
 const INFER_URL = process.env.BEETREE_INFER_URL || 'http://127.0.0.1:3002';
 
@@ -3044,7 +3044,7 @@ app.post('/api/assist', async (req, res) => {
     if (e.name === 'TimeoutError') {
       return res.status(504).json({ error: 'Inference server timed out (60s). Is the Python inference server running on port 3002?' });
     }
-    res.status(502).json({ error: `Inference server unavailable: ${e.message}. Start it: python training/inference_server.py` });
+    res.status(502).json({ error: `Inference server unavailable: ${e.message}. Start it: python llm-assistant-training/inference_server.py` });
   }
 });
 
