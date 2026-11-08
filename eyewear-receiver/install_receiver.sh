@@ -3,8 +3,8 @@
 #
 # Idempotent: safe to re-run to update the script or the unit file.
 #
-#   sudo bash pi/install_receiver.sh --beetree-url https://your-host.your-tailnet.ts.net:8443 \
-#                                    --beetree-key <KEY> --upload-token <TOKEN>
+#   sudo bash eyewear-receiver/install_receiver.sh --beetree-url https://your-host.your-tailnet.ts.net:8443 \
+#                                                  --beetree-key <KEY> --upload-token <TOKEN>
 #
 # Deliberately does NOT enable or start the service — bring it up yourself after
 # checking the credentials landed correctly.

@@ -3,7 +3,7 @@
 
 Usage:
   python run_lora.py smoke    # 20-iter sanity run
-  python run_lora.py full     # 3 epochs over training/data
+  python run_lora.py full     # 3 epochs over llm-assistant-training/data
   python run_lora.py chat     # quick generation against adapter
 """
 import subprocess

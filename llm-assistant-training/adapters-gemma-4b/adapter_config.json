@@ -1,9 +1,9 @@
 {
-    "adapter_path": "/Users/developer/beetree/training/adapters",
+    "adapter_path": "/Users/developer/beetree/llm-assistant-training/adapters",
     "batch_size": 4,
     "clear_cache_threshold": 0,
     "config": null,
-    "data": "/Users/developer/beetree/training/data",
+    "data": "/Users/developer/beetree/llm-assistant-training/data",
     "fine_tune_type": "lora",
     "grad_accumulation_steps": 1,
     "grad_checkpoint": true,

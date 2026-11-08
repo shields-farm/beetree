@@ -1,6 +1,6 @@
 # BeeTree ML — Training Pipeline
 
-Machine learning pipeline for BeeTree beehive monitoring. Lives under `ml/` in the BeeTree repo.
+Machine learning pipeline for BeeTree beehive monitoring. Lives under `ml-research/` in the BeeTree repo.
 
 ## Phases
 

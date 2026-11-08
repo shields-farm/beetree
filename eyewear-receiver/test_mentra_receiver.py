@@ -2,7 +2,7 @@
 """
 Tests for mentra_receiver.py — run standalone (no pytest needed):
 
-    python3 pi/test_mentra_receiver.py
+    python3 eyewear-receiver/test_mentra_receiver.py
 
 Covers the parts that are easy to get wrong and expensive to debug on a Pi in a
 field: hand-rolled multipart parsing (Python 3.13 has no `cgi` module), magic-byte
