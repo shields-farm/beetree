@@ -28,7 +28,7 @@ const metricReader = new PeriodicExportingMetricReader({
 export const sdk = new NodeSDK({
   serviceName: 'beetree-api',
   traceExporter,
-  metricReader,
+  metricReaders: [metricReader],
   instrumentations: [
     getNodeAutoInstrumentations({
       // Enable Express, HTTP, fs instrumentation; disable others to keep noise down.
