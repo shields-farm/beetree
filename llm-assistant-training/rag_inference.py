@@ -107,9 +107,24 @@ for state in vocab.get("classes", {}).get("Colony", {}).get("inferred_states", [
         "full": {"state": state},
     })
 
-# Common aliases / colloquial names → canonical
-ALIASES = {
-    "murder hornet": "ylh",  # GA context → yellow-legged hornet (Vespa velutina), not northern giant hornet
+# Aliases: DERIVED from the OKF bundle, not hand-maintained here.
+#
+# This used to be a hardcoded dict, and it silently rotted during the OKF v0.2
+# migration: 8 of its 26 entries pointed at ids that do not exist
+# (`small_hive_beetle`, `nosema_ceranae`, `greater_wax_moth`, `chalkbrood_fungus`,
+# `tropilaelaps_clareae`). A dangling alias does not error -- `retrieve()` finds
+# no entry, falls through to keyword search, also finds nothing, and the caller
+# answers from parametric memory instead. The eval then records a PASS, so the
+# bug was invisible while quietly inflating the score and hiding a real
+# retrieval failure. The bundle (`okf/threats/aliases.md`) is the single source
+# of truth and had zero dangling entries.
+#
+# Only aliases that are *regional policy decisions* rather than ontology facts
+# belong below. The murder-hornet mapping is the sole case: in Georgia the
+# relevant hornet is Vespa velutina (yellow-legged), not Vespa mandarinia, and
+# that judgement is not something the bundle should encode.
+LOCAL_ALIASES = {
+    "murder hornet": "ylh",
     "murder hornets": "ylh",
     "yellow legged hornet": "ylh",
     "yellow-legged hornet": "ylh",
@@ -118,32 +133,42 @@ ALIASES = {
     "northern giant hornet": "ngh",
     "asian giant hornet": "ngh",
     "vespa mandarinia": "ngh",
-    "kettlebeetle": "small_hive_beetle",
-    "tropi": "tropilaelaps",
-    "tropilaelaps": "tropilaelaps_clareae",
-    "varroa": "varroa_destructor",
-    "varroa mite": "varroa_destructor",
-    "varroa mites": "varroa_destructor",
-    "foulbrood": "afb",
-    "american foulbrood": "afb",
-    "european foulbrood": "efb",
-    "wax moth": "greater_wax_moth",
-    "wax moths": "wax_moths",
-    "small hive beetle": "small_hive_beetle",
-    "shb": "small_hive_beetle",
-    "hive beetle": "small_hive_beetle",
-    "tracheal mite": "tracheal_mites",
-    "nosema": "nosema_ceranae",
-    "chalkbrood": "chalkbrood_fungus",
 }
+
+ALIASES = {**load_vocab().get("threat_aliases", {}), **LOCAL_ALIASES}
+
+# Fail at import, not at answer time. A dangling alias is a data bug that the
+# eval scores as a success, so it must be impossible to ship one.
+_dangling = {a: c for a, c in ALIASES.items() if c not in {e["id"] for e in INDEX}}
+if _dangling:
+    raise RuntimeError(
+        "dangling threat alias(es) -- target id is not in the index: "
+        + ", ".join(f"{a!r}->{c!r}" for a, c in sorted(_dangling.items()))
+        + ". Fix okf/threats/aliases.md or LOCAL_ALIASES; do not silence this."
+    )
+
 
 STOP_WORDS = {'the','a','an','is','are','of','in','on','my','me','i','see','seeing',
               'looks','look','about','what','how','should','this','that','there',
               'and','or','to','with','for','it','be','at','by','from','some',
               'really','very','quite','bit','kind','sort','type','tell','me',
-              'worry','concerned','question','ask','know','think','guess',
-              'hive','hives','colony','colonies','frame','frames','comb','combs',
-              'brood','bees','bee','cells','cell','capped','uncapped','empty'}
+              'worry','concerned','question','ask','know','think','guess'}
+
+# DOMAIN NOUNS ARE NOT STOP WORDS.
+#
+# This list used to also strip: hive, hives, colony, colonies, frame, frames,
+# comb, combs, brood, bees, bee, cells, cell, capped, uncapped, empty.
+#
+# The reasoning was presumably that those words occur in almost every query, so
+# they carry no discriminative signal. That is exactly backwards for this
+# ontology: they are the terms that separate burr_comb from cross_comb from
+# brace_comb, and solid_capped from spotty. Stripping them collapsed queries to
+# nothing -- "How often should I rotate my brood comb?" reduced to
+# {often, rotate} and matched zero entries, while the answer sat in the bundle.
+#
+# A term that appears in EVERY query is harmless: it contributes equally to all
+# candidates and cannot reorder them. A term that appears in SOME queries is the
+# signal. Never strip a domain noun to reduce noise; strip function words only.
 
 def retrieve(query: str, top_k: int = 5) -> list:
     """Keyword-based retrieval over the ontology index."""
