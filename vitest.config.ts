@@ -18,7 +18,19 @@ export default defineConfig({
     include: ['src/**/*.{test,spec}.{ts,tsx}', 'server/**/*.{test,spec}.{ts,tsx}'],
     // `server/node_modules` is a separate install; without the glob it
     // collects third-party test files from inside it.
-    exclude: ['**/node_modules/**', 'dist/**', 'e2e/**'],
+    //
+    // `node_modules_link` is a SYMLINK to `server/node_modules`. The
+    // `**/node_modules/**` glob matches on the directory NAME, so it never
+    // excluded the link: vitest walked through it, collected pg-protocol's own
+    // .test.ts files, and died with `ReferenceError: describe is not defined`
+    // because those run under ts-jest, not vitest. That made the test hook fail
+    // on EVERY commit in this repo regardless of what changed.
+    exclude: [
+      '**/node_modules/**',
+      '**/node_modules_link/**',
+      'dist/**',
+      'e2e/**',
+    ],
     // Point every worker at its own throwaway DB + media dir before server/db.ts
     // is imported. Without this the suite runs migrations against the live
     // database, and parallel workers race each other applying them.
