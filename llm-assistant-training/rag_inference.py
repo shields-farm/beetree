@@ -13,15 +13,13 @@ Usage:
 import json
 import re
 import sys
-import yaml
 from pathlib import Path
 
-# ─── Load ontology ───
-HERE = Path(__file__).resolve().parent
-VOCAB_PATH = HERE.parent / "server" / "ontology" / "beetree-vocab.yaml"
+from okf_vocab import load_vocab
 
-with open(VOCAB_PATH) as f:
-    vocab = yaml.safe_load(f)
+# ─── Load ontology (OKF v0.2 bundle; replaced beetree-vocab.yaml) ───
+HERE = Path(__file__).resolve().parent
+vocab = load_vocab(HERE.parent / "okf")
 
 # ─── Build retrieval index ───
 INDEX = []
@@ -221,12 +219,14 @@ ASSISTANT:"""
 def generate_mlx(prompt: str, max_tokens: int = 512) -> str:
     """Generate via MLX with LoRA adapter."""
     import subprocess
-    PY = "/Users/developer/.venvs/beetree-train/bin/python"
+    sys.path.insert(0, str(HERE))
+    from _common import venv_python
+    PY = venv_python()
     code = f'''
 import sys
 sys.path.insert(0, "{HERE}")
 from mlx_lm import load, generate
-model, tokenizer = load("mlx-community/gemma-3-4b-it-4bit", adapter_path="{HERE}/adapters")
+model, tokenizer = load("mlx-community/gemma-3-text-12b-it-4bit", adapter_path="{HERE}/adapters")
 response = generate(model, tokenizer, prompt={repr(prompt)}, max_tokens={max_tokens}, verbose=False)
 print(response)
 '''

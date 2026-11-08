@@ -1,6 +1,8 @@
 // server/ontology.ts — ontology persistence + lookups for Beetree.
 //
-// Single source of truth: server/ontology/beetree-vocab.yaml (js-yaml).
+// Single source of truth: the Open Knowledge Format v0.2 bundle at <repo>/okf/
+// (read by server/okf.ts). The legacy server/ontology/beetree-vocab.yaml is
+// retired — OKF is the canonical form.
 // On boot we:
 //   1. load the vocab
 //   2. create the onto_* tables if missing (idempotent DDL)
@@ -14,67 +16,15 @@
 //   - Federated sharing needs shared vocabulary — typed entities, not vibes.
 
 import { db, genId, now } from './db.js';
-import { readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-// @ts-ignore — js-yaml has own types
-import * as yaml from 'js-yaml';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const VOCAB_PATH = join(__dirname, 'ontology', 'beetree-vocab.yaml');
+// The vocabulary is defined and loaded by okf-vocab.ts, which has no database
+// dependency; re-exported here so existing importers keep working unchanged.
+import { loadVocab, type Vocab } from './okf-vocab.js';
+export { loadVocab, buildVocab, VOCAB_DIR } from './okf-vocab.js';
+export type {
+  Vocab, VocabClass, VocabRelation, VocabIndication, VocabInferenceCue, ThreatSpeciesSeed,
+} from './okf-vocab.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-export interface VocabClass {
-  extends?: string;
-  parent_of?: string[];
-  description?: string;
-  inferred_states?: string[];
-  headed_by?: string[];
-  events?: string[];
-  observed_via?: string[];
-  phase?: { enum?: string[] };
-  kind?: { enum?: string[] };
-  vector_of?: string[];
-}
-export interface VocabRelation { inverse?: string; }
-export interface ThreatSpeciesSeed {
-  id: string; name: string; scientific?: string;
-  kind: 'pest'|'parasite'|'disease'|'commensal';
-  vectors?: string[]; vectored_by?: string[];
-  notifiable?: boolean; notes?: string;
-}
-export interface VocabIndication {
-  state: string;
-  confidence?: number;
-  reason?: string;
-}
-/** One observation → candidate states, with the operational notes attached. */
-export interface VocabInferenceCue {
-  description?: string;
-  indicates?: VocabIndication[];
-  notes?: string;
-  /** comb_inference only: brood-cycle age band. */
-  age_cycles?: number | string;
-  /** comb_inference only: what to do about it. */
-  action?: string;
-}
-export interface Vocab {
-  name: string; version: string; schema_version: string;
-  classes: Record<string, VocabClass>;
-  relations: Record<string, VocabRelation>;
-  season_phase_inference: Record<string, { months: number[]; mean_temp_band_c?: [number, number] }>;
-  // Differential-diagnosis blocks. These are the knowledge the onto_* tools do
-  // NOT carry, and they are what server/inference.ts reads to turn a frame
-  // observation into ranked, checked candidates.
-  brood_inference?: Record<string, VocabInferenceCue>;
-  comb_inference?: Record<string, VocabInferenceCue>;
-  queen_inference?: Record<string, VocabInferenceCue>;
-  varroa_inference?: Record<string, VocabInferenceCue>;
-  deadout_inference?: Record<string, Record<string, unknown>>;
-  threat_aliases: Record<string, string>;
-  threat_species: ThreatSpeciesSeed[];
-  undefined_behavior: Record<string, string>;
-}
 export interface OntoEntity {
   entity_id: string; entity_type: string; name: string|null;
   properties: Record<string, unknown>; source_table?: string|null; source_id?: string|null;
@@ -82,13 +32,6 @@ export interface OntoEntity {
 export interface OntoRelationRow {
   entity_id: string; subject_id: string; predicate: string; object_id: string;
   confidence: number; evidence: string[];
-}
-
-let vocabCache: Vocab | null = null;
-
-export function loadVocab(): Vocab {
-  if (!vocabCache) vocabCache = (yaml.load(readFileSync(VOCAB_PATH, 'utf8')) as Vocab);
-  return vocabCache;
 }
 
 // ─── Table creation (idempotent; mirrors 006_ontology.sql) ──────────────────

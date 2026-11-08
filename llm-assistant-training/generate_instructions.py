@@ -14,7 +14,7 @@ Categories:
   6. undefined_behavior (~110) — unknown pest/predicate → checkpoint behavior
 
 Usage:
-  python3 generate_instructions.py [--db PATH] [--vocab PATH] [--out PATH]
+  python3 generate_instructions.py [--db PATH] [--bundle PATH] [--out PATH]
 """
 
 import argparse
@@ -24,13 +24,14 @@ import sqlite3
 import sys
 from pathlib import Path
 
-import yaml
+from okf_vocab import load_vocab
 
 random.seed(42)
 
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_DB = REPO / "data" / "beetree.db"
-DEFAULT_VOCAB = REPO / "server" / "ontology" / "beetree-vocab.yaml"
+# The vocabulary is an OKF v0.2 bundle now, not a YAML file.
+DEFAULT_BUNDLE = REPO / "okf"
 DEFAULT_OUT = Path(__file__).resolve().parent / "data" / "instructions.jsonl"
 
 MONTH_NAMES = [
@@ -43,11 +44,6 @@ SYSTEM_PREFIX = (
     "typed ontology of the beekeeper's yard. Answer using ontology vocabulary "
     "and cite confidence when a state is inferred rather than observed."
 )
-
-
-def load_vocab(path: Path) -> dict:
-    with open(path) as f:
-        return yaml.safe_load(f)
 
 
 def q1(conn, sql, *args):
@@ -1029,11 +1025,11 @@ def gen_deadout_forensics(vocab: dict) -> list:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--db", type=Path, default=DEFAULT_DB)
-    ap.add_argument("--vocab", type=Path, default=DEFAULT_VOCAB)
+    ap.add_argument("--bundle", type=Path, default=DEFAULT_BUNDLE)
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
     args = ap.parse_args()
 
-    vocab = load_vocab(args.vocab)
+    vocab = load_vocab(args.bundle)
     conn = sqlite3.connect(str(args.db))
 
     buckets = [

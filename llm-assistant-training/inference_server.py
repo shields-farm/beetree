@@ -12,19 +12,18 @@ Runs on port 3002 — BeeTree's Express server proxies to it.
 import json
 import re
 import sys
-import yaml
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 
+from okf_vocab import load_vocab
+
 HERE = Path(__file__).resolve().parent
-VOCAB_PATH = HERE.parent / "server" / "ontology" / "beetree-vocab.yaml"
 MODEL = "mlx-community/gemma-3-text-12b-it-4bit"
 ADAPTER = str(HERE / "adapters")
 
-# ─── Load ontology ───
-with open(VOCAB_PATH) as f:
-    vocab = yaml.safe_load(f)
+# ─── Load ontology (OKF v0.2 bundle; replaced beetree-vocab.yaml) ───
+vocab = load_vocab(HERE.parent / "okf")
 
 # ─── Build retrieval index ───
 INDEX = []

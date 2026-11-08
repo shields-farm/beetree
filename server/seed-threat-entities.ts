@@ -1,7 +1,7 @@
 // server/seed-threat-entities.ts — materialize ThreatSpecies entities into the
 // ontology graph from the vocab catalog.
 //
-// Why: the catalog (onto_threat_species) is seeded on boot from beetree-vocab.yaml,
+// Why: the catalog (onto_threat_species) is seeded on boot from the `okf/` bundle,
 // but the *graph* layer (onto_entity) is not — so the World tab threat catalog and
 // every graph traversal silently drop species that have no entity row. As of
 // 2026-09-12 only 19 of 33 species had entity rows.
