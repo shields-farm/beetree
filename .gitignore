@@ -88,3 +88,7 @@ data/*.sqlite3
 data/*.db
 data/*.db-wal
 data/*.db-shm
+
+# Slack bridge tokens (never commit)
+integrations/slack/.env
+integrations/slack/bridge.log
