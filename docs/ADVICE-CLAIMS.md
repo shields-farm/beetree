@@ -80,6 +80,50 @@ npm run grade:advice -- --claim claim-abc123   # one claim, ignoring due state
 A provider outage does not poison the ledger: the claims stay `open` and the
 next run picks them up.
 
+## Coverage audit
+
+```bash
+npm run audit:advice
+# or point at a copy
+npm run audit:advice -- --db /path/to/beetree-copy.db
+```
+
+The report separates assistant messages that look actionable/predictive from
+those whose persisted tool log contains a successful `record_advice_claim` call.
+It also reports ledger totals, grades, chat linkage, and the ten most recent
+review gaps. The message matcher is deliberately a heuristic review queue, not a
+claim that every matched response needed a prediction.
+
+Buzz chat responses now include an `adviceClaims` receipt array whenever that
+turn recorded claims. The production system prompt explicitly requires
+predictive advice to call `record_advice_claim` before the final response, while
+exempting definitions and purely mechanical reminders.
+
+## Capture and human-override API
+
+All routes use the normal BeeTree bearer authentication.
+
+- `GET /api/advice/coverage` — coverage report plus the accuracy summary
+- `GET /api/advice/claims?status=open&hiveId=hive-1` — ledger entries
+- `POST /api/advice/claims` — manual or proactive-lane capture. Accepts the
+  `CreateClaimInput` fields; `source` defaults to `manual` and must be one of
+  `buzz-chat`, `briefing`, `weekly-review`, `post-inspection`, `manual`.
+- `POST /api/advice/claims/:id/grade` — append a human verdict. Requires `grade`
+  and a non-empty `reason`; records `grader=human:local` and preserves prior
+  grades in `advice_claim_grades`.
+
+Example observation claim and override:
+
+```bash
+curl -s http://127.0.0.1:3001/api/advice/claims \
+  -H "Authorization: Bearer $BEETREE_API_KEY" -H 'Content-Type: application/json' \
+  -d '{"source":"post-inspection","advice":"Recheck for eggs in 14 days","claim":"Eggs are observed at the next inspection","metric":"observation","predicate":"observed","windowEnd":"2026-11-23T00:00:00.000Z","confidence":0.6}'
+
+curl -s http://127.0.0.1:3001/api/advice/claims/CLAIM_ID/grade \
+  -H "Authorization: Bearer $BEETREE_API_KEY" -H 'Content-Type: application/json' \
+  -d '{"grade":"confirmed","reason":"Eggs seen during the follow-up inspection"}'
+```
+
 ### The scheduled run
 
 Both schedulers call `scripts/run-advice-grader.sh`, which sources

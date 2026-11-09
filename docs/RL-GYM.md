@@ -112,6 +112,8 @@ replay horizon is masked as unverifiable.
 
 - Telemetry is the only automated outcome label in v1. Real inspections, human
   corrections, action acceptance, and `advice_claim_grades` are the next dataset.
+  Track capture with `npm run audit:advice`; authenticated ledger and human-grade
+  routes are documented in `docs/ADVICE-CLAIMS.md`.
 - A confirmed forecast is not a causal effect estimate. Do not turn this reward
   into a claim that BeeTree advice improved colony survival.
 - Tasks lack `createdAt`, so pruning future-dated tasks is conservative. Hive

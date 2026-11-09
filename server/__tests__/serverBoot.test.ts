@@ -148,4 +148,42 @@ describe('server boots against a fresh database', () => {
     const r = await fetch(`${base}/api/hives`);
     expect([401, 403]).toContain(r.status);
   });
+
+  it('captures and human-grades an advice claim over HTTP', async () => {
+    const headers = { Authorization: `Bearer ${API_KEY}`, 'Content-Type': 'application/json' };
+    const created = await fetch(`${base}/api/advice/claims`, {
+      method: 'POST', headers,
+      body: JSON.stringify({
+        source: 'manual',
+        advice: 'Inspect for a queenright colony.',
+        claim: 'Eggs are observed at the next inspection',
+        metric: 'observation', predicate: 'observed',
+        windowEnd: '2027-01-01T00:00:00.000Z',
+        confidence: 0.6,
+      }),
+    });
+    expect(created.status).toBe(201);
+    const claim = await created.json();
+
+    const graded = await fetch(`${base}/api/advice/claims/${claim.id}/grade`, {
+      method: 'POST', headers,
+      body: JSON.stringify({ grade: 'confirmed', reason: 'Boot smoke human override' }),
+    });
+    expect(graded.status).toBe(200);
+    const after = await graded.json();
+    expect(after.grade).toBe('confirmed');
+    expect(after.gradeBasis).toBe('human');
+
+    const listed = await fetch(`${base}/api/advice/claims`, { headers });
+    expect(listed.status).toBe(200);
+    const listBody = await listed.json();
+    expect(listBody.items).toHaveLength(1);
+    expect(listBody.accuracy.confirmed).toBe(1);
+
+    const coverage = await fetch(`${base}/api/advice/coverage`, { headers });
+    expect(coverage.status).toBe(200);
+    const coverageBody = await coverage.json();
+    expect(coverageBody.claims.total).toBe(1);
+    expect(coverageBody.claims.graded).toBe(1);
+  });
 });

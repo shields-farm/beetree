@@ -2458,6 +2458,11 @@ app.post('/api/vision/reconstruct', async (req, res) => {
 // mid-conversation for grounded, real-time data.
 // ============================================================================
 import { buzzToolSchemas, dispatchBuzzTool } from './buzzTools.js';
+import {
+  accuracySummary, createClaim, getClaim, listClaims, recordGrade,
+  type ClaimGrade, type ClaimStatus,
+} from './adviceClaims.js';
+import { adviceCoverage } from './adviceCoverage.js';
 import { getAllWeightTrends, getWeightTrend as getWeightTrendForHive } from './weightTracking.js';
 import { getAllFeedingStatuses, getFeedingStatus, recordFeeding, getAllFeedingEvents } from './feeding.js';
 import { syrupTypeForSeason } from './weightTracking.js';
@@ -2679,7 +2684,8 @@ ${personaReference}
 You are answering as Buzz in the BeeTree app. The user is Mark, a beekeeper in Georgia.
 Use the date and season above to give temporally-aware advice. Do NOT ask what time of year it is — you already know.
 Reference the current forage forecast, weather, and sensor data when relevant. Be specific about what "it's time to" do THIS month.
-You also have access to BeeTree API tools (inspection schedule, swarm risk, weather, forage, treatments, queen status, etc.) — use them to get fresh data when you need it.`;
+You also have access to BeeTree API tools (inspection schedule, swarm risk, weather, forage, treatments, queen status, etc.) — use them to get fresh data when you need it.
+When your advice predicts an observable outcome, call record_advice_claim BEFORE the final response. Keep the claim falsifiable, choose a realistic outcome window, and state confidence. Do not manufacture a claim for definitions, casual conversation, or a purely mechanical reminder with no prediction.`;
 }
 
 app.post('/api/chat', async (req, res) => {
@@ -2728,6 +2734,7 @@ app.post('/api/chat', async (req, res) => {
     let assistantContent = '';
     let toolRounds = 0;
     const toolCallLog: { name: string; args: string; result: string }[] = [];
+    const recordedAdviceClaimIds: string[] = [];
     let thinkingLog = '';
 
     // Agentic loop: call Hermes → if tool_calls, dispatch and feed back → repeat
@@ -2844,6 +2851,15 @@ app.post('/api/chat', async (req, res) => {
           });
 
           const toolResult = await dispatchBuzzTool(toolName, toolArgs);
+
+          if (toolName === 'record_advice_claim') {
+            try {
+              const parsed = JSON.parse(toolResult);
+              if (parsed?.ok === true && typeof parsed.claimId === 'string') {
+                recordedAdviceClaimIds.push(parsed.claimId);
+              }
+            } catch { /* the tool's visible error remains in toolCallLog */ }
+          }
 
           // Log for frontend display
           toolCallLog.push({
@@ -3043,9 +3059,22 @@ app.post('/api/chat', async (req, res) => {
       }
     }
 
+    const responseAdviceClaims = recordedAdviceClaimIds
+      .map(id => getClaim(id))
+      .filter((claim): claim is NonNullable<ReturnType<typeof getClaim>> => claim != null)
+      .map(claim => ({
+        id: claim.id,
+        claim: claim.claim,
+        metric: claim.metric,
+        windowEnd: claim.windowEnd,
+        confidence: claim.confidence,
+        status: claim.status,
+      }));
+
     res.json({
       content: assistantContent,
       model: HERMES_MODEL,
+      adviceClaims: responseAdviceClaims.length > 0 ? responseAdviceClaims : undefined,
       toolCalls: toolCallDetails.length > 0 ? toolCallDetails : undefined,
       thinking: (thinkingLog as string) || undefined,
       a2uiMessages: a2uiMessages.length > 0 ? a2uiMessages : undefined,
@@ -3070,6 +3099,69 @@ app.post('/api/chat', async (req, res) => {
     console.error('[chat] error:', e);
     res.status(500).json({ error: e instanceof Error ? e.message : 'chat failed' });
   }
+});
+
+// ============================================================================
+// Advice outcome ledger — coverage, manual/proactive capture, human verdicts
+// ============================================================================
+const ADVICE_SOURCES = new Set(['buzz-chat', 'briefing', 'weekly-review', 'post-inspection', 'manual']);
+const CLAIM_GRADES = new Set(['confirmed', 'refuted', 'partial', 'unverifiable']);
+const CLAIM_STATUSES = new Set(['open', 'graded', 'void']);
+
+app.get('/api/advice/coverage', (_req, res) => {
+  res.json({ ...adviceCoverage(db), accuracy: accuracySummary() });
+});
+
+app.get('/api/advice/claims', (req, res) => {
+  const status = req.query.status ? String(req.query.status) : undefined;
+  const grade = req.query.grade ? String(req.query.grade) : undefined;
+  if (status && !CLAIM_STATUSES.has(status)) return res.status(400).json({ error: 'invalid status' });
+  if (grade && !CLAIM_GRADES.has(grade)) return res.status(400).json({ error: 'invalid grade' });
+  const items = listClaims({
+    status: status as ClaimStatus | undefined,
+    grade: grade as ClaimGrade | undefined,
+    hiveId: req.query.hiveId ? String(req.query.hiveId) : undefined,
+    source: req.query.source ? String(req.query.source) : undefined,
+    limit: req.query.limit ? Number(req.query.limit) : 50,
+    offset: req.query.offset ? Number(req.query.offset) : 0,
+  });
+  res.json({ items, accuracy: accuracySummary() });
+});
+
+app.post('/api/advice/claims', (req, res) => {
+  try {
+    const body = req.body || {};
+    const source = body.source ?? 'manual';
+    if (!ADVICE_SOURCES.has(source)) return res.status(400).json({ error: 'invalid advice source' });
+    if (body.hiveId) {
+      const hive = db.prepare(
+        'SELECT name FROM hives WHERE entity_id = ? AND superseded_by IS NULL',
+      ).get(String(body.hiveId)) as { name: string } | undefined;
+      if (!hive) return res.status(404).json({ error: `unknown hiveId: ${body.hiveId}` });
+      body.hiveName = hive.name;
+    }
+    const claim = createClaim({ ...body, source });
+    res.status(201).json(claim);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : 'claim rejected' });
+  }
+});
+
+app.post('/api/advice/claims/:id/grade', (req, res) => {
+  const claim = getClaim(req.params.id);
+  if (!claim) return res.status(404).json({ error: 'claim not found' });
+  const grade = String(req.body?.grade ?? '');
+  const reason = String(req.body?.reason ?? '').trim();
+  if (!CLAIM_GRADES.has(grade)) return res.status(400).json({ error: 'invalid grade' });
+  if (!reason) return res.status(400).json({ error: 'a human override needs a reason' });
+  recordGrade({
+    claimId: claim.id,
+    grader: 'human:local',
+    grade: grade as ClaimGrade,
+    reason,
+    observed: { source: 'human-override', previousGrade: claim.grade },
+  });
+  res.json(getClaim(claim.id));
 });
 
 // ============================================================================
