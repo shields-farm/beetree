@@ -17,6 +17,7 @@ import { recordFeeding, getFeedingStatus, getAllFeedingStatuses } from './feedin
 import { syrupTypeForSeason } from './weightTracking.js';
 import { ontologyToolSchemas, dispatchOntologyTool } from './ontologyTools.js';
 import { calibrationReport } from './calibration.js';
+import { createClaim, accuracySummary } from './adviceClaims.js';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Tool schemas (OpenAI function-calling format)
@@ -213,6 +214,67 @@ export const buzzToolSchemas = [...ontologyToolSchemas,
   {
     type: 'function' as const,
     function: {
+      name: 'record_advice_claim',
+      description: `Record a falsifiable claim so BeeTree can later check whether the advice was right. Call this whenever you give advice that predicts something observable — an alert, a recommendation, a diagnosis with a follow-up. Do NOT call it for general conversation, definitions, or questions that make no prediction.
+
+The claim must be checkable by machine or by the next inspection. Pick the metric and predicate:
+- temperature / humidity / battery: predicate lt, gt, or between, with threshold (and threshold2 for between)
+- weight: predicate lt, gt, or between against hive weight in lb at the next inspection
+- inspection / observation: predicate observed or absent, for things only an inspection can confirm (e.g. "queen cells will appear", "the spotty brood is varroa, not a failing queen")
+
+windowEnd is the date by which the prediction can be judged — not when you want it checked, but when the outcome is settled. Examples: "temp comes back under 95F" → windowEnd 7 days out, metric temperature, predicate lt, threshold 95, unit F. "colony will be queenright" → windowEnd 14 days out, metric observation, predicate observed.
+
+Be specific enough that a grader can be wrong. "Hive looks fine" is not a claim.`,
+      parameters: {
+        type: 'object',
+        properties: {
+          hiveId: { type: 'string', description: 'Hive entity ID. Omit only for apiary-level advice.' },
+          advice: { type: 'string', description: 'What you told the beekeeper, verbatim or near-verbatim' },
+          claim: { type: 'string', description: 'The prediction in one falsifiable sentence' },
+          metric: {
+            type: 'string',
+            enum: ['temperature', 'humidity', 'weight', 'battery', 'inspection', 'observation'],
+            description: 'Which record settles the claim',
+          },
+          predicate: {
+            type: 'string',
+            enum: ['lt', 'gt', 'between', 'observed', 'absent'],
+            description: 'How the value is tested',
+          },
+          threshold: { type: 'number', description: 'Numeric bound (required for lt/gt/between)' },
+          threshold2: { type: 'number', description: 'Upper bound, for predicate between' },
+          unit: { type: 'string', description: 'F, %, lb, V' },
+          basis: {
+            type: 'string',
+            enum: ['final', 'majority', 'any', 'all'],
+            description: 'How the window is reduced: final = last reading, majority = most readings, any = at least one, all = every reading',
+          },
+          windowEnd: { type: 'string', description: 'ISO timestamp by which the outcome is settled' },
+          toleranceDays: { type: 'integer', description: 'Days of grace after windowEnd for telemetry lag (default 1)' },
+          confidence: { type: 'number', description: 'Your confidence 0..1. Used to check calibration — do not inflate.' },
+          rationale: { type: 'string', description: 'Why you believe it. For the human reading the ledger; never shown to the grader.' },
+          taskId: { type: 'string', description: 'Task entity ID, if you created one alongside this advice' },
+        },
+        required: ['claim', 'advice', 'metric', 'windowEnd'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'get_advice_accuracy',
+      description: 'How often BeeTree advice has been confirmed by reality: counts by verdict plus a calibration curve (confidence stated vs outcome). Use when asked how reliable the advice is, or when you want to temper a recommendation that resembles past refuted calls.',
+      parameters: {
+        type: 'object',
+        properties: {
+          since: { type: 'string', description: 'Optional ISO date; default is all time' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
       name: 'get_weight_trends',
       description: 'Get hive weight trend analysis for all hives (or a specific hive). Returns current weight, trend (gaining/stable/declining), rate per week, seasonal threshold, and alerts if below minimum. Use when asked about hive weight, stores, or starvation risk.',
       parameters: {
@@ -282,6 +344,10 @@ export const buzzToolSchemas = [...ontologyToolSchemas,
 const TOOL_CACHE_TTL_MS = 60_000;
 const toolCache = new Map<string, { value: string; expires: number }>();
 
+// NOT cacheable, deliberately:
+//   record_advice_claim — a write; caching it would silently drop a prediction
+//   get_advice_accuracy — its answer changes every time the grader runs, so a
+//                         cached number would misreport how reliable advice is
 const CACHEABLE_TOOLS = new Set([
   'get_hives', 'get_sensors', 'get_tasks', 'get_inspection_schedule',
   'get_swarm_risk', 'get_outlier_report', 'get_health_trends',
@@ -419,6 +485,58 @@ async function _dispatchBuzzToolInner(
           'INSERT INTO tasks (id, entity_id, version, superseded_by, superseded_at, hiveId, title, dueDate, priority, completed) VALUES (?, ?, 1, NULL, NULL, ?, ?, ?, ?, 0)',
         ).run(rowId, entityId, hiveId, title, dueDate ?? null, priority ?? 'medium');
         return JSON.stringify({ ok: true, taskId: entityId, title, hiveId, dueDate, priority });
+      }
+
+      case 'record_advice_claim': {
+        const {
+          hiveId, advice, claim, metric, predicate, threshold, threshold2,
+          unit, basis, windowEnd, toleranceDays, confidence, rationale, taskId,
+        } = args;
+
+        // Resolve the hive name once so the ledger is readable without a join.
+        let hiveName: string | null = null;
+        if (hiveId) {
+          const hive = db.prepare(
+            'SELECT name FROM hives WHERE entity_id = ? AND superseded_by IS NULL',
+          ).get(hiveId) as { name: string } | undefined;
+          if (!hive) return JSON.stringify({ error: `unknown hiveId: ${hiveId}` });
+          hiveName = hive.name;
+        }
+
+        try {
+          const stored = createClaim({
+            hiveId: hiveId ?? null,
+            hiveName,
+            source: 'buzz-chat',
+            taskId: taskId ?? null,
+            advice, claim, metric,
+            predicate,
+            threshold: threshold ?? null,
+            threshold2: threshold2 ?? null,
+            unit: unit ?? null,
+            basis,
+            windowEnd,
+            toleranceDays,
+            confidence: confidence ?? null,
+            rationale: rationale ?? null,
+          });
+          return JSON.stringify({
+            ok: true,
+            claimId: stored.id,
+            gradedAfter: stored.windowEnd,
+            metric: stored.metric,
+            predicate: stored.predicate,
+            basis: stored.basis,
+          });
+        } catch (e) {
+          // Validation failures go back to the model as tool errors so it can
+          // fix the claim in the same turn rather than silently dropping it.
+          return JSON.stringify({ error: e instanceof Error ? e.message : 'claim rejected' });
+        }
+      }
+
+      case 'get_advice_accuracy': {
+        return JSON.stringify(accuracySummary(args.since ?? undefined));
       }
 
       case 'get_weight_trends': {
