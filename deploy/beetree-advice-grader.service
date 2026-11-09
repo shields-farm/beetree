@@ -1,0 +1,20 @@
+[Unit]
+Description=BeeTree advice grader — grade claims whose test window has closed
+Documentation=file:/opt/beetree/docs/ADVICE-CLAIMS.md
+# The server owns the database; grading only needs it to exist and be quiescent
+# enough to write a verdict. Wants (not Requires) so a grader run can never stop
+# the server.
+Wants=network-online.target
+After=network-online.target beetree.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/beetree
+ExecStart=/opt/beetree/scripts/run-advice-grader.sh
+# One batch can call the model for up to 8 observation claims per batch; a slow
+# provider plus backoff should never hang the unit past this.
+TimeoutStartSec=10min
+# A provider outage prints an error and exits non-zero. That is expected and
+# self-healing: claims stay 'open' and the next run picks them up. Marking the
+# unit failed would page a human about a problem that fixes itself.
+SuccessExitStatus=0

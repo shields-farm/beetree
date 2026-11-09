@@ -80,6 +80,33 @@ npm run grade:advice -- --claim claim-abc123   # one claim, ignoring due state
 A provider outage does not poison the ledger: the claims stay `open` and the
 next run picks them up.
 
+### The scheduled run
+
+Both schedulers call `scripts/run-advice-grader.sh`, which sources
+`server/.env` and invokes the grader — one invocation to keep correct.
+
+- **Pi (production):** `deploy/beetree-advice-grader.service` +
+  `.timer`. 03:15 local, `RandomizedDelaySec=15m` so the field does not all
+  wake at the same minute, `Persistent=true` so a Pi that was off grades on the
+  next boot rather than skipping a night.
+  ```
+  sudo cp deploy/beetree-advice-grader.{service,timer} /etc/systemd/system/
+  sudo systemctl daemon-reload && sudo systemctl enable --now beetree-advice-grader.timer
+  systemctl list-timers beetree-advice-grader.timer
+  ```
+- **Mac (dev box):** `deploy/com.beebeetree.grader.plist`, same 03:15 slot.
+  ```
+  cp deploy/com.beebeetree.grader.plist ~/Library/LaunchAgents/
+  launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.beebeetree.grader.plist
+  launchctl kickstart -p gui/$(id -u)/com.beebeetree.grader   # run once now
+  ```
+  Agents in `~/Library/LaunchAgents` are also picked up at the next login.
+
+Concurrency: the grader is a second writer on the same SQLite file, so
+`server/db.ts` sets `busy_timeout = 5000`. Without it the default timeout is 0
+and a grading run that lands while the server is writing fails immediately with
+"database is locked" — which reads as a grader bug and is not one.
+
 ## Known data issue
 
 Telemetry device ids live in two formats — `sensors.deviceId` is `47:12:C8`,

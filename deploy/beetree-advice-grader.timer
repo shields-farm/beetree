@@ -1,0 +1,19 @@
+[Unit]
+Description=Nightly BeeTree advice grading
+
+[Timer]
+# 03:15 local. Late enough that the day's inspections and telemetry have landed,
+# early enough that a beekeeper who opens the app at breakfast sees fresh verdicts.
+OnCalendar=*-*-* 03:15:00
+# Spread customers out. Every Pi in the field waking at the same minute would
+# not hurt us — each one bills its owner's API key — but it produces identical
+# traffic spikes at whatever model provider they chose, and the point of the
+# product is that it is quiet when nothing needs attention.
+RandomizedDelaySec=15m
+# A Pi that was off at 03:15 grades on the next boot instead of skipping a night.
+# The grader is idempotent and window_end is an absolute date, so a late run is
+# correct, not stale.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

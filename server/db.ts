@@ -18,6 +18,16 @@ mkdirSync(dirname(DB_PATH), { recursive: true });
 export const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
+// Wait for a competing writer instead of failing instantly.
+//
+// SQLite's default busy timeout is 0, so a second process writing to this file
+// gets SQLITE_BUSY immediately rather than waiting the few milliseconds the
+// other writer needs. That matters as soon as anything runs alongside the
+// server — the advice grader is a separate process on a timer, and it writes
+// verdicts into the same database. Without this, a nightly grading run against
+// a busy server would fail with "database is locked" and look like a bug in the
+// grader.
+db.pragma('busy_timeout = 5000');
 
 // ---------------------------------------------------------------------------
 // Migrations — run before schema init
