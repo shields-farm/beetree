@@ -113,6 +113,35 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Request logger
+//
+// Logs on completion, not on entry: a line that only says a request arrived
+// cannot answer "did it work?". That gap is why a failed BeeTree call left no
+// trace in this log — the path was recorded, the outcome never was.
+//
+// Mounted BEFORE the rate limiter and the auth guard on purpose. Both of those
+// can reject a request outright, and a 401 or a 429 is indistinguishable from
+// "the app did nothing" to a beekeeper staring at a spinner. Behind the guards,
+// those rejections were never logged at all.
+//
+// 'close' without 'finish' means the client gave up before the response ended,
+// which is precisely the shape of "the app failed to respond". Those are logged
+// as ABORTED so a hang is visible instead of silent.
+app.use((req, res, next) => {
+  const startedAt = Date.now();
+  let logged = false;
+  const writeLine = (outcome: string) => {
+    if (logged) return;
+    logged = true;
+    console.log(
+      `${new Date().toISOString()} ${req.method} ${req.originalUrl} ${outcome} ${Date.now() - startedAt}ms`,
+    );
+  };
+  res.on('finish', () => writeLine(String(res.statusCode)));
+  res.on('close', () => writeLine(res.writableFinished ? String(res.statusCode) : 'ABORTED'));
+  next();
+});
+
 // Simple rate limiting (in-memory, per-IP, 100 requests per minute).
 // Overridable so a browser test suite loading many routes in parallel doesn't
 // trip the limiter and report app failures that are really harness throttling.
@@ -177,11 +206,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Request logger
-app.use((req, _res, next) => {
-  console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
-  next();
-});
+// Request logger is mounted above, before the rate limiter and auth guard.
 
 // ============================================================================
 // OpenTelemetry: request duration histogram middleware
