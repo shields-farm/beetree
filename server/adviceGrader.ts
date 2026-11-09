@@ -23,7 +23,7 @@
 //   npx tsx server/adviceGrader.ts --claim claim-abc123
 
 import { pathToFileURL } from 'node:url';
-import { db, now } from './db.js';
+import { db, now, type BeetreeDb } from './db.js';
 import {
   dueClaims, getClaim, recordGrade, NUMERIC_METRICS,
   type AdviceClaim, type ClaimGrade,
@@ -71,16 +71,16 @@ function normalizeDeviceId(id: string): string {
   return id.replace(/:/g, '').toLowerCase();
 }
 
-function deviceIdsForHive(hiveId: string): string[] {
+function deviceIdsForHive(database: BeetreeDb, hiveId: string): string[] {
   const ids = new Set<string>();
 
-  for (const r of db.prepare(
+  for (const r of database.prepare(
     'SELECT DISTINCT deviceId FROM sensors WHERE hiveId = ? AND superseded_by IS NULL',
   ).all(hiveId) as { deviceId: string }[]) {
     if (r.deviceId) ids.add(normalizeDeviceId(r.deviceId));
   }
 
-  const hive = db.prepare(
+  const hive = database.prepare(
     'SELECT sensorIds FROM hives WHERE entity_id = ? AND superseded_by IS NULL',
   ).get(hiveId) as { sensorIds: string } | undefined;
 
@@ -92,7 +92,7 @@ function deviceIdsForHive(hiveId: string): string[] {
 
     if (entityIds.length > 0) {
       const placeholders = entityIds.map(() => '?').join(',');
-      for (const r of db.prepare(
+      for (const r of database.prepare(
         `SELECT DISTINCT deviceId FROM sensors WHERE entity_id IN (${placeholders}) AND superseded_by IS NULL`,
       ).all(...entityIds) as { deviceId: string }[]) {
         if (r.deviceId) ids.add(normalizeDeviceId(r.deviceId));
@@ -164,12 +164,12 @@ function summarize(
 }
 
 /** Telemetry-window statistics for a numeric claim. */
-function telemetryStats(claim: AdviceClaim): WindowStats {
+function telemetryStats(database: BeetreeDb, claim: AdviceClaim): WindowStats {
   const column = METRIC_COLUMN[claim.metric];
   if (!column || !claim.hiveId) {
     return { readings: 0, first: null, last: null, min: null, max: null, avg: null, maxGapHours: 0, holdRate: null, lastHolds: null, source: 'none' };
   }
-  const devices = deviceIdsForHive(claim.hiveId);
+  const devices = deviceIdsForHive(database, claim.hiveId);
   if (devices.length === 0) {
     return { readings: 0, first: null, last: null, min: null, max: null, avg: null, maxGapHours: 0, holdRate: null, lastHolds: null, source: 'no-device' };
   }
@@ -177,7 +177,7 @@ function telemetryStats(claim: AdviceClaim): WindowStats {
   // Normalize on both sides: sensors store '47:12:C8', telemetry stores
   // '4712c8'. Comparing raw values returns zero rows and grades everything
   // 'unverifiable' — the failure is silent, so do it in SQL.
-  const rows = db.prepare(`
+  const rows = database.prepare(`
     SELECT time, ${column} AS value
       FROM telemetry_cache
      WHERE lower(replace(deviceId, ':', '')) IN (${placeholders})
@@ -189,11 +189,11 @@ function telemetryStats(claim: AdviceClaim): WindowStats {
 }
 
 /** Inspection-weight statistics — weight is recorded per inspection, not per packet. */
-function weightStats(claim: AdviceClaim): WindowStats {
+function weightStats(database: BeetreeDb, claim: AdviceClaim): WindowStats {
   if (!claim.hiveId) {
     return { readings: 0, first: null, last: null, min: null, max: null, avg: null, maxGapHours: 0, holdRate: null, lastHolds: null, source: 'none' };
   }
-  const rows = db.prepare(`
+  const rows = database.prepare(`
     SELECT date AS time, hiveWeight AS value
       FROM inspections
      WHERE hiveId = ? AND superseded_by IS NULL
@@ -292,10 +292,17 @@ function fmt(v: number | null): string {
   return Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1);
 }
 
-/** Grade a numeric claim with no model call. */
-export function gradeNumeric(claim: AdviceClaim): Verdict {
-  const stats = claim.metric === 'weight' ? weightStats(claim) : telemetryStats(claim);
+/** Grade a numeric claim against any BeeTree DB snapshot with no model call. */
+export function gradeNumericWith(database: BeetreeDb, claim: AdviceClaim): Verdict {
+  const stats = claim.metric === 'weight'
+    ? weightStats(database, claim)
+    : telemetryStats(database, claim);
   return verdictFromStats(claim, stats);
+}
+
+/** Grade a numeric claim against the running app's DB with no model call. */
+export function gradeNumeric(claim: AdviceClaim): Verdict {
+  return gradeNumericWith(db, claim);
 }
 
 // ─── Observation grading (batched model call) ───────────────────────────────
@@ -355,7 +362,7 @@ function observationEvidence(claim: AdviceClaim): EvidencePacket {
       `).all(claim.hiveId, claim.windowStart, claim.windowEnd) as { title: string }[]).map((t) => t.title)
     : [];
 
-  const stats = telemetryStats({ ...claim, metric: 'temperature', predicate: 'lt', threshold: 0 });
+  const stats = telemetryStats(db, { ...claim, metric: 'temperature', predicate: 'lt', threshold: 0 });
 
   return {
     claimId: claim.id,

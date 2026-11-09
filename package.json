@@ -19,7 +19,10 @@
     "verify:build": "npm run build && node scripts/verify-app.mjs",
     "test:all": "npm run test && npm run test:e2e",
     "grade:advice": "tsx server/adviceGrader.ts",
-    "grade:advice:dry": "tsx server/adviceGrader.ts --dry-run"
+    "grade:advice:dry": "tsx server/adviceGrader.ts --dry-run",
+    "rl:build": "node scripts/run-rl-gym.mjs build",
+    "rl:run": "node scripts/run-rl-gym.mjs run",
+    "rl:report": "node scripts/run-rl-gym.mjs report"
   },
   "dependencies": {
     "@a2ui/react": "^0.14.0",

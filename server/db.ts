@@ -16,6 +16,8 @@ const DB_PATH = process.env.BEETREE_DB
 mkdirSync(dirname(DB_PATH), { recursive: true });
 
 export const db = new Database(DB_PATH);
+/** Structural type for replay/eval paths that grade against a separate DB copy. */
+export type BeetreeDb = typeof db;
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 // Wait for a competing writer instead of failing instantly.
