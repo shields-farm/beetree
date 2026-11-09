@@ -44,6 +44,7 @@ initSchema();
 
 // Ontology: structured world-model (threat catalog, colony graph, season frames)
 import { initOntology } from './ontology.js';
+import { isTransientStorageFault, STORAGE_FAULT_MESSAGE } from './upstreamFaults.js';
 const ontoBoot = initOntology();
 console.log(`[ontology] boot: seeded ${ontoBoot.catalog.seeded} species, ${ontoBoot.catalog.aliases} aliases; ${ontoBoot.vocab.name}@${ontoBoot.vocab.version}`);
 
@@ -2763,26 +2764,49 @@ app.post('/api/chat', async (req, res) => {
           console.error(`[chat] Hermes API error (attempt ${attempt + 1}/${MAX_API_RETRIES}):`, hermesResp.status, txt.slice(0, 200));
 
           // Retry on 5xx (transient upstream failures); don't retry on 4xx (client errors)
-          if (hermesResp.status < 500) break;
+          // — except a storage fault, which is upstream state and worth retrying
+          // even when it is dressed as a client error.
+          if (hermesResp.status < 500 && !isTransientStorageFault(txt)) break;
         } catch (e: any) {
           lastError = e instanceof Error ? e.message : 'fetch failed';
           console.error(`[chat] Hermes API fetch error (attempt ${attempt + 1}/${MAX_API_RETRIES}):`, lastError);
         }
 
-        // Exponential backoff: 1s, 2s, 4s
+        // Exponential backoff: 1s, 2s, 4s. A storage fault backs off longer — the
+        // other holder needs time to release the WAL generation, which is not a
+        // network blip and does not clear in one second.
         if (attempt < MAX_API_RETRIES - 1) {
-          await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
+          const base = isTransientStorageFault(lastError) ? 3000 : 1000;
+          await new Promise(r => setTimeout(r, base * Math.pow(2, attempt)));
         }
       }
 
       if (!hermesResp || !hermesResp.ok) {
-        return res.status(503).json({ error: `Buzz backend unavailable after ${MAX_API_RETRIES} attempts: ${lastError}` });
+        // The technical detail belongs in the log, not in the beekeeper's chat.
+        const storage = isTransientStorageFault(lastError);
+        return res.status(503).json({
+          error: storage
+            ? STORAGE_FAULT_MESSAGE
+            : 'The assistant is unavailable right now. Try again in a moment.',
+          code: storage ? 'upstream_storage_fault' : 'upstream_unavailable',
+          retryable: true,
+        });
       }
 
       const data = await hermesResp.json() as any;
       const choice = data.choices?.[0];
       if (!choice) {
-        return res.status(500).json({ error: 'Hermes returned no choices' });
+        // A 200 with no choices is the storage-fault shape: the gateway answers,
+        // then cannot read the session it was about to write.
+        console.error('[chat] Hermes returned no choices:', JSON.stringify(data).slice(0, 400));
+        const storage = isTransientStorageFault(JSON.stringify(data));
+        return res.status(503).json({
+          error: storage
+            ? STORAGE_FAULT_MESSAGE
+            : 'The assistant returned an unexpected response. Try again in a moment.',
+          code: storage ? 'upstream_storage_fault' : 'upstream_bad_response',
+          retryable: true,
+        });
       }
 
       const msg = choice.message;
@@ -2847,6 +2871,19 @@ app.post('/api/chat', async (req, res) => {
 
       // No tool calls — this is the final text response
       assistantContent = msg.content ?? '';
+
+      // The fault can arrive as the model's own message. Rendering it would put a
+      // stack trace in the beekeeper's chat and, worse, persist it as if the
+      // assistant had said it. Treat it as the outage it is.
+      if (isTransientStorageFault(assistantContent)) {
+        console.error('[chat] upstream storage fault surfaced as content:', assistantContent.slice(0, 300));
+        return res.status(503).json({
+          error: STORAGE_FAULT_MESSAGE,
+          code: 'upstream_storage_fault',
+          retryable: true,
+        });
+      }
+
       if (!assistantContent) {
         return res.status(500).json({ error: 'Hermes returned empty response' });
       }
