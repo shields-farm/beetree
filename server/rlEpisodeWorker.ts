@@ -9,6 +9,7 @@
 
 import Database from 'better-sqlite3';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import {
   gradeClaimsForTask, nullPolicy, rulesPolicy, scoreEpisode,
   type RlAction, type RlEpisodeResult, type RlTask, type RlToolCall,
@@ -28,6 +29,33 @@ const ALLOWED_TOOLS = new Set([
   'onto_current_season', 'onto_list_threats', 'onto_lookup_pest',
   'onto_lookup_species_detail', 'onto_get_graph', 'onto_current_state',
 ]);
+
+export const REPLAY_REQUIRED_TOOLS = ['record_advice_claim', 'get_hives'] as const;
+
+/**
+ * PREFLIGHT. 2026-11-10: three replay episodes produced inspect/wait decisions
+ * with zero recorded claims, because the model could not reach
+ * record_advice_claim at all -- the tool was not in the exposed schema set.
+ *
+ * An episode that returns a confident decision while physically unable to record
+ * a falsifiable claim is not a low score, it is an invalid measurement. Fail
+ * before spending a model call rather than grading an empty ledger.
+ *
+ * Exported so the invariant has a test; this must stay independent of the DB and
+ * the model endpoint.
+ */
+export function assertRequiredTools(tools: any[]): void {
+  const missing = REPLAY_REQUIRED_TOOLS.filter(
+    n => !tools.some(t => t.function?.name === n),
+  );
+  if (missing.length > 0) {
+    throw new Error(
+      `replay preflight failed: required tool(s) not exposed to the model: ${missing.join(', ')}. ` +
+      `Exposed ${tools.length} schemas. Refusing to score an episode that cannot record a claim. ` +
+      `Fix the tool schema registration rather than the prompt.`,
+    );
+  }
+}
 
 function requiredEnv(name: string): string {
   const value = process.env[name];
@@ -142,6 +170,7 @@ async function main(): Promise<void> {
     const url = process.env.HERMES_API_URL ?? 'http://127.0.0.1:8642/v1/chat/completions';
     const key = process.env.HERMES_API_KEY ?? 'dev-hermes-api-key-replace-me';
     const tools = (buzzToolSchemas as any[]).filter(s => ALLOWED_TOOLS.has(s.function.name));
+    assertRequiredTools(tools);
     const system = `You are Buzz, BeeTree's beekeeping advisor, inside a historical replay evaluation.
 The current time is ${task.cutoff}. The acting database contains no records after that time.
 Use the available BeeTree tools when they would improve the decision. Live weather is deliberately unavailable because it cannot be replayed from this snapshot.
@@ -210,18 +239,29 @@ Do not put claims in the JSON; the replay scorer reads them from the tool ledger
   db.close();
 }
 
-main().catch(error => {
-  const resultPath = process.env.BEETREE_RL_RESULT_PATH;
-  const taskPath = process.env.BEETREE_RL_TASK_PATH;
-  if (resultPath) {
-    let taskId = 'unknown';
-    try { if (taskPath) taskId = (JSON.parse(readFileSync(taskPath, 'utf8')) as RlTask).id; } catch { /* retain unknown */ }
-    writeFileSync(resultPath, JSON.stringify({
-      taskId,
-      policy: process.env.BEETREE_RL_POLICY ?? 'unknown',
-      error: error instanceof Error ? error.message : String(error),
-    }, null, 2) + '\n');
-  }
-  console.error('[rlEpisode] failed:', error);
-  process.exit(1);
-});
+// Run the worker only when this file is the process entry point. Before this
+// guard, importing the module (e.g. from a unit test of assertRequiredTools)
+// executed main(), failed on missing env vars, and called process.exit(1) --
+// which Vitest reported as an unhandled rejection in an unrelated test file.
+const isDirectRun = Boolean(
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href,
+);
+
+if (isDirectRun) {
+  main().catch(error => {
+    const resultPath = process.env.BEETREE_RL_RESULT_PATH;
+    const taskPath = process.env.BEETREE_RL_TASK_PATH;
+    if (resultPath) {
+      let taskId = 'unknown';
+      try { if (taskPath) taskId = (JSON.parse(readFileSync(taskPath, 'utf8')) as RlTask).id; } catch { /* retain unknown */ }
+      writeFileSync(resultPath, JSON.stringify({
+        taskId,
+        policy: process.env.BEETREE_RL_POLICY ?? 'unknown',
+        error: error instanceof Error ? error.message : String(error),
+      }, null, 2) + '\n');
+    }
+    console.error('[rlEpisode] failed:', error);
+    process.exit(1);
+  });
+}
