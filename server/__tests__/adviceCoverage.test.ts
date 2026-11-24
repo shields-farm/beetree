@@ -47,7 +47,7 @@ describe('adviceCoverage', () => {
     createClaim({
       source: 'buzz-chat', chatMessageId: 'm-covered',
       advice: 'Check ventilation', claim: 'Temperature falls below 99F',
-      metric: 'observation', windowEnd: '2026-11-16T12:00:00.000Z',
+      metric: 'observation', windowStart: '2026-11-09T12:00:00.000Z', windowEnd: '2026-11-16T12:00:00.000Z',
     });
 
     const report = adviceCoverage(db, NOW);
