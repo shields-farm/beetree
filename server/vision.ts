@@ -1,8 +1,9 @@
 // server/vision.ts — Frame photo → structured analysis via Ollama vision API
-// Uses kimi-k2.7-code:cloud on local Ollama for vision-capable inference.
+// Default: kimi-k3.1-pro:cloud on local Ollama for vision-capable inference.
+// Override with VISION_MODEL / VISION_URL (e.g. point at DeepSeek for a cross-check).
 
-const VISION_URL = 'http://localhost:11434/v1/chat/completions';
-const VISION_MODEL = 'kimi-k2.7-code:cloud';
+const VISION_URL = process.env.VISION_URL ?? 'http://localhost:11434/v1/chat/completions';
+const VISION_MODEL = process.env.VISION_MODEL ?? 'kimi-k3.1-pro:cloud';
 
 /** Structured result of analyzing a frame photo. */
 export interface FrameAnalysisDisease {
